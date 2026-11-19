@@ -46,10 +46,12 @@ Open:
 
 ## Online copy on Railway (optional)
 
-The demo never needs the internet. For an optional hosted copy, Railway reads
-`railway.json` and runs `python scripts/cloud_start.py` (backend on `$PORT` plus the
+The demo never needs the internet. For an optional hosted copy, Railway uses the
+settings in `.railway/railway.py` and runs `python scripts/cloud_start.py` (backend on `$PORT` plus the
 simulators, synthetic data only). Set `WATTWISE_DB=/data/wattwise.db` with a volume
 at `/data` to keep the database. Steps in Arabic: `docs/deploy/railway_ar.md`.
+To change those settings: `pip install railway-sdk`, edit the file, then
+`railway config plan` (preview) and `railway config apply`.
 
 ## AI planner (optional)
 

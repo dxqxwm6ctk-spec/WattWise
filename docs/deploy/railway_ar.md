@@ -6,7 +6,8 @@
 
 ## شو اللي بصير على Railway؟
 
-- Railway بقرأ الملف `railway.json` من المستودع، وبشغّل الأمر `python scripts/cloud_start.py`.
+- إعدادات Railway موجودة بالملف `.railway/railway.py` (بدل `railway.json` القديم اللي Railway وقّف يقرأه بـ 1/12/2026)، وRailway بشغّل الأمر `python scripts/cloud_start.py`.
+- إذا بدك تغيّر الإعدادات: `pip install railway-sdk`، عدّل الملف، بعدين `railway config plan` (بتشوف شو رح يتغيّر بدون ما يتغيّر شي) وبعدها `railway config apply`.
 - هذا السكربت بشغّل السيرفر (FastAPI) على البورت اللي بعطيه Railway (`PORT`)،
   وبعدين بشغّل المحاكي (البيت + المبنى ١٠ غرف) عشان اللوحة يكون فيها بيانات **مصطنعة** حيّة.
 - Railway بفحص `/api/health`، وإذا السيرفر وقع بعيد تشغيله.
@@ -17,7 +18,7 @@
 1. افتح https://railway.com واعمل حساب، والأسهل تدخل بـ **Login with GitHub**.
 2. اضغط **New Project** ← **Deploy from GitHub repo**.
    إذا طلب صلاحية، اسمحله يشوف المستودع `WattWise` بس.
-3. اختار `WattWise`. Railway رح يبلّش يبني لحاله (بشوف `requirements.txt` و`railway.json`).
+3. اختار `WattWise`. Railway رح يبلّش يبني لحاله (بشوف `requirements.txt`).
    البناء أول مرة بوخذ تقريباً ٣ لـ ٥ دقايق.
 4. **خلّي قاعدة البيانات ما تنمسح** (منصوح فيه):
    - جوّا المشروع على Railway، كبسة يمين على الخدمة ← **Attach Volume** (أو من **+ Create** ← Volume).
