@@ -1,0 +1,415 @@
+/* WattWise dashboard: polls the backend every second and renders the design. */
+
+const { esc, fmt } = WW;
+const $ = id => document.getElementById(id);
+
+const SITE_SCALE = { home: { maxW: 4000, unit: 'kW' }, lab: { maxW: 200, unit: 'W' } };
+const scale = SITE_SCALE[WW.site] || SITE_SCALE.home;
+const ui = { confirmId: null, goalText: 'خلّي فاتورة هالشهر تحت 30 دينار بدون ما تزعّج حدا بالبيت', goalTarget: '30' };
+let st = null;
+let chart = null;
+
+const powerStr = w => scale.unit === 'kW' ? fmt((w || 0) / 1000, 2) : fmt(w, 0);
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast.h);
+  toast.h = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ---------------- sections ----------------
+
+function toolbar() {
+  const sim = st.source === 'simulator';
+  const other = WW.site === 'home'
+    ? '<a class="tb link" href="index.html?site=lab">← وضع المختبر</a>'
+    : '<a class="tb link" href="index.html?site=home">← وضع البيت</a>';
+  const scen = sim ? `
+    <button class="tb" data-act="scenario" data-name="bedroom_empty_window">١ · غرفة النوم فاضية والشباك مفتوح</button>
+    <select class="tb ghost" id="scenario-pick" aria-label="سيناريوهات المحاكي">
+      <option value="">سيناريوهات ثانية…</option>
+      <option value="heat_wave">موجة حر</option>
+      <option value="holiday">عطلة (البيت فاضي)</option>
+      <option value="sensor_fault">عطل حسّاسات</option>
+      <option value="normal">رجّع طبيعي</option>
+    </select>` : '';
+  return `${other}${scen}
+    <button class="tb ghost" data-act="reset">إعادة الضبط</button>
+    <button class="tb stop" data-act="estop">إيقاف طوارئ</button>`;
+}
+
+function hero() {
+  const w = st.meter.power_w || 0;
+  const g = WW.gauge(w, scale.maxW);
+  const ticks = Array.from({ length: 41 }, (_, i) => {
+    const major = i % 10 === 0, mid = i % 5 === 0;
+    const lit = i / 40 <= g.frac;
+    const color = lit ? (major ? '#ECEBE4' : '#8E8C82') : (major ? '#5E5C55' : '#33352D');
+    return `<div style="position:absolute;left:150px;top:150px;width:${major ? 2 : 1}px;height:${major ? 14 : mid ? 10 : 6}px;background:${color};transform-origin:0 0;transform:rotate(${-90 + i * 4.5}deg) translate(-50%,-118px)"></div>`;
+  }).join('');
+  const labels = [0, 1, 2, 3, 4].map(k => {
+    const th = (-90 + k * 45) * Math.PI / 180;
+    const t = scale.unit === 'kW' ? k * scale.maxW / 4000 : k * scale.maxW / 4;
+    return `<span style="position:absolute;left:${(150 + 94 * Math.sin(th)).toFixed(1)}px;top:${(150 - 94 * Math.cos(th)).toFixed(1)}px;transform:translate(-50%,-50%);font-family:var(--mono);font-size:11px;color:#6F6D64">${t}</span>`;
+  }).join('');
+  const odo = WW.odometer(st.meter.energy_kwh).map((d, i) => `
+    <div style="width:34px;height:48px;overflow:hidden;border-radius:6px;background:${i === 5 ? '#3A1712' : '#16170F'};box-shadow:inset 0 10px 10px -6px rgba(0,0,0,0.7), inset 0 -10px 10px -6px rgba(0,0,0,0.7)">
+      <div style="display:flex;flex-direction:column;transform:translateY(${-d * 48}px);transition:transform .9s cubic-bezier(.45,.05,.2,1)">
+        ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<span style="height:48px;display:grid;place-items:center;font-family:var(--mono);font-size:26px;font-weight:500;color:${i === 5 ? '#FF8A70' : '#ECEBE4'}">${n}</span>`).join('')}
+      </div>
+    </div>`).join('');
+  const v = st.meter.voltage_v, a = st.meter.current_a, f = st.meter.freq_hz;
+  const mini = [
+    { label: 'الجهد', v: fmt(v, 1) + ' V', pct: v ? (v - 200) / 50 * 100 : 0 },
+    { label: 'التيار', v: fmt(a, 2) + ' A', pct: a ? Math.min(100, a / 20 * 100) : 0 },
+    { label: 'التردد', v: fmt(f, 2) + ' Hz', pct: f ? 50 : 0 },
+  ].map(m => `
+    <div style="padding:10px;border-radius:12px;background:#181A15;display:flex;flex-direction:column;gap:6px">
+      <span style="font-size:11px;color:#8E8C82">${m.label}</span>
+      <span style="font-family:var(--mono);font-size:15px" dir="ltr">${m.v}</span>
+      <div style="height:3px;border-radius:2px;background:#23251F;overflow:hidden"><div style="height:100%;width:${m.pct.toFixed(0)}%;background:#B8F04A;transition:width 1s cubic-bezier(.34,1.3,.64,1)"></div></div>
+    </div>`).join('');
+
+  const roomMax = scale.maxW * 0.6;
+  const bars = st.rooms.map(r => {
+    const val = r.power_w, hot = r.waste;
+    const color = hot ? '#F2B544' : val > 0 ? '#B8F04A' : '#3A3C33';
+    const base = hot ? '#5A4518' : val > 0 ? '#2E3A1C' : '#23251F';
+    const label = val >= 1000 ? (val / 1000).toFixed(2) + 'k' : String(val);
+    const h = Math.max(1.5, Math.min(100, val / roomMax * 100)).toFixed(1);
+    return `
+      <div style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px">
+        <span style="font-family:var(--mono);font-size:11px;color:${color};transition:color .6s" dir="ltr">${label}</span>
+        <div style="width:100%;max-width:38px;height:${h}%;min-height:3px;border-radius:8px 8px 2px 2px;background:linear-gradient(to top,${base},${color});transition:height 1.1s cubic-bezier(.34,1.35,.64,1), background .6s;position:relative">
+          <div style="position:absolute;inset:-6px -4px auto -4px;height:10px;border-radius:50%;background:${color};filter:blur(8px);animation:ww-glow 2.4s ease-in-out infinite"></div>
+        </div>
+      </div>`;
+  }).join('');
+  const names = st.rooms.map(r => `<span style="flex:1;min-width:0;text-align:center;font-size:11px;color:#8E8C82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</span>`).join('');
+
+  return `
+    <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:6px;align-items:center">
+      <div class="label" style="align-self:stretch;display:flex;justify-content:space-between"><span>LIVE LOAD</span><span>الحمل الآن</span></div>
+      <div style="position:relative;width:300px;height:190px">
+        <div style="position:absolute;left:60px;top:60px;width:180px;height:180px;border-radius:50%;background:${g.color};filter:blur(60px);opacity:.18;transition:background .8s"></div>
+        <svg width="300" height="170" viewBox="0 0 300 170" style="position:absolute;inset:0;overflow:visible">
+          <path d="M 20 150 A 130 130 0 0 1 280 150" fill="none" stroke="#23251F" stroke-width="14" stroke-linecap="round"></path>
+          <path d="M 20 150 A 130 130 0 0 1 280 150" fill="none" stroke="${g.color}" stroke-width="14" stroke-linecap="round" stroke-dasharray="408.4" stroke-dashoffset="${(408.4 * (1 - g.frac)).toFixed(1)}" style="transition:stroke-dashoffset 1.1s cubic-bezier(.34,1.25,.64,1), stroke .8s"></path>
+        </svg>
+        ${ticks}${labels}
+        <div style="position:absolute;left:148.5px;top:42px;width:3px;height:108px;border-radius:2px;background:linear-gradient(to top,#ECEBE4,${g.color});transform-origin:50% 100%;transform:rotate(${g.needleDeg}deg);transition:transform 1.1s cubic-bezier(.34,1.45,.64,1)"></div>
+        <div style="position:absolute;left:140px;top:140px;width:20px;height:20px;border-radius:50%;background:#0C0D0A;border:3px solid #ECEBE4"></div>
+        <div style="position:absolute;left:0;right:0;top:162px;display:flex;justify-content:center;align-items:baseline;gap:6px" dir="ltr">
+          <span style="font-family:var(--mono);font-size:26px;font-weight:500">${powerStr(w)}</span><span style="font-family:var(--mono);font-size:12px;color:#8E8C82">${scale.unit}</span>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:14px;justify-content:center">
+      <div class="label" style="display:flex;justify-content:space-between"><span>METER</span><span>عدّاد الشهر</span></div>
+      <div style="display:flex;justify-content:center;gap:4px;padding:12px;border-radius:14px;background:#0A0B08;border:1px solid #2A2C25;box-shadow:inset 0 6px 14px rgba(0,0,0,0.6)" dir="ltr">
+        ${odo}<span style="align-self:flex-end;font-family:var(--mono);font-size:12px;color:#6F6D64;padding:0 0 4px 6px">kWh</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">${mini}</div>
+    </div>
+    <div style="flex:1.3 1 320px;min-width:0;display:flex;flex-direction:column;gap:10px">
+      <div class="label" style="display:flex;justify-content:space-between"><span>BY ROOM</span><span>مين عم يسحب هلأ</span></div>
+      <div style="flex:1;min-height:190px;display:flex;align-items:flex-end;gap:10px;padding-top:8px;border-bottom:1px solid #2A2C25">${bars}</div>
+      <div style="display:flex;gap:10px">${names}</div>
+    </div>`;
+}
+
+function goal() {
+  const ag = WW.agentLabel(st);
+  const steps = WW.goalSteps(st).map(s => `
+    <div style="display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;border:1px solid ${s.border};background:${s.bg}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-family:var(--mono);font-size:12px;color:${s.color}">${s.n}</span>
+        <span style="font-size:11px;color:${s.color}">${s.tag}</span>
+      </div>
+      <div style="font-size:13.5px;line-height:1.45;color:${s.text}">${esc(s.label)}</div>
+    </div>`).join('');
+  let body;
+  if (st.goal) {
+    const t = st.goal.bill_target_jd;
+    body = `<div style="font-size:clamp(20px,2.2vw,28px);font-weight:600;line-height:1.45;text-wrap:pretty">«${esc(st.goal.text)}»</div>
+      ${t ? `<div class="muted">سقف الفاتورة: <span style="color:#B8F04A" class="mono">${fmt(t)} JD</span></div>` : ''}
+      <div><button class="tb ghost" data-act="clear-goal" style="height:30px;font-size:12px">تغيير الهدف</button></div>`;
+  } else {
+    body = `<div class="muted">أعطِ الوكيل هدف (مش سؤال)، وهو بيقسّمه لخطوات لحاله:</div>
+      <div class="goal-form">
+        <input class="text" id="goal-text" value="${esc(ui.goalText)}" aria-label="نص الهدف">
+        <label class="muted" style="display:flex;align-items:center;gap:6px">سقف الفاتورة
+          <input class="num" id="goal-target" type="number" min="1" value="${esc(ui.goalTarget)}" dir="ltr"> JD</label>
+        <button class="btn-lime" data-act="set-goal">أعطِ الوكيل الهدف</button>
+      </div>`;
+  }
+  return `
+    <div class="head">
+      <div class="label">GOAL · ${WW.site === 'home' ? 'هدف العيلة' : 'هدف المختبر'}</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:${ag.color}"><span style="width:8px;height:8px;border-radius:50%;background:${ag.color}"></span>${ag.label}</div>
+    </div>
+    ${body}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">${steps}</div>`;
+}
+
+function roomsMap() {
+  const cards = st.rooms.map(r => {
+    const hot = r.waste;
+    const devs = st.devices.filter(d => d.room === r.id).map(d => `
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <span style="width:7px;height:7px;border-radius:50%;background:${d.is_on ? '#B8F04A' : '#4A4C44'};flex:none"></span>
+        <span style="color:${d.is_on ? '#ECEBE4' : '#6F6D64'}">${esc(d.name)}</span>
+        <span style="margin-inline-start:auto;font-family:var(--mono);font-size:11px;color:${d.tier === 'T2' ? '#E8553F' : '#6F6D64'}">${d.tier}</span>
+      </div>`).join('');
+    const occ = r.occupied === null ? '—' : r.occupied ? 'مشغولة' : 'فاضية';
+    const contact = WW.site === 'lab' ? 'باب' : 'شباك';
+    const win = r.window_open === null ? '' : `<span style="font-size:11.5px;padding:3px 9px;border-radius:10px;background:#1E201B;color:${r.window_open ? '#F2B544' : '#8E8C82'}">${contact} ${r.window_open ? 'مفتوح' : 'مسكّر'} · محاكى</span>`;
+    return `
+      <div style="border-radius:16px;border:1px solid ${hot ? '#5A4518' : '#23251F'};background:${hot ? '#1E1A10' : '#181A15'};padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+          <span style="font-size:16px;font-weight:600">${esc(r.name)}</span>
+          <span style="font-family:var(--mono);font-size:15px;color:${hot ? '#F2B544' : '#ECEBE4'}" dir="ltr">${r.power_w}W</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <span style="font-size:11.5px;padding:3px 9px;border-radius:10px;background:#1E201B;color:${r.occupied === false ? '#F2B544' : '#ECEBE4'}">${occ}</span>
+          <span style="font-size:11.5px;padding:3px 9px;border-radius:10px;background:#1E201B;color:#D9D7CF" dir="ltr">${fmt(r.temp_c, 1)}°</span>
+          ${win}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">${devs}</div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="head">
+      <div class="label">${WW.site === 'home' ? 'HOME MAP · غرف البيت' : 'LAB · غرفة المختبر'}</div>
+      <div style="font-size:11px;color:#6F6D64">إشغال مشغول/فاضي فقط، بلا كاميرات وبلا تتبّع أشخاص</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${cards}</div>`;
+}
+
+function devicesGrid() {
+  const onCount = st.devices.filter(d => d.is_on).length;
+  const confirmDev = st.devices.find(d => d.id === ui.confirmId);
+  const confirm = confirmDev ? `
+    <div style="border-radius:14px;border:1px solid #5A4518;background:#1E1A10;padding:16px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
+      <div style="flex:1 1 300px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#F2B544">متأكد بدك تطفي ${esc(confirmDev.name)}؟</span>
+        <span style="font-size:13px;line-height:1.6;color:#D9D7CF">تطبيق الموافقة على الهاتف رح ينقطع، والوكيل بيدخل الوضع الآمن: ما بيطلب موافقة وما بينفّذ ولا إجراء لحد ما يرجع الاتصال.</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button data-act="confirm-cancel" class="tb ghost" style="height:40px">لا، خلّيه</button>
+        <button data-act="confirm-off" data-id="${esc(confirmDev.id)}" style="height:40px;white-space:nowrap;padding:0 16px;border-radius:10px;border:none;background:#F2B544;color:#0C0D0A;font-size:14px;font-weight:600;cursor:pointer">طفّيه</button>
+      </div>
+    </div>` : '';
+  const learning = st.learn ? `<div style="border-radius:14px;border:1px dashed #4C6A20;background:#151A0F;padding:12px 16px;font-size:13px;color:#D9D7CF">عم تضيف جهاز جديد من تطبيق الهاتف ← كمّل الخطوات هناك. العدّاد هون رح يبيّن بصمته وقت القياس.</div>` : '';
+  const cards = st.devices.map(d => {
+    const on = d.is_on, locked = d.tier === 'T2';
+    const state = locked ? 'محمي · دايمًا شغّال' : on ? 'شغّال' : 'مطفي';
+    const note = (d.added ? 'جديد · ' : '') + (locked ? 'T2 · ممنوع بالكود' : d.sensitive ? 'حساس · بيقطع تطبيق الموافقة' : !d.allow ? 'يدوي فقط · الوكيل ما بيقترح' : 'T1 · تحكم يدوي')
+      + (d.agent_off ? ' · طفاه الوكيل بموافقتك' : '');
+    const ac = d.kind === 'ac' && d.setpoint != null ? `
+      <div style="display:flex;align-items:center;gap:4px" dir="ltr">
+        <button data-act="setpoint" data-id="${esc(d.id)}" data-delta="-1" style="width:28px;height:28px;border-radius:8px;border:1px solid #3A3C33;background:transparent;color:#ECEBE4;cursor:pointer;font-size:15px">−</button>
+        <span style="font-family:var(--mono);font-size:13px;min-width:32px;text-align:center">${fmt(d.setpoint)}°</span>
+        <button data-act="setpoint" data-id="${esc(d.id)}" data-delta="1" style="width:28px;height:28px;border-radius:8px;border:1px solid #3A3C33;background:transparent;color:#ECEBE4;cursor:pointer;font-size:15px">+</button>
+      </div>` : '';
+    return `
+      <div style="border-radius:14px;border:1px solid ${locked ? '#3A2A26' : on ? '#2E3A1C' : '#23251F'};background:#181A15;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+            <span style="font-size:14.5px;font-weight:600">${esc(d.name)}</span>
+            <span style="font-size:11.5px;color:#8E8C82">${esc(d.room_name)} · ${state}</span>
+          </div>
+          <button data-act="toggle" data-id="${esc(d.id)}" aria-label="${esc(d.name)}" style="width:48px;height:28px;border-radius:14px;border:none;background:${locked ? '#3A2A26' : on ? '#3D5418' : '#2A2C25'};position:relative;cursor:pointer;flex:none;padding:0">
+            <span style="position:absolute;top:4px;${on ? 'left' : 'right'}:4px;width:20px;height:20px;border-radius:50%;background:${locked ? '#E8553F' : on ? '#B8F04A' : '#6F6D64'}"></span>
+          </button>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-family:var(--mono);font-size:13px;color:${on ? '#ECEBE4' : '#5E5C55'}" dir="ltr">${d.est_w} W${d.signature_measured ? '' : ' *'}</span>
+          ${ac}
+        </div>
+        <span style="font-size:11px;color:#6F6D64">${note}</span>
+      </div>`;
+  }).join('');
+  return `
+    <div class="head">
+      <div class="label">DEVICES · تحكّم يدوي بكل جهاز</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:12px;color:#8E8C82">${onCount} شغّال من ${st.devices.length}</span>
+        <button class="btn-lime" data-act="open-wiz" style="height:34px;font-size:13px">+ ضيف جهاز</button>
+      </div>
+    </div>
+    ${learning}${confirm}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px">${cards}</div>
+    <div class="note">* بصمة تقديرية من لوحة الجهاز، لسا ما قسناها على العدّاد.</div>`;
+}
+
+function bill() {
+  const b = st.bill, s = st.savings;
+  const goalJd = st.goal && st.goal.bill_target_jd;
+  const projColor = goalJd && b.bill_projected > goalJd ? '#F2B544' : '#B8F04A';
+  const shades = b.type === 'unsub' ? ['#6B5A1E', '#6A2A1E'] : ['#3D5418', '#6B5A1E', '#6A2A1E'];
+  const segs = b.segments.map((t, i) => `<div style="width:${t.width_pct}%;background:${shades[i] || '#6A2A1E'};border-left:1px solid #131411"></div>`).join('');
+  const segLabels = b.segments.map(t => `<span style="width:${t.width_pct}%;font-size:11px;color:#8E8C82;font-family:var(--mono)">${t.fils} فلس</span>`).join('');
+  const opts = b.types.map(o => `<button data-act="tariff" data-type="${o.key}" style="height:28px;white-space:nowrap;padding:0 10px;border-radius:8px;border:none;background:${b.type === o.key ? '#B8F04A' : 'transparent'};color:${b.type === o.key ? '#0C0D0A' : '#D9D7CF'};font-size:12px;font-weight:600;cursor:pointer">${esc(o.label)}</button>`).join('');
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div class="label">BILL · الفاتورة</div>
+      <div style="display:flex;padding:3px;border-radius:10px;background:#1B1D17;gap:2px">${opts}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:12px;color:#8E8C82">لحد اليوم · ${fmt(b.kwh_now)} ك.و.س</span>
+      <span style="font-family:var(--mono);font-size:34px;font-weight:500" dir="ltr">${fmt(b.bill_now, 2)} <span style="font-size:15px;color:#8E8C82">JD</span></span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="position:relative;height:30px">
+        <div style="position:absolute;inset:8px 0 auto 0;height:14px;border-radius:7px;overflow:hidden;display:flex">${segs}</div>
+        <div style="position:absolute;top:2px;right:${b.now_pos}%;width:3px;height:26px;border-radius:2px;background:#ECEBE4;transition:right 1s"></div>
+        <div style="position:absolute;top:2px;right:${b.proj_pos}%;width:3px;height:26px;border-radius:2px;background:${projColor};transition:right 1s"></div>
+      </div>
+      <div style="display:flex">${segLabels}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:#8E8C82">
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:3px;height:12px;background:#ECEBE4"></span>الآن</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:3px;height:12px;background:${projColor}"></span>متوقّع آخر الشهر ${fmt(b.projected_kwh)} ك.و.س ≈ ${fmt(b.bill_projected, 1)} JD</span>
+      </div>
+    </div>
+    <div style="font-size:13px;line-height:1.6;color:#D9D7CF;padding:10px 12px;border-radius:10px;background:#181A15">${esc(b.message)}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-top:6px;border-top:1px solid #1E201B">
+      <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px;color:#B8F04A" dir="ltr">${fmt(s.jod, 3)}</span><span style="font-size:11.5px;color:#8E8C82">دينار وفّرناها (مُقاس · بسعر شريحتك)</span></div>
+      <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px" dir="ltr">${fmt(s.kwh, 2)}</span><span style="font-size:11.5px;color:#8E8C82">ك.و.س · ${s.co2_kg === null ? '—' : fmt(s.co2_kg, 2)} كغ CO₂</span></div>
+    </div>
+    <div class="note">${esc(b.source || '')} المعروض قيمة الطاقة بس، بدون الدعم النقدي أو أي رسوم ثانية.${st.source === 'simulator' ? ' الاستهلاك هون من المحاكي (بيانات تركيبية).' : ''}${s.co2_kg === null ? ' معامل CO₂ لسا مش مُعبّى.' : ''}</div>`;
+}
+
+function auditLog() {
+  const color = t => ({ T1: '#F2B544', STOP: '#E8553F', OK: '#B8F04A', MANUAL: '#8FC7FF', T2: '#E8553F' }[t] || '#8E8C82');
+  const tierLabel = t => t === 'MANUAL' ? 'يدوي' : t;
+  const rows = st.log.map(e => `
+    <div style="display:grid;grid-template-columns:52px 64px minmax(0,1fr);gap:12px;align-items:baseline;padding:8px 0;border-top:1px solid #1E201B">
+      <span style="font-family:var(--mono);font-size:12px;color:#6F6D64" dir="ltr">${esc(e.clock)}</span>
+      <span style="font-family:var(--mono);font-size:11px;color:${color(e.tier)}">${tierLabel(e.tier)}</span>
+      <span style="font-size:13.5px;line-height:1.55;color:#D9D7CF;text-wrap:pretty">${esc(e.message)}</span>
+    </div>`).join('') || '<div class="muted">ما في قرارات لسا.</div>';
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <div class="label">AUDIT LOG · سجل القرارات</div>
+      <div style="font-size:11px;color:#6F6D64">كل قرار، سببه، موافقته، ونتيجته</div>
+    </div>${rows}`;
+}
+
+// ---------------- chart (Chart.js) ----------------
+
+function updateChart() {
+  const labels = st.history.map(h => h.t);
+  const actual = st.history.map(h => h.power_w);
+  const base = st.history.map(h => h.baseline_w);
+  if (!chart) {
+    chart = new Chart($('chart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'الفعلي', data: actual, borderColor: '#B8F04A', backgroundColor: 'rgba(184,240,74,0.10)', fill: 'origin', borderWidth: 2, pointRadius: 0, tension: 0.25 },
+          { label: 'خط الأساس', data: base, borderColor: '#8E8C82', borderDash: [4, 5], borderWidth: 1, pointRadius: 0, fill: false, tension: 0.25 },
+        ],
+      },
+      options: {
+        animation: false, maintainAspectRatio: false, responsive: true,
+        plugins: { legend: { display: false }, tooltip: { rtl: true } },
+        scales: {
+          x: { ticks: { color: '#6F6D64', maxTicksLimit: 6, font: { family: 'JetBrains Mono' } }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: '#6F6D64', font: { family: 'JetBrains Mono' }, callback: v => scale.unit === 'kW' ? (v / 1000).toFixed(1) + 'k' : v }, grid: { color: '#262822' } },
+        },
+      },
+    });
+  } else {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = actual;
+    chart.data.datasets[1].data = base;
+    chart.update('none');
+  }
+}
+
+// ---------------- main loop ----------------
+
+function renderAll() {
+  $('mode-label').textContent = WW.site === 'home' ? '· وضع البيت' : '· وضع المختبر';
+  $('mode-sub').textContent = st.source === 'simulator'
+    ? 'تصوّر للتوسّع من غرفة المختبر لبيت كامل · بيانات تركيبية من المحاكي'
+    : 'غرفة المختبر · قراءات حقيقية من ESP32 + PZEM-004T';
+  if (!document.activeElement || document.activeElement.id !== 'scenario-pick') WW.render($('toolbar'), toolbar());
+  WW.render($('hero'), hero());
+  WW.render($('goal'), goal());
+  WW.render($('rooms'), roomsMap());
+  WW.render($('devices'), devicesGrid());
+  WW.render($('bill'), bill());
+  WW.render($('log'), auditLog());
+  $('meter-kw').textContent = powerStr(st.meter.power_w);
+  $('meter-unit').textContent = scale.unit;
+  $('meter-title').textContent = WW.site === 'home' ? 'عدّاد البيت' : 'عدّاد المختبر';
+  $('meter-clock').textContent = st.clock + (st.source === 'simulator' ? ' · sim ×60' : '');
+  $('phone-clock').textContent = st.clock;
+  updateChart();
+}
+
+async function refresh() {
+  try {
+    st = await WW.getState();
+    renderAll();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function act(fn) {
+  try { await fn(); } catch (e) { toast(e.message); }
+  refresh();
+}
+
+WW.onAction({
+  onError: e => toast(e.message),
+  scenario: d => act(() => WW.post('/scenario', { name: d.name })),
+  reset: () => act(() => WW.post('/reset')),
+  estop: () => act(() => WW.post('/estop')),
+  'set-goal': () => act(() => {
+    const target = parseFloat($('goal-target').value);
+    const text = $('goal-text').value.trim();
+    ui.goalText = text;
+    return WW.post('/goal', { text, bill_target_jd: target || null });
+  }),
+  'clear-goal': () => { st.goal = null; renderAll(); },
+  toggle: d => {
+    const dev = st.devices.find(x => x.id === d.id);
+    if (dev.sensitive && dev.is_on) { ui.confirmId = dev.id; renderAll(); return; }
+    return act(() => WW.post(`/devices/${d.id}/toggle`, { on: !dev.is_on }));
+  },
+  'confirm-off': d => { ui.confirmId = null; return act(() => WW.post(`/devices/${d.id}/toggle`, { on: false, confirmed: true })); },
+  'confirm-cancel': () => { ui.confirmId = null; renderAll(); },
+  setpoint: d => {
+    const dev = st.devices.find(x => x.id === d.id);
+    return act(() => WW.post(`/devices/${d.id}/setpoint`, { value: dev.setpoint + Number(d.delta) }));
+  },
+  tariff: d => act(() => WW.post('/tariff', { type: d.type })),
+  'open-wiz': () => {
+    const f = $('phone-frame');
+    if (f.contentWindow) f.contentWindow.postMessage({ type: 'open-wizard' }, location.origin);
+  },
+});
+
+document.addEventListener('change', ev => {
+  if (ev.target.id === 'scenario-pick' && ev.target.value) {
+    const name = ev.target.value;
+    ev.target.value = '';
+    ev.target.blur();
+    act(() => WW.post('/scenario', { name }));
+  }
+});
+document.addEventListener('input', ev => {
+  if (ev.target.id === 'goal-text') ui.goalText = ev.target.value;
+  if (ev.target.id === 'goal-target') ui.goalTarget = ev.target.value;
+});
+
+$('phone-frame').src = 'app.html?site=' + encodeURIComponent(WW.site) + '&embed=1';
+refresh();
+setInterval(refresh, 1000);

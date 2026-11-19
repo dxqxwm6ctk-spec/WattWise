@@ -1,0 +1,11 @@
+{
+  "name": "WattWise",
+  "short_name": "WattWise",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "app.html",
+  "display": "standalone",
+  "background_color": "#F3F1EA",
+  "theme_color": "#F3F1EA",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

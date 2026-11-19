@@ -1,0 +1,20 @@
+/* WattWise phone page (web backup of the Flutter app). Light theme from the design. */
+:root { --ink: #1A1B16; --paper: #F3F1EA; --sub: #77756C; --lime: #B8F04A; --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--paper); color: var(--ink); font-family: 'IBM Plex Sans Arabic', system-ui, 'Segoe UI', Tahoma, sans-serif; -webkit-font-smoothing: antialiased; }
+button, input { font-family: inherit; }
+@keyframes ww-pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+@keyframes ww-rise { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
+
+.app { height: 100%; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; }
+.content { flex: 1; overflow-y: auto; padding: 14px 20px 16px; display: flex; flex-direction: column; gap: 14px; }
+.tabs { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); padding: 8px 14px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid #E2DFD4; background: var(--paper); }
+.tab { height: 48px; border: none; background: transparent; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+.tab i { width: 18px; height: 3px; border-radius: 2px; }
+.mono { font-family: var(--mono); }
+.box { border-radius: 18px; background: #FFFFFF; padding: 14px 16px; }
+.sub { font-size: 13px; color: var(--sub); }
+.btn-dark { border-radius: 18px; border: none; background: var(--ink); color: var(--paper); font-weight: 700; cursor: pointer; }
+.btn-line { border-radius: 18px; border: 1.5px solid #D8D5CA; background: transparent; color: var(--ink); font-weight: 600; cursor: pointer; }
+.err { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: #FBE3DD; color: #7A2A1C; padding: 10px 14px; border-radius: 14px; font-size: 13px; max-width: 90%; z-index: 5; }
