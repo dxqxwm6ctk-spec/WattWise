@@ -88,3 +88,4 @@ select.tb { appearance: none; padding-left: 28px; }
   .big-kw span:first-child { font-size: 40px; }
   .phone { height: 720px; }
 }
+a.tb { text-decoration: none; }

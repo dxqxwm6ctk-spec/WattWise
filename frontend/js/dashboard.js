@@ -38,6 +38,7 @@ function toolbar() {
       <option value="normal">رجّع طبيعي</option>
     </select>` : '';
   return `${other}${scen}
+    <a class="tb ghost" href="/api/sites/${WW.site}/report" target="_blank" rel="noopener">تقرير التوفير</a>
     <button class="tb ghost" data-act="reset">إعادة الضبط</button>
     <button class="tb stop" data-act="estop">إيقاف طوارئ</button>`;
 }
@@ -309,6 +310,15 @@ function forecastBlock() {
     </div>`;
 }
 
+// M&V: savings against the baseline model (only shown when the model passes).
+function mvLine() {
+  const m = st.mv;
+  if (!m) return '';
+  const q = m.model ? ` · CV(RMSE) ${fmt(m.model.cv_rmse_pct, 1)}%` : '';
+  const color = m.status === 'ok' ? (m.saved_kwh >= 0 ? '#B8F04A' : '#F2B544') : '#8E8C82';
+  return `<div style="font-size:12.5px;line-height:1.6;color:${color}">M&amp;V: ${esc(m.message_ar)}<span style="color:#8E8C82">${q}</span></div>`;
+}
+
 function bill() {
   const b = st.bill, s = st.savings;
   const goalJd = st.goal && st.goal.bill_target_jd;
@@ -340,6 +350,7 @@ function bill() {
     </div>
     <div style="font-size:13px;line-height:1.6;color:#D9D7CF;padding:10px 12px;border-radius:10px;background:#181A15">${esc(b.message)}</div>
     ${forecastBlock()}
+    ${mvLine()}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-top:6px;border-top:1px solid #1E201B">
       <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px;color:#B8F04A" dir="ltr">${fmt(s.jod, 3)}</span><span style="font-size:11.5px;color:#8E8C82">دينار وفّرناها (مُقاس · بسعر شريحتك)</span></div>
       <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px" dir="ltr">${fmt(s.kwh, 2)}</span><span style="font-size:11.5px;color:#8E8C82">ك.و.س · ${s.co2_kg === null ? '—' : fmt(s.co2_kg, 2)} كغ CO₂</span></div>

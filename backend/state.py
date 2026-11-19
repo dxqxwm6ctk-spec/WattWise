@@ -4,7 +4,7 @@ import calendar
 import json
 import time
 
-from backend import actions, anomaly, billing, config, db, forecast, llm, weather
+from backend import actions, anomaly, billing, config, db, forecast, llm, mv, weather
 
 CATEGORY = {"ac": "المكيّفات", "fan": "المكيّفات", "fridge": "الثلاجة", "heater": "سخّان الماء",
             "light": "الإنارة"}
@@ -133,6 +133,7 @@ def build(conn, site: str) -> dict:
         "plan": _plan(conn, site, goal),
         "anomaly": anomaly.status(conn, site),
         "forecast": forecast.cached(conn, site),
+        "mv": {k: v for k, v in mv.cached(conn, site).items() if k != "series"},
         "weather": weather.cached(),
         "goal": goal and {"text": goal["text"], "bill_target_jd": goal["bill_target_jd"]},
         "steps": actions.GOAL_STEPS,

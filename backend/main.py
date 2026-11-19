@@ -7,11 +7,11 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend import actions, agent, config, db, state
+from backend import actions, agent, config, db, report, state
 
 
 async def _agent_loop():
@@ -127,6 +127,12 @@ def get_commands(site: str):
 @app.get("/api/sites")
 def list_sites():
     return {k: {"name": v["name"], "source": v["source"]} for k, v in config.load_sites().items()}
+
+
+@app.get("/api/sites/{site}/report", response_class=HTMLResponse)
+def savings_report(site: str):
+    """Printable savings report (M&V, verified actions, approvals, audit log)."""
+    return HTMLResponse(_run(report.build, site))
 
 
 @app.get("/api/sites/{site}/state")

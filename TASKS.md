@@ -22,7 +22,7 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Add-device flow: measure a new device's signature on the main meter
 - [x] Dashboard (plain HTML/JS + Chart.js) implementing the "WattWise Home" design
 - [x] Web approval page (PWA, works offline on the local network) as backup for the Flutter app
-- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building (50 passing)
+- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report (57 passing)
 - [x] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API (tested as a web build against the simulator)
 - [ ] Run the Flutter app on a real Android phone on the local Wi-Fi
 - [x] LLM planner + explainer with tool use, spending cap, provider abstraction, rule-based fallback (tested with a fake provider; 38 tests passing)
@@ -49,8 +49,8 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [ ] Wiring checked by the electrician / supervisor before first power-up
 
 ## Phase D: proof and story
-- [ ] M&V baseline model (temperature, occupancy, hour) + tests
-- [ ] Savings report (PDF/HTML)
+- [x] M&V baseline model (Ridge on hour, occupancy, temperature; ASHRAE G14 checks; refuses to report when data or model is not good enough) + tests
+- [x] Savings report: `/api/sites/{site}/report` (HTML, print to PDF); sample from the simulator in project files
 - [ ] "How this works" notes for every part (`docs/explain/`)
 - [ ] Phase 1 proposal text (Arabic) in `docs/proposal/` (draft written; placeholders for bill, measurement, team still open)
 - [ ] Demo script and backup plan (offline network, recorded video, pre-generated report)

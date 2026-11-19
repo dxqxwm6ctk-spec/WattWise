@@ -22,6 +22,7 @@ python -m simulator.sim --site building
 Open:
 - Dashboard: http://localhost:8000/index.html (building: `index.html?site=building`)
 - Phone app: Flutter, in `mobile/` (see `mobile/README.md`)
+- Savings report (print to PDF): http://localhost:8000/api/sites/home/report
 - Web backup of the phone page: http://localhost:8000/app.html
   From a phone on the same Wi-Fi, use the laptop's IP, for example `http://192.168.1.10:8000/app.html`.
 
@@ -59,7 +60,7 @@ python -m pytest -q
 | `config/` | sites, rooms, devices, tariff |
 | `firmware/` | ESP32 sketches (Phase B) |
 | `docs/` | proposal, "how this works" notes, data sources, wiring |
-| `tests/` | Policy Guard, billing, agent flow, LLM layer (fake provider), anomaly detection, forecast, building |
+| `tests/` | Policy Guard, billing, agent flow, LLM layer (fake provider), anomaly detection, forecast, building, M&V and report |
 
 ## API (same for the ESP32 and the simulator)
 
