@@ -9,6 +9,7 @@ All data here is SYNTHETIC. The simulator clock runs 60x faster than real time
 (1 real second = 1 simulated minute) so a demo shows a whole evening quickly.
 
 Run:  python -m simulator.sim            (backend must be running on port 8000)
+      python -m simulator.sim --site building     (the 10-room office floor)
       python -m simulator.sim --url http://192.168.1.10:8000 --speed 60
 """
 
@@ -23,7 +24,6 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SITE = "home"
 
 # Demo "unknown_load" scenario: a device the backend does not know (anomaly detection demo).
 UNKNOWN_LOAD_W = 700
@@ -33,9 +33,6 @@ UNKNOWN_LOAD_W = 700
 NEW_DEVICE_W = {"ac": 1100, "light": 30, "heater": 1800, "tv": 110, "washer": 600, "pc": 180,
                 "router": 12, "fridge": 150, "medical": 80, "other": 75}
 
-# Who is home in the evening snapshot (PIR: occupied or empty, nothing more).
-OCCUPIED = {"living": True, "bedroom": True, "kids": True, "kitchen": True, "bath": False, "hall": False}
-BASE_TEMP = {"living": 24.5, "bedroom": 23.8, "kids": 25.2, "kitchen": 26.0, "bath": 24.0, "hall": 24.6}
 
 
 def http_json(method: str, url: str, body: dict | None = None) -> dict:
@@ -46,8 +43,13 @@ def http_json(method: str, url: str, body: dict | None = None) -> dict:
 
 
 class House:
-    def __init__(self, speed: float, start_kwh: float):
-        cfg = json.loads((ROOT / "config" / "sites.json").read_text(encoding="utf-8"))["sites"][SITE]
+    def __init__(self, site: str, speed: float, start_kwh: float):
+        cfg = json.loads((ROOT / "config" / "sites.json").read_text(encoding="utf-8"))["sites"][site]
+        self.site = site
+        # Who is there in the evening snapshot (PIR: occupied or empty, nothing more) and base temperatures.
+        self.occupied_cfg = {r["id"]: r["sim"]["occupied"] for r in cfg["rooms"]}
+        self.base_temp = {r["id"]: r["sim"]["temp_c"] for r in cfg["rooms"]}
+        self.demo_room = cfg.get("demo_waste", {}).get("room")
         self.devices = {d["id"]: d for d in cfg["devices"]}
         self.rooms = [r["id"] for r in cfg["rooms"]]
         self.on = {k: d.get("on", True) for k, d in self.devices.items()}
@@ -97,15 +99,15 @@ class House:
     def occupied(self, room: str) -> bool:
         if self.scenario == "holiday":
             return False
-        if self.scenario == "bedroom_empty_window" and room == "bedroom":
+        if self.scenario == "bedroom_empty_window" and room == self.demo_room:
             return False
-        return OCCUPIED.get(room, False)
+        return self.occupied_cfg.get(room, False)
 
     def window_open(self, room: str) -> bool:
-        return self.scenario == "bedroom_empty_window" and room == "bedroom"
+        return self.scenario == "bedroom_empty_window" and room == self.demo_room
 
     def temperature(self, room: str) -> float:
-        t = BASE_TEMP.get(room, 25.0)
+        t = self.base_temp.get(room, 25.0)
         if self.window_open(room):
             t += 3.3
         if self.scenario == "heat_wave":
@@ -125,7 +127,7 @@ class House:
         volt = 229.4 + math.sin(minute) * 0.8
         self.energy_kwh += power / 1000 * (self.speed / 3600)
         return {
-            "site": SITE,
+            "site": self.site,
             "source": "simulator",
             "meter_ts": self.clock,
             "meter": {
@@ -148,17 +150,18 @@ class House:
 def main() -> None:
     ap = argparse.ArgumentParser(description="WattWise house simulator (synthetic data)")
     ap.add_argument("--url", default="http://127.0.0.1:8000")
+    ap.add_argument("--site", default="home", help="simulated site from config/sites.json: home or building")
     ap.add_argument("--speed", type=float, default=60, help="simulated seconds per real second")
     ap.add_argument("--start-kwh", type=float, default=286, help="synthetic meter reading at start")
     args = ap.parse_args()
 
-    house = House(args.speed, args.start_kwh)
+    house = House(args.site, args.speed, args.start_kwh)
     house.learning_id = None
-    print(f"Simulator running: {args.url}  speed x{args.speed:g}  (Ctrl+C to stop)")
+    print(f"Simulator running: site={args.site}  {args.url}  speed x{args.speed:g}  (Ctrl+C to stop)")
     while True:
         started = time.time()
         try:
-            house.apply(http_json("GET", f"{args.url}/api/sites/{SITE}/commands"))
+            house.apply(http_json("GET", f"{args.url}/api/sites/{args.site}/commands"))
             reading = house.reading()
             if time.time() >= house.fault_until:
                 http_json("POST", f"{args.url}/api/readings", reading)

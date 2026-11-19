@@ -348,11 +348,16 @@ def set_scenario(conn, site: str, name: str) -> None:
     if name not in SCENARIOS:
         raise ActionError("سيناريو مش معروف.")
     db.set_state(conn, f"scenario:{site}", name)
-    if name == "bedroom_empty_window":
-        db.set_device(conn, site, "bedAc", is_on=1, agent_off=AGENT_OFF_NONE)
+    demo = config.load_sites()[site].get("demo_waste")
+    if name == "bedroom_empty_window" and demo:
+        db.set_device(conn, site, demo["device"], is_on=1, agent_off=AGENT_OFF_NONE)
     if get_phase(conn, site) not in ("pending", "executing"):
         set_phase(conn, site, "normal")
-    db.audit(conn, site, "T0", "system", "scenario", "محاكاة: " + SCENARIOS[name])
+    text = SCENARIOS[name]
+    if name == "bedroom_empty_window" and demo:
+        room = db.one(conn.execute("SELECT name FROM rooms WHERE site=? AND id=?", (site, demo["room"])))
+        text = f"{room['name']}: الإشغال فاضي، وحسّاس الشباك (محاكى) مفتوح. المكيّف شغّال."
+    db.audit(conn, site, "T0", "system", "scenario", "محاكاة: " + text)
 
 
 SCENARIOS = {

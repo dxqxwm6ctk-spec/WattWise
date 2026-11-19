@@ -22,16 +22,16 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Add-device flow: measure a new device's signature on the main meter
 - [x] Dashboard (plain HTML/JS + Chart.js) implementing the "WattWise Home" design
 - [x] Web approval page (PWA, works offline on the local network) as backup for the Flutter app
-- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection (44 passing)
+- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building (50 passing)
 - [x] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API (tested as a web build against the simulator)
 - [ ] Run the Flutter app on a real Android phone on the local Wi-Fi
 - [x] LLM planner + explainer with tool use, spending cap, provider abstraction, rule-based fallback (tested with a fake provider; 38 tests passing)
 - [ ] Try the LLM planner with a real API key (team puts the key in `.env`)
 - [x] Open-Meteo weather tool (optional when offline; offline path verified, online call not reachable from the dev sandbox)
 - [x] Anomaly detection: residual (meter minus known signatures) learned per hour and occupancy with running mean/std; alert-only; simulator scenario "unknown_load"
-- [ ] Short-horizon load forecast
+- [x] Short-horizon load forecast (now + hourly profile blend, accuracy measured against the meter every hour; weather not used yet)
 - [ ] Lab-mode page polish (the design's "WattWise.dc.html")
-- [ ] Simulator: scale to ~10 rooms (config only)
+- [x] Simulator: 10-room office building as a third site (`--site building`), config only, same agent code
 
 ## Data to fill (team)
 - [ ] Verify tariff tiers in `config/tariff.json` against a real, anonymized bill

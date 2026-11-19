@@ -35,7 +35,7 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxW = st['site'] == 'lab' ? 200.0 : 4000.0;
+    final maxW = ((st['labels'] as Map<String, dynamic>?)?['max_w'] as num? ?? 4000).toDouble();
     final w = ((st['meter']['power_w'] ?? 0) as num).toDouble();
     final bill = st['bill'] as Map<String, dynamic>;
     final goal = st['goal'] as Map<String, dynamic>?;

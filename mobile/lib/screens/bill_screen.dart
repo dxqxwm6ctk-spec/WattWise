@@ -22,6 +22,7 @@ class BillScreen extends StatelessWidget {
     final b = st['bill'] as Map<String, dynamic>;
     final s = st['savings'] as Map<String, dynamic>;
     final breakdown = st['breakdown'] as List<dynamic>;
+    final f = st['forecast'] as Map<String, dynamic>?;
     const sub = TextStyle(fontSize: 13, color: WW.sub);
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -113,6 +114,25 @@ class BillScreen extends StatelessWidget {
               style: const TextStyle(fontSize: 12.5, color: WW.greenText)),
         ]),
       ),
+      if (f != null) ...[
+        const SizedBox(height: 12),
+        WWBox(
+          radius: 22,
+          padding: 18,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('المتوقّع بالـ${(f['steps'] as List).length} ساعات الجاية', style: sub),
+            const SizedBox(height: 6),
+            Text('${WW.fmt(f['jod'], 2)} JD · ${WW.fmt(f['kwh'], 1)} kWh',
+                textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 22, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 6),
+            Text(
+                (f['accuracy']['hours'] as num) > 0
+                    ? 'خطأ التوقّع ≈ ${WW.fmt(f['accuracy']['mean_err_pct'], 0)}% (مقاس بالعدّاد)'
+                    : 'لسا عم نقيس دقّة التوقّع',
+                style: const TextStyle(fontSize: 12.5, color: WW.sub)),
+          ]),
+        ),
+      ],
       const SizedBox(height: 16),
       const Text('نصايح (ما بننفّذها لحالنا)', style: sub),
       for (final t in tips) ...[

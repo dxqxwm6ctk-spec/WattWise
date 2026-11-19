@@ -1,31 +1,33 @@
 {
-  "_note": "Sites, rooms and devices. 'home' is the simulated house (digital twin, synthetic data). 'lab' is the real test room with the ESP32. rated_w is the nameplate value, used only as a first guess until the meter measures the real load signature.",
+  "_note": "Sites, rooms and devices. 'home' is the simulated house and 'building' a simulated 10-room office floor (digital twins, synthetic data). 'lab' is the real test room with the ESP32. rated_w is the nameplate value, used only as a first guess until the meter measures the real load signature. 'sim' values are only read by the simulator.",
   "sites": {
     "home": {
       "name": "بيت العيلة",
       "source": "simulator",
       "rooms": [
-        {"id": "living",  "name": "الصالون"},
-        {"id": "bedroom", "name": "غرفة النوم"},
-        {"id": "kids",    "name": "غرفة الأولاد"},
-        {"id": "kitchen", "name": "المطبخ"},
-        {"id": "bath",    "name": "الحمّام"},
-        {"id": "hall",    "name": "الممر"}
+        {"id": "living", "name": "الصالون", "sim": {"occupied": true, "temp_c": 24.5}},
+        {"id": "bedroom", "name": "غرفة النوم", "sim": {"occupied": true, "temp_c": 23.8}},
+        {"id": "kids", "name": "غرفة الأولاد", "sim": {"occupied": true, "temp_c": 25.2}},
+        {"id": "kitchen", "name": "المطبخ", "sim": {"occupied": true, "temp_c": 26.0}},
+        {"id": "bath", "name": "الحمّام", "sim": {"occupied": false, "temp_c": 24.0}},
+        {"id": "hall", "name": "الممر", "sim": {"occupied": false, "temp_c": 24.6}}
       ],
       "devices": [
-        {"id": "livingAc",    "name": "مكيّف الصالون",     "room": "living",  "kind": "ac",         "rated_w": 1150, "tier": "T1", "on": true,  "setpoint": 24},
-        {"id": "livingLight", "name": "إنارة الصالون",     "room": "living",  "kind": "light",      "rated_w": 60,   "tier": "T1", "on": true},
-        {"id": "tv",          "name": "التلفزيون",          "room": "living",  "kind": "tv",         "rated_w": 95,   "tier": "T1", "on": true},
-        {"id": "bedAc",       "name": "مكيّف غرفة النوم",  "room": "bedroom", "kind": "ac",         "rated_w": 980,  "tier": "T1", "on": true,  "setpoint": 23},
-        {"id": "bedLight",    "name": "إنارة غرفة النوم",  "room": "bedroom", "kind": "light",      "rated_w": 40,   "tier": "T1", "on": false},
-        {"id": "kidsLight",   "name": "إنارة غرفة الأولاد", "room": "kids",    "kind": "light",      "rated_w": 20,   "tier": "T1", "on": true},
-        {"id": "charger",     "name": "شاحن اللابتوب",      "room": "kids",    "kind": "other",      "rated_w": 45,   "tier": "T1", "on": true},
-        {"id": "washer",      "name": "الغسالة",            "room": "kitchen", "kind": "washer",     "rated_w": 500,  "tier": "T1", "on": false},
-        {"id": "heater",      "name": "سخّان الماء",        "room": "bath",    "kind": "heater",     "rated_w": 2000, "tier": "T1", "on": false},
-        {"id": "router",      "name": "الراوتر",            "room": "hall",    "kind": "router",     "rated_w": 12,   "tier": "T1", "on": true,  "sensitive": true, "allow": false},
-        {"id": "fridge",      "name": "الثلاجة",            "room": "kitchen", "kind": "fridge",     "rated_w": 140,  "tier": "T2", "on": true},
-        {"id": "fireAlarm",   "name": "إنذار الحريق",       "room": "hall",    "kind": "fire_alarm", "rated_w": 3,    "tier": "T2", "on": true}
-      ]
+        {"id": "livingAc", "name": "مكيّف الصالون", "room": "living", "kind": "ac", "rated_w": 1150, "tier": "T1", "on": true, "setpoint": 24},
+        {"id": "livingLight", "name": "إنارة الصالون", "room": "living", "kind": "light", "rated_w": 60, "tier": "T1", "on": true},
+        {"id": "tv", "name": "التلفزيون", "room": "living", "kind": "tv", "rated_w": 95, "tier": "T1", "on": true},
+        {"id": "bedAc", "name": "مكيّف غرفة النوم", "room": "bedroom", "kind": "ac", "rated_w": 980, "tier": "T1", "on": true, "setpoint": 23},
+        {"id": "bedLight", "name": "إنارة غرفة النوم", "room": "bedroom", "kind": "light", "rated_w": 40, "tier": "T1", "on": false},
+        {"id": "kidsLight", "name": "إنارة غرفة الأولاد", "room": "kids", "kind": "light", "rated_w": 20, "tier": "T1", "on": true},
+        {"id": "charger", "name": "شاحن اللابتوب", "room": "kids", "kind": "other", "rated_w": 45, "tier": "T1", "on": true},
+        {"id": "washer", "name": "الغسالة", "room": "kitchen", "kind": "washer", "rated_w": 500, "tier": "T1", "on": false},
+        {"id": "heater", "name": "سخّان الماء", "room": "bath", "kind": "heater", "rated_w": 2000, "tier": "T1", "on": false},
+        {"id": "router", "name": "الراوتر", "room": "hall", "kind": "router", "rated_w": 12, "tier": "T1", "on": true, "sensitive": true, "allow": false},
+        {"id": "fridge", "name": "الثلاجة", "room": "kitchen", "kind": "fridge", "rated_w": 140, "tier": "T2", "on": true},
+        {"id": "fireAlarm", "name": "إنذار الحريق", "room": "hall", "kind": "fire_alarm", "rated_w": 3, "tier": "T2", "on": true}
+      ],
+      "demo_waste": {"room": "bedroom", "device": "bedAc", "label": "١ · غرفة النوم فاضية والشباك مفتوح"},
+      "labels": {"mode": "وضع البيت", "goal": "هدف العيلة", "map": "HOME MAP · غرف البيت", "meter": "عدّاد البيت", "max_w": 4000}
     },
     "lab": {
       "name": "غرفة المختبر",
@@ -35,8 +37,56 @@
       ],
       "devices": [
         {"id": "lamp", "name": "اللمبة", "room": "lab", "kind": "light", "rated_w": 40, "tier": "T1", "on": true, "relay_channel": 1},
-        {"id": "fan",  "name": "المروحة (بدل المكيّف)", "room": "lab", "kind": "fan", "rated_w": 45, "tier": "T1", "on": true, "relay_channel": 2}
-      ]
+        {"id": "fan", "name": "المروحة (بدل المكيّف)", "room": "lab", "kind": "fan", "rated_w": 45, "tier": "T1", "on": true, "relay_channel": 2}
+      ],
+      "labels": {"mode": "وضع المختبر", "goal": "هدف المختبر", "map": "LAB · غرفة المختبر", "meter": "عدّاد المختبر", "max_w": 200}
+    },
+    "building": {
+      "name": "مبنى مكاتب صغير (١٠ غرف)",
+      "source": "simulator",
+      "rooms": [
+        {"id": "lobby", "name": "الاستقبال", "sim": {"occupied": true, "temp_c": 24.8}},
+        {"id": "office1", "name": "مكتب ١", "sim": {"occupied": true, "temp_c": 24.2}},
+        {"id": "office2", "name": "مكتب ٢", "sim": {"occupied": false, "temp_c": 25.0}},
+        {"id": "office3", "name": "مكتب ٣", "sim": {"occupied": true, "temp_c": 24.6}},
+        {"id": "office4", "name": "مكتب ٤", "sim": {"occupied": false, "temp_c": 25.4}},
+        {"id": "meeting", "name": "غرفة الاجتماعات", "sim": {"occupied": true, "temp_c": 24.0}},
+        {"id": "training", "name": "قاعة التدريب", "sim": {"occupied": false, "temp_c": 25.8}},
+        {"id": "kitchenette", "name": "المطبخ الصغير", "sim": {"occupied": false, "temp_c": 26.2}},
+        {"id": "server", "name": "غرفة السيرفر", "sim": {"occupied": false, "temp_c": 22.5}},
+        {"id": "corridor", "name": "الممر", "sim": {"occupied": false, "temp_c": 24.9}}
+      ],
+      "devices": [
+        {"id": "lobbyAc", "name": "مكيّف الاستقبال", "room": "lobby", "kind": "ac", "rated_w": 1300, "tier": "T1", "on": true, "setpoint": 24},
+        {"id": "lobbyLight", "name": "إنارة الاستقبال", "room": "lobby", "kind": "light", "rated_w": 80, "tier": "T1", "on": true},
+        {"id": "off1Ac", "name": "مكيّف مكتب ١", "room": "office1", "kind": "ac", "rated_w": 1100, "tier": "T1", "on": true, "setpoint": 24},
+        {"id": "off1Light", "name": "إنارة مكتب ١", "room": "office1", "kind": "light", "rated_w": 40, "tier": "T1", "on": true},
+        {"id": "off1Pc", "name": "كمبيوتر مكتب ١", "room": "office1", "kind": "pc", "rated_w": 150, "tier": "T1", "on": true},
+        {"id": "off2Ac", "name": "مكيّف مكتب ٢", "room": "office2", "kind": "ac", "rated_w": 1100, "tier": "T1", "on": true, "setpoint": 24},
+        {"id": "off2Light", "name": "إنارة مكتب ٢", "room": "office2", "kind": "light", "rated_w": 40, "tier": "T1", "on": true},
+        {"id": "off2Pc", "name": "كمبيوتر مكتب ٢", "room": "office2", "kind": "pc", "rated_w": 150, "tier": "T1", "on": true},
+        {"id": "off3Ac", "name": "مكيّف مكتب ٣", "room": "office3", "kind": "ac", "rated_w": 1100, "tier": "T1", "on": true, "setpoint": 24},
+        {"id": "off3Light", "name": "إنارة مكتب ٣", "room": "office3", "kind": "light", "rated_w": 40, "tier": "T1", "on": true},
+        {"id": "off3Pc", "name": "كمبيوتر مكتب ٣", "room": "office3", "kind": "pc", "rated_w": 150, "tier": "T1", "on": true},
+        {"id": "off4Ac", "name": "مكيّف مكتب ٤", "room": "office4", "kind": "ac", "rated_w": 1100, "tier": "T1", "on": false, "setpoint": 24},
+        {"id": "off4Light", "name": "إنارة مكتب ٤", "room": "office4", "kind": "light", "rated_w": 40, "tier": "T1", "on": true},
+        {"id": "off4Pc", "name": "كمبيوتر مكتب ٤", "room": "office4", "kind": "pc", "rated_w": 150, "tier": "T1", "on": false},
+        {"id": "meetAc", "name": "مكيّف الاجتماعات", "room": "meeting", "kind": "ac", "rated_w": 1500, "tier": "T1", "on": true, "setpoint": 24},
+        {"id": "meetLight", "name": "إنارة الاجتماعات", "room": "meeting", "kind": "light", "rated_w": 60, "tier": "T1", "on": true},
+        {"id": "projector", "name": "البروجكتر", "room": "training", "kind": "other", "rated_w": 250, "tier": "T1", "on": true},
+        {"id": "trainAc", "name": "مكيّف قاعة التدريب", "room": "training", "kind": "ac", "rated_w": 1800, "tier": "T1", "on": true, "setpoint": 23},
+        {"id": "trainLight", "name": "إنارة قاعة التدريب", "room": "training", "kind": "light", "rated_w": 120, "tier": "T1", "on": true},
+        {"id": "kettle", "name": "الغلّاية", "room": "kitchenette", "kind": "heater", "rated_w": 1500, "tier": "T1", "on": false},
+        {"id": "kitLight", "name": "إنارة المطبخ", "room": "kitchenette", "kind": "light", "rated_w": 30, "tier": "T1", "on": true},
+        {"id": "officeFridge", "name": "ثلاجة المطبخ", "room": "kitchenette", "kind": "fridge", "rated_w": 150, "tier": "T2", "on": true},
+        {"id": "serverRack", "name": "السيرفر", "room": "server", "kind": "router", "rated_w": 350, "tier": "T1", "on": true, "sensitive": true, "allow": false},
+        {"id": "serverAc", "name": "مكيّف غرفة السيرفر", "room": "server", "kind": "ac", "rated_w": 900, "tier": "T1", "on": true, "setpoint": 22, "sensitive": true, "allow": false},
+        {"id": "corrLight", "name": "إنارة الممر", "room": "corridor", "kind": "light", "rated_w": 50, "tier": "T1", "on": true},
+        {"id": "emergencyLight", "name": "إنارة الطوارئ", "room": "corridor", "kind": "emergency_light", "rated_w": 10, "tier": "T2", "on": true},
+        {"id": "bldFireAlarm", "name": "إنذار الحريق", "room": "corridor", "kind": "fire_alarm", "rated_w": 3, "tier": "T2", "on": true}
+      ],
+      "demo_waste": {"room": "meeting", "device": "meetAc", "label": "١ · غرفة الاجتماعات فاضية والشباك مفتوح"},
+      "labels": {"mode": "وضع المبنى", "goal": "هدف المبنى", "map": "BUILDING · ١٠ غرف", "meter": "عدّاد المبنى", "max_w": 12000}
     }
   }
 }

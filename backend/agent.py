@@ -15,7 +15,7 @@ LLM is missing, late, broken or over budget.
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 
-from backend import actions, billing, config, db, llm, policy, weather
+from backend import actions, billing, config, db, forecast, llm, policy, weather
 
 # Remembers what the agent is currently looking at, per site: {"device_id", "since"}
 _analyzing: dict[str, dict] = {}
@@ -132,6 +132,7 @@ def tick(conn, site: str, now: float | None = None) -> None:
 
     # 3. Verify executed actions with the meter.
     _verify(conn, site, now)
+    forecast.track(conn, site)
 
     if estop or actions.flag(conn, "safe_mode", site):
         _analyzing.pop(site, None)
@@ -258,7 +259,7 @@ def snapshot(conn, site: str, now: float, wastes: list[dict], price: float) -> d
               "saving_jod_per_hour": round(w["device"]["signature_w"] / 1000 * price, 3)} for w in wastes]
     return {"read_sensors": {"power_w": meter.get("power_w"), "rooms": rooms, "devices_on": on,
                              "comfort_c": [config.COMFORT_MIN_TEMP_C, config.COMFORT_MAX_TEMP_C]},
-            "get_tariff": tariff, "detect_waste": waste}
+            "get_tariff": tariff, "detect_waste": waste, "forecast_load": forecast.cached(conn, site)}
 
 
 def _finish(conn, site: str, job: dict, kind: str):

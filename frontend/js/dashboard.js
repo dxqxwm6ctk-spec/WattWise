@@ -3,10 +3,11 @@
 const { esc, fmt } = WW;
 const $ = id => document.getElementById(id);
 
-const SITE_SCALE = { home: { maxW: 4000, unit: 'kW' }, lab: { maxW: 200, unit: 'W' } };
+const SITE_SCALE = { home: { maxW: 4000, unit: 'kW' }, building: { maxW: 12000, unit: 'kW' }, lab: { maxW: 200, unit: 'W' } };
 const scale = SITE_SCALE[WW.site] || SITE_SCALE.home;
 const ui = { confirmId: null, goalText: 'خلّي فاتورة هالشهر تحت 30 دينار بدون ما تزعّج حدا بالبيت', goalTarget: '30' };
 let st = null;
+const lbl = (key, fallback) => (st && st.labels && st.labels[key]) || fallback;
 let chart = null;
 
 const powerStr = w => scale.unit === 'kW' ? fmt((w || 0) / 1000, 2) : fmt(w, 0);
@@ -23,11 +24,11 @@ function toast(msg) {
 
 function toolbar() {
   const sim = st.source === 'simulator';
-  const other = WW.site === 'home'
-    ? '<a class="tb link" href="index.html?site=lab">← وضع المختبر</a>'
-    : '<a class="tb link" href="index.html?site=home">← وضع البيت</a>';
+  const SITES = [['home', 'البيت'], ['building', 'المبنى (١٠ غرف)'], ['lab', 'المختبر']];
+  const other = SITES.filter(([k]) => k !== WW.site)
+    .map(([k, label]) => `<a class="tb link" href="index.html?site=${k}">← ${label}</a>`).join('');
   const scen = sim ? `
-    <button class="tb" data-act="scenario" data-name="bedroom_empty_window">١ · غرفة النوم فاضية والشباك مفتوح</button>
+    <button class="tb" data-act="scenario" data-name="bedroom_empty_window">${esc(st.demo_label || '١ · غرفة فاضية والشباك مفتوح')}</button>
     <select class="tb ghost" id="scenario-pick" aria-label="سيناريوهات المحاكي">
       <option value="">سيناريوهات ثانية…</option>
       <option value="heat_wave">موجة حر</option>
@@ -149,7 +150,7 @@ function goal() {
   }
   return `
     <div class="head">
-      <div class="label">GOAL · ${WW.site === 'home' ? 'هدف العيلة' : 'هدف المختبر'}</div>
+      <div class="label">GOAL · ${esc(lbl('goal', 'الهدف'))}</div>
       <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:${ag.color}"><span style="width:8px;height:8px;border-radius:50%;background:${ag.color}"></span>${ag.label}</div>
     </div>
     ${body}
@@ -224,7 +225,7 @@ function roomsMap() {
   }).join('');
   return `
     <div class="head">
-      <div class="label">${WW.site === 'home' ? 'HOME MAP · غرف البيت' : 'LAB · غرفة المختبر'}</div>
+      <div class="label">${esc(lbl('map', 'الغرف'))}</div>
       <div style="font-size:11px;color:#6F6D64">إشغال مشغول/فاضي فقط، بلا كاميرات وبلا تتبّع أشخاص</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${cards}</div>`;
@@ -287,6 +288,27 @@ function devicesGrid() {
     <div class="note">* بصمة تقديرية من لوحة الجهاز، لسا ما قسناها على العدّاد.</div>`;
 }
 
+// AI layer 2: expected load for this hour and the next 5, plus our measured accuracy.
+function forecastBlock() {
+  const f = st.forecast;
+  if (!f) return '';
+  const max = Math.max(...f.steps.map(x => x.power_w), 1);
+  const bars = f.steps.map(x => `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <span class="mono" style="font-size:10.5px;color:#D9D7CF">${fmt(x.power_w / 1000, 1)}</span>
+      <div style="width:100%;height:${Math.max(4, x.power_w / max * 54)}px;border-radius:4px;background:${x.method === 'now' ? '#3A3C34' : '#6B8F2A'}"></div>
+      <span class="mono" style="font-size:10.5px;color:#8E8C82">${x.hour}</span>
+    </div>`).join('');
+  const a = f.accuracy;
+  const acc = a.hours ? `دقّتنا: خطأ ≈ ${fmt(a.mean_err_pct, 0)}% (آخر ${a.hours} ساعة، مقارنة بالعدّاد)` : 'دقّتنا: لسا عم نقيسها (بعد أول ساعة كاملة)';
+  return `<div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:#8E8C82"><span>التوقّع للـ${f.steps.length} ساعات الجاية (kW)</span>
+        <span dir="ltr" class="mono" style="color:#D9D7CF">${fmt(f.kwh, 1)} kWh ≈ ${fmt(f.jod, 2)} JD</span></div>
+      <div style="display:flex;align-items:flex-end;gap:6px;height:86px">${bars}</div>
+      <div style="font-size:11.5px;color:#8E8C82">${acc}${f.profile_hours ? '' : ' · لسا ما في تاريخ يومي، فالتوقّع = الاستهلاك الحالي'}</div>
+    </div>`;
+}
+
 function bill() {
   const b = st.bill, s = st.savings;
   const goalJd = st.goal && st.goal.bill_target_jd;
@@ -317,6 +339,7 @@ function bill() {
       </div>
     </div>
     <div style="font-size:13px;line-height:1.6;color:#D9D7CF;padding:10px 12px;border-radius:10px;background:#181A15">${esc(b.message)}</div>
+    ${forecastBlock()}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-top:6px;border-top:1px solid #1E201B">
       <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px;color:#B8F04A" dir="ltr">${fmt(s.jod, 3)}</span><span style="font-size:11.5px;color:#8E8C82">دينار وفّرناها (مُقاس · بسعر شريحتك)</span></div>
       <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px" dir="ltr">${fmt(s.kwh, 2)}</span><span style="font-size:11.5px;color:#8E8C82">ك.و.س · ${s.co2_kg === null ? '—' : fmt(s.co2_kg, 2)} كغ CO₂</span></div>
@@ -376,10 +399,12 @@ function updateChart() {
 // ---------------- main loop ----------------
 
 function renderAll() {
-  $('mode-label').textContent = WW.site === 'home' ? '· وضع البيت' : '· وضع المختبر';
-  $('mode-sub').textContent = st.source === 'simulator'
-    ? 'تصوّر للتوسّع من غرفة المختبر لبيت كامل · بيانات تركيبية من المحاكي'
-    : 'غرفة المختبر · قراءات حقيقية من ESP32 + PZEM-004T';
+  $('mode-label').textContent = '· ' + lbl('mode', '');
+  $('mode-sub').textContent = st.source !== 'simulator'
+    ? 'غرفة المختبر · قراءات حقيقية من ESP32 + PZEM-004T'
+    : WW.site === 'building'
+      ? 'نفس الوكيل ونفس الكود على مبنى بـ١٠ غرف · بيانات تركيبية من المحاكي'
+      : 'تصوّر للتوسّع من غرفة المختبر لبيت كامل · بيانات تركيبية من المحاكي';
   if (!document.activeElement || document.activeElement.id !== 'scenario-pick') WW.render($('toolbar'), toolbar());
   WW.render($('hero'), hero());
   WW.render($('goal'), goal());
@@ -389,7 +414,7 @@ function renderAll() {
   WW.render($('log'), auditLog());
   $('meter-kw').textContent = powerStr(st.meter.power_w);
   $('meter-unit').textContent = scale.unit;
-  $('meter-title').textContent = WW.site === 'home' ? 'عدّاد البيت' : 'عدّاد المختبر';
+  $('meter-title').textContent = lbl('meter', 'العدّاد');
   $('meter-clock').textContent = st.clock + (st.source === 'simulator' ? ' · sim ×60' : '');
   $('phone-clock').textContent = st.clock;
   updateChart();

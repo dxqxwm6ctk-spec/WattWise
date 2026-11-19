@@ -3,6 +3,7 @@
 | Data | Source | Status |
 |---|---|---|
 | House readings (6 rooms, 12 devices) | `simulator/sim.py`, **synthetic** | in use |
+| Office building readings (10 rooms, 27 devices) | `simulator/sim.py --site building`, **synthetic** | in use |
 | Starting meter value of the simulated house (286 kWh) | synthetic, chosen for the demo | in use |
 | Lab room readings | ESP32 + PZEM-004T + PIR/DHT11/LDR | Phase B |
 | Door / window contact | **simulated** (a push button on the device, a flag in the simulator) | in use |

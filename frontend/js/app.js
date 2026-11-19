@@ -5,7 +5,7 @@ const { esc, fmt } = WW;
 const $ = id => document.getElementById(id);
 
 const OWNER = 'أهلين 👋';   // generic greeting: no personal data
-const MAX_W = WW.site === 'lab' ? 200 : 4000;
+const MAX_W = { lab: 200, building: 12000 }[WW.site] || 4000;
 const TYPES = [
   { k: 'ac', label: 'مكيّف' }, { k: 'light', label: 'إنارة' }, { k: 'heater', label: 'دفاية / سخّان' },
   { k: 'tv', label: 'تلفزيون / شاشة' }, { k: 'washer', label: 'غسالة / جلاية' }, { k: 'pc', label: 'كمبيوتر' },
@@ -307,6 +307,11 @@ function billTab() {
         <span class="mono" style="font-size:30px;font-weight:500" dir="ltr">${fmt(s.jod, 3)} JD</span>
         <span style="font-size:12.5px;color:#4A6418">${fmt(s.kwh, 2)} ك.و.س · ${s.co2_kg === null ? '—' : fmt(s.co2_kg, 2)} كغ CO₂ أقل</span>
       </div>
+      ${st.forecast ? `<div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:6px">
+        <span class="sub">المتوقّع بالـ${st.forecast.steps.length} ساعات الجاية</span>
+        <span class="mono" style="font-size:22px;font-weight:500" dir="ltr">${fmt(st.forecast.jod, 2)} JD · ${fmt(st.forecast.kwh, 1)} kWh</span>
+        <span style="font-size:12.5px;color:#77756C">${st.forecast.accuracy.hours ? `خطأ التوقّع ≈ ${fmt(st.forecast.accuracy.mean_err_pct, 0)}% (مقاس بالعدّاد)` : 'لسا عم نقيس دقّة التوقّع'}</span>
+      </div>` : ''}
       <span class="sub" style="padding-top:4px">نصايح (ما بننفّذها لحالنا)</span>
       ${TIPS.map(t => `<div class="box" style="font-size:14px;line-height:1.65">${t}</div>`).join('')}
     </div>`;
