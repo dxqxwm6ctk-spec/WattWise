@@ -1,0 +1,22 @@
+{
+  "_note": "Household tariff tiers in JOD per kWh. These tiers were taken from the design mockup, which cites the EMRC 2025 household tariff. VERIFY them against a real, anonymized Jordanian electricity bill before the demo and fill price_source. Energy charge only: no subsidy refund or other fees.",
+  "currency": "JOD",
+  "default_type": "sub",
+  "types": {
+    "sub": {
+      "label": "مدعوم",
+      "who": "للمشتركين الأردنيين المسجّلين بالدعم، عدّاد واحد مدعوم لكل مشترك.",
+      "display_max_kwh": 700,
+      "tiers": [[300, 0.05], [600, 0.10], [null, 0.20]]
+    },
+    "unsub": {
+      "label": "غير مدعوم",
+      "who": "لغير الأردنيين، والعدّاد الثاني فما فوق، وبعض الحالات الثانية حسب الهيئة.",
+      "display_max_kwh": 1200,
+      "tiers": [[1000, 0.12], [null, 0.15]]
+    }
+  },
+  "price_source": "EMRC household tariff 2025 (as cited in the design). NOT YET VERIFIED against a real bill.",
+  "co2_kg_per_kwh": null,
+  "co2_source": "Fill with an official grid emission factor for Jordan and cite it. Until then CO2 is shown as '—'."
+}

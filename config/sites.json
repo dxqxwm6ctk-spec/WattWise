@@ -1,0 +1,42 @@
+{
+  "_note": "Sites, rooms and devices. 'home' is the simulated house (digital twin, synthetic data). 'lab' is the real test room with the ESP32. rated_w is the nameplate value, used only as a first guess until the meter measures the real load signature.",
+  "sites": {
+    "home": {
+      "name": "بيت العيلة",
+      "source": "simulator",
+      "rooms": [
+        {"id": "living",  "name": "الصالون"},
+        {"id": "bedroom", "name": "غرفة النوم"},
+        {"id": "kids",    "name": "غرفة الأولاد"},
+        {"id": "kitchen", "name": "المطبخ"},
+        {"id": "bath",    "name": "الحمّام"},
+        {"id": "hall",    "name": "الممر"}
+      ],
+      "devices": [
+        {"id": "livingAc",    "name": "مكيّف الصالون",     "room": "living",  "kind": "ac",         "rated_w": 1150, "tier": "T1", "on": true,  "setpoint": 24},
+        {"id": "livingLight", "name": "إنارة الصالون",     "room": "living",  "kind": "light",      "rated_w": 60,   "tier": "T1", "on": true},
+        {"id": "tv",          "name": "التلفزيون",          "room": "living",  "kind": "tv",         "rated_w": 95,   "tier": "T1", "on": true},
+        {"id": "bedAc",       "name": "مكيّف غرفة النوم",  "room": "bedroom", "kind": "ac",         "rated_w": 980,  "tier": "T1", "on": true,  "setpoint": 23},
+        {"id": "bedLight",    "name": "إنارة غرفة النوم",  "room": "bedroom", "kind": "light",      "rated_w": 40,   "tier": "T1", "on": false},
+        {"id": "kidsLight",   "name": "إنارة غرفة الأولاد", "room": "kids",    "kind": "light",      "rated_w": 20,   "tier": "T1", "on": true},
+        {"id": "charger",     "name": "شاحن اللابتوب",      "room": "kids",    "kind": "other",      "rated_w": 45,   "tier": "T1", "on": true},
+        {"id": "washer",      "name": "الغسالة",            "room": "kitchen", "kind": "washer",     "rated_w": 500,  "tier": "T1", "on": false},
+        {"id": "heater",      "name": "سخّان الماء",        "room": "bath",    "kind": "heater",     "rated_w": 2000, "tier": "T1", "on": false},
+        {"id": "router",      "name": "الراوتر",            "room": "hall",    "kind": "router",     "rated_w": 12,   "tier": "T1", "on": true,  "sensitive": true, "allow": false},
+        {"id": "fridge",      "name": "الثلاجة",            "room": "kitchen", "kind": "fridge",     "rated_w": 140,  "tier": "T2", "on": true},
+        {"id": "fireAlarm",   "name": "إنذار الحريق",       "room": "hall",    "kind": "fire_alarm", "rated_w": 3,    "tier": "T2", "on": true}
+      ]
+    },
+    "lab": {
+      "name": "غرفة المختبر",
+      "source": "device",
+      "rooms": [
+        {"id": "lab", "name": "غرفة المختبر"}
+      ],
+      "devices": [
+        {"id": "lamp", "name": "اللمبة", "room": "lab", "kind": "light", "rated_w": 40, "tier": "T1", "on": true, "relay_channel": 1},
+        {"id": "fan",  "name": "المروحة (بدل المكيّف)", "room": "lab", "kind": "fan", "rated_w": 45, "tier": "T1", "on": true, "relay_channel": 2}
+      ]
+    }
+  }
+}
