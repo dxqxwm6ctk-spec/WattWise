@@ -4,7 +4,7 @@ import calendar
 import json
 import time
 
-from backend import actions, billing, config, db, llm, weather
+from backend import actions, anomaly, billing, config, db, llm, weather
 
 CATEGORY = {"ac": "المكيّفات", "fan": "المكيّفات", "fridge": "الثلاجة", "heater": "سخّان الماء",
             "light": "الإنارة"}
@@ -129,6 +129,7 @@ def build(conn, site: str) -> dict:
             "brain": llm.status(conn),
         },
         "plan": _plan(conn, site, goal),
+        "anomaly": anomaly.status(conn, site),
         "weather": weather.cached(),
         "goal": goal and {"text": goal["text"], "bill_target_jd": goal["bill_target_jd"]},
         "steps": actions.GOAL_STEPS,

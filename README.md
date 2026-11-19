@@ -56,7 +56,7 @@ python -m pytest -q
 | `config/` | sites, rooms, devices, tariff |
 | `firmware/` | ESP32 sketches (Phase B) |
 | `docs/` | proposal, "how this works" notes, data sources, wiring |
-| `tests/` | Policy Guard, billing, agent flow, LLM layer (fake provider) |
+| `tests/` | Policy Guard, billing, agent flow, LLM layer (fake provider), anomaly detection |
 
 ## API (same for the ESP32 and the simulator)
 

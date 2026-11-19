@@ -53,6 +53,19 @@ function statusCard() {
     </div>`;
 }
 
+function anomalyCard() {
+  const a = st.anomaly;
+  if (!a || !a.open) return '';
+  const msg = a.kind === 'extra'
+    ? `في جهاز عم يسحب ≈ ${a.residual_w} واط وما بنعرفه. شيكي إذا في إشي شغّال ومش لازم.`
+    : `الاستهلاك أقل من المتوقع بـ≈ ${-a.residual_w} واط. ممكن جهاز فاصل أو معطّل.`;
+  return `
+    <div style="border-radius:20px;background:#FFF4D9;border:1.5px solid #E8B23A;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:14px;font-weight:700;color:#8A5A00">استهلاك غريب</span>
+      <span style="font-size:14px;line-height:1.7;color:#4A4840">${msg}</span>
+    </div>`;
+}
+
 function approvalCard() {
   const p = st.pending;
   const pct = (p.expires_in_s / p.timeout_s * 100).toFixed(1);
@@ -141,6 +154,7 @@ function homeTab() {
         </div>
       </div>
       ${st.pending ? approvalCard() : statusCard()}
+      ${anomalyCard()}
     </div>`;
 }
 

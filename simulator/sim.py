@@ -25,6 +25,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SITE = "home"
 
+# Demo "unknown_load" scenario: a device the backend does not know (anomaly detection demo).
+UNKNOWN_LOAD_W = 700
+
 # True power of a newly plugged-in device, per kind (the backend never sees this;
 # it has to measure the step on the meter, like with real hardware).
 NEW_DEVICE_W = {"ac": 1100, "light": 30, "heater": 1800, "tv": 110, "washer": 600, "pc": 180,
@@ -115,6 +118,8 @@ class House:
     def reading(self) -> dict:
         all_ids = list(self.devices) + list(self.extra_w)
         power = sum(self.device_w(k) for k in all_ids) + random.uniform(-20, 20)
+        if self.scenario == "unknown_load":   # a load the backend does not know about
+            power += UNKNOWN_LOAD_W
         power = max(0.0, power)
         minute = self.clock / 60
         volt = 229.4 + math.sin(minute) * 0.8

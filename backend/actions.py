@@ -7,7 +7,7 @@ every change goes through the same Policy Guard checks and the same audit log.
 import json
 import time
 
-from backend import config, db, policy
+from backend import anomaly, config, db, policy
 
 # Approval statuses
 PENDING, APPROVED, REJECTED, EXPIRED, BLOCKED, CANCELLED = (
@@ -128,6 +128,11 @@ def ingest(conn, payload: dict) -> None:
              None if r.get("occupied") is None else int(r["occupied"]),
              None if r.get("window_open") is None else int(r["window_open"])),
         )
+
+    # AI layer 1: is the meter reading what the known devices explain?
+    rooms = payload.get("rooms", [])
+    anomaly.observe(conn, site, power, meter_ts, occupied=any(r.get("occupied") for r in rooms),
+                    learning=db.get_state(conn, f"learn:{site}", None) is not None)
 
     # The physical emergency-stop button on the ESP32.
     if payload.get("estop_pressed") and not flag(conn, "estop", site):
@@ -322,6 +327,7 @@ def reset_demo(conn, site: str) -> None:
     db.set_state(conn, f"scenario:{site}", "normal")
     db.set_state(conn, f"saved_wh:{site}", 0.0)
     db.set_state(conn, f"learn:{site}", None)
+    anomaly.clear(conn, site)
     _close_pending(conn, site, CANCELLED)
     restore_normal(conn, site)
     for d in config.load_sites()[site]["devices"]:
@@ -355,6 +361,7 @@ SCENARIOS = {
     "heat_wave": "موجة حر: حرارة الغرف أعلى بـ5 درجات.",
     "holiday": "عطلة: البيت كله فاضي والأجهزة ضلّت شغّالة.",
     "sensor_fault": "عطل حسّاسات: المحاكي بيوقف يبعت قراءات شوي.",
+    "unknown_load": "حمل غريب: جهاز مش مسجّل (≈ 700 واط) انشغل بالبيت.",
 }
 
 

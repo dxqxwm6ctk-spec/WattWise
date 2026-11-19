@@ -33,6 +33,7 @@ function toolbar() {
       <option value="heat_wave">موجة حر</option>
       <option value="holiday">عطلة (البيت فاضي)</option>
       <option value="sensor_fault">عطل حسّاسات</option>
+      <option value="unknown_load">حمل غريب (جهاز مش مسجّل)</option>
       <option value="normal">رجّع طبيعي</option>
     </select>` : '';
   return `${other}${scen}
@@ -153,6 +154,7 @@ function goal() {
     </div>
     ${body}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">${steps}</div>
+    ${anomalyBox()}
     ${brainLine()}`;
 }
 
@@ -164,6 +166,23 @@ function planBox() {
   return `<div style="border:1px solid #2A2C25;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
       <div class="muted" style="font-size:12px">${by}</div>
       ${p.steps.map((x, i) => `<div style="font-size:13.5px;line-height:1.5"><span class="mono" style="color:#B8F04A">${i + 1}.</span> ${esc(x)}</div>`).join('')}
+    </div>`;
+}
+
+// AI layer 1: the meter reads something the known devices do not explain.
+function anomalyBox() {
+  const a = st.anomaly;
+  if (!a) return '';
+  if (!a.open) {
+    const learning = a.ready ? 'كشف الشذوذ: الاستهلاك ضمن الطبيعي' : `كشف الشذوذ: عم نتعلّم الطبيعي (${a.samples} قراءة)`;
+    return `<div class="muted" style="font-size:12px">${learning}</div>`;
+  }
+  const what = a.kind === 'extra'
+    ? `العدّاد ≈ <span class="mono">${a.power_w}</span> واط والمتوقع ≈ <span class="mono">${a.expected_w}</span> واط: زيادة ≈ <span class="mono">${a.residual_w}</span> واط ما بنعرف مصدرها.`
+    : `العدّاد أقل من المتوقع بـ≈ <span class="mono">${-a.residual_w}</span> واط: ممكن جهاز فاصل أو معطّل.`;
+  return `<div style="border:1px solid #F2B544;background:rgba(242,181,68,.08);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px">
+      <div style="color:#F2B544;font-weight:600;font-size:13.5px">⚠ شذوذ بالاستهلاك (تنبيه بس، ما بنطفي إشي)</div>
+      <div style="font-size:13.5px;line-height:1.6">${what}</div>
     </div>`;
 }
 

@@ -21,6 +21,10 @@ class HomeScreen extends StatelessWidget {
       pending != null
           ? _ApprovalCard(p: pending, onApprove: () => run(() => onApprove(pending['id'])), onReject: () => run(() => onReject(pending['id'])))
           : _StatusCard(st: st),
+      if ((st['anomaly'] as Map<String, dynamic>?)?['open'] == true) ...[
+        const SizedBox(height: 12),
+        _AnomalyCard(a: st['anomaly'] as Map<String, dynamic>),
+      ],
     ]);
   }
 }
@@ -230,6 +234,30 @@ class _StatusCard extends StatelessWidget {
         Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.$1)),
         const SizedBox(height: 4),
         Text(body, style: const TextStyle(fontSize: 14, height: 1.7, color: Color(0xFF4A4840))),
+      ]),
+    );
+  }
+}
+
+
+/// AI layer 1: the meter reads something the known devices do not explain. Alert only.
+class _AnomalyCard extends StatelessWidget {
+  const _AnomalyCard({required this.a});
+  final Map<String, dynamic> a;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = (a['residual_w'] as num? ?? 0).toInt();
+    final msg = a['kind'] == 'extra'
+        ? 'في جهاز عم يسحب ≈ $w واط وما بنعرفه. شيكي إذا في إشي شغّال ومش لازم.'
+        : 'الاستهلاك أقل من المتوقع بـ≈ ${-w} واط. ممكن جهاز فاصل أو معطّل.';
+    return WWBox(
+      color: WW.pendingBg,
+      border: WW.pendingBorder,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('استهلاك غريب', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: WW.pendingText)),
+        const SizedBox(height: 4),
+        Text(msg, style: const TextStyle(fontSize: 14, height: 1.7)),
       ]),
     );
   }

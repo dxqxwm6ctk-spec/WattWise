@@ -104,6 +104,16 @@ CREATE TABLE IF NOT EXISTS goals (
     active      INTEGER NOT NULL
 );
 
+-- Anomaly model: running mean/variance of (meter - expected) per hour and occupancy.
+CREATE TABLE IF NOT EXISTS anomaly_stats (
+    site        TEXT NOT NULL,
+    bucket      TEXT NOT NULL,             -- "19:occ", "03:empty", or "all"
+    n           INTEGER NOT NULL,
+    mean        REAL NOT NULL,
+    m2          REAL NOT NULL,
+    PRIMARY KEY (site, bucket)
+);
+
 CREATE TABLE IF NOT EXISTS system_state (
     key         TEXT PRIMARY KEY,
     value       TEXT NOT NULL
