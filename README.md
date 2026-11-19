@@ -18,7 +18,8 @@ python -m simulator.sim
 
 Open:
 - Dashboard: http://localhost:8000/index.html
-- Phone approval page (web backup of the Flutter app): http://localhost:8000/app.html
+- Phone app: Flutter, in `mobile/` (see `mobile/README.md`)
+- Web backup of the phone page: http://localhost:8000/app.html
   From a phone on the same Wi-Fi, use the laptop's IP, for example `http://192.168.1.10:8000/app.html`.
 
 ### طريقة التجربة بالعربي
@@ -40,7 +41,8 @@ python -m pytest -q
 |---|---|
 | `backend/` | FastAPI app, agent loop, Policy Guard, approvals, bill math |
 | `simulator/` | digital twin that posts the same data as the ESP32 |
-| `frontend/` | dashboard (HTML/JS + Chart.js) and the phone approval page (PWA) |
+| `frontend/` | dashboard (HTML/JS + Chart.js) and the web backup of the phone page (PWA) |
+| `mobile/` | owner's phone app (Flutter), see `mobile/README.md` |
 | `config/` | sites, rooms, devices, tariff |
 | `firmware/` | ESP32 sketches (Phase B) |
 | `docs/` | proposal, "how this works" notes, data sources, wiring |

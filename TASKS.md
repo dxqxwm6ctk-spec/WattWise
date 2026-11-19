@@ -23,7 +23,8 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Dashboard (plain HTML/JS + Chart.js) implementing the "WattWise Home" design
 - [x] Web approval page (PWA, works offline on the local network) as backup for the Flutter app
 - [x] Tests: Policy Guard, bill math, end-to-end agent flow (29 passing)
-- [ ] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API
+- [x] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API (tested as a web build against the simulator)
+- [ ] Run the Flutter app on a real Android phone on the local Wi-Fi
 - [ ] LLM planner + explainer with tool use, spending cap, provider abstraction, rule-based fallback
 - [ ] Open-Meteo weather tool (optional when offline)
 - [ ] Anomaly detection model (rolling mean / Isolation Forest per load, hour, occupancy)
