@@ -73,6 +73,26 @@ STALE_READING_S = _env_float("STALE_READING_S", 15)
 # How often the agent loop runs.
 AGENT_INTERVAL_S = _env_float("AGENT_INTERVAL_S", 1)
 
+# --- Weather tool (Open-Meteo, free, no key). Default: Irbid. ---
+WEATHER_ENABLED = os.environ.get("WEATHER_ENABLED", "1") != "0"
+WEATHER_LAT = _env_float("WEATHER_LAT", 32.56)
+WEATHER_LON = _env_float("WEATHER_LON", 35.85)
+WEATHER_PLACE = os.environ.get("WEATHER_PLACE", "Irbid")
+
+# --- LLM planner (optional). With no key, the rule-based planner does everything. ---
+# "anthropic" or "none". The key is read from the environment, never from the code.
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic")
+LLM_API_KEY = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("LLM_API_KEY") or ""
+LLM_MODEL = os.environ.get("LLM_MODEL", "claude-opus-5-5")
+# Spending cap: when this month's estimated spend reaches it, the agent uses rules only.
+LLM_MONTHLY_BUDGET_USD = _env_float("LLM_MONTHLY_BUDGET_USD", 5)
+# Price per million tokens, used to estimate the spend (Claude Opus 5.5 list price).
+LLM_PRICE_IN_PER_MTOK = _env_float("LLM_PRICE_IN_PER_MTOK", 4)
+LLM_PRICE_OUT_PER_MTOK = _env_float("LLM_PRICE_OUT_PER_MTOK", 20)
+# If the LLM does not answer within this time, the rule-based explanation is used.
+LLM_TIMEOUT_S = _env_float("LLM_TIMEOUT_S", 30)
+LLM_MAX_TOOL_ROUNDS = 6
+
 
 def load_sites() -> dict:
     return json.loads(SITES_FILE.read_text(encoding="utf-8"))["sites"]

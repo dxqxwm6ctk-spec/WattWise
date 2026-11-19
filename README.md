@@ -29,6 +29,16 @@ Open:
 4. بعد ثواني بتطلع بطاقة «بدنا رأيك» على الهاتف. اضغط «إيه، طفّيه» أو «لا، خلّيه».
 5. شوف سجل القرارات والتوفير المُقاس بالفاتورة.
 
+## AI planner (optional)
+
+Without an API key everything runs on the rule-based planner (works offline).
+To let the LLM split the goal into a plan and explain each proposal, copy
+`.env.example` to `.env` and set `ANTHROPIC_API_KEY`. The monthly spending cap is
+`LLM_MONTHLY_BUDGET_USD` (default 5 USD); when it is reached, or the API is down
+or late, the agent falls back to the rules by itself. The LLM never switches a
+device: the Policy Guard and your approval still decide. Requests opt in to the
+API's server-side fallback model, so a declined request is retried on another model.
+
 ## Tests
 
 ```bash
@@ -46,7 +56,7 @@ python -m pytest -q
 | `config/` | sites, rooms, devices, tariff |
 | `firmware/` | ESP32 sketches (Phase B) |
 | `docs/` | proposal, "how this works" notes, data sources, wiring |
-| `tests/` | Policy Guard, billing, agent flow |
+| `tests/` | Policy Guard, billing, agent flow, LLM layer (fake provider) |
 
 ## API (same for the ESP32 and the simulator)
 

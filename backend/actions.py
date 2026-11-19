@@ -12,9 +12,24 @@ from backend import config, db, policy
 # Approval statuses
 PENDING, APPROVED, REJECTED, EXPIRED, BLOCKED, CANCELLED = (
     "pending", "approved", "rejected", "expired", "blocked", "cancelled")
+SKIPPED = "skipped"   # the LLM planner decided not to ask about this device
 
 # devices.agent_off values
 AGENT_OFF_NONE, AGENT_OFF_UNVERIFIED, AGENT_OFF_VERIFIED = 0, 1, 2
+
+def rule_plan(text: str, bill_target_jd: float | None) -> list[str]:
+    """The plan the rule-based agent follows (used when there is no LLM)."""
+    steps = [
+        "أراقب العدّاد وكل غرفة كل ثانية.",
+        "أدوّر على أجهزة شغّالة بغرف فاضية.",
+        "أتأكد إنه الإطفاء ما بيكسر حدود الراحة ولا بيلمس جهاز ممنوع.",
+        "أسألك قبل أي إطفاء، وإذا ما رديت ما بعمل إشي.",
+        "أتأكد من التوفير بالعدّاد وأحسبه بالدينار.",
+    ]
+    if bill_target_jd:
+        steps.append(f"أقارن الفاتورة المتوقعة بهدفك ({bill_target_jd:g} دينار).")
+    return steps
+
 
 GOAL_STEPS = [
     "قراءة العدّاد والحسّاسات والطقس",
@@ -152,6 +167,9 @@ def set_goal(conn, site: str, text: str, bill_target_jd: float | None) -> dict:
     conn.execute("UPDATE goals SET active=0 WHERE site=?", (site,))
     conn.execute("INSERT INTO goals (site, created_ts, text, bill_target_jd, active) VALUES (?,?,?,?,1)",
                  (site, time.time(), text, bill_target_jd))
+    goal = active_goal(conn, site)
+    db.set_state(conn, f"plan:{site}", {"goal_id": goal["id"], "by": "rules",
+                                         "steps": rule_plan(text, bill_target_jd), "summary": ""})
     db.audit(conn, site, "T0", "agent", "goal_received",
              f"استلمت الهدف وقسّمته لـ{len(GOAL_STEPS)} خطوات. الوضع: مراقبة.",
              {"goal": text, "steps": GOAL_STEPS})

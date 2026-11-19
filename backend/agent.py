@@ -1,4 +1,4 @@
-"""The agent loop (rule-based planner for now).
+"""The agent loop: rule-based planner, with an optional LLM planner on top.
 
 Every second, for each site, the agent:
   1. expires approval requests nobody answered (silence is not consent),
@@ -6,14 +6,16 @@ Every second, for each site, the agent:
   3. verifies executed actions with the meter (and learns the load signature),
   4. looks for waste and, if it finds some, proposes an action and asks the human.
 
-The steps are written as small "tools" so the LLM planner (next phase) can call
-the very same functions. The LLM will only choose and explain; the Policy Guard
-and the approval flow stay in plain code.
+The steps are small "tools". When an LLM is configured (backend/llm.py) it
+splits the goal into a plan and chooses/explains the proposal; the Policy Guard
+and the approval flow stay in plain code, and the rules take over whenever the
+LLM is missing, late, broken or over budget.
 """
 
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 
-from backend import actions, billing, config, db, policy
+from backend import actions, billing, config, db, llm, policy, weather
 
 # Remembers what the agent is currently looking at, per site: {"device_id", "since"}
 _analyzing: dict[str, dict] = {}
@@ -69,8 +71,8 @@ def detect_waste(conn, site: str, now: float) -> list[dict]:
 
 def recently_asked(conn, site: str, device_id: str, now: float) -> bool:
     row = conn.execute(
-        "SELECT MAX(decided_ts) AS t FROM approvals WHERE site=? AND device_id=? AND status IN (?,?,?)",
-        (site, device_id, actions.REJECTED, actions.EXPIRED, actions.BLOCKED)).fetchone()
+        "SELECT MAX(decided_ts) AS t FROM approvals WHERE site=? AND device_id=? AND status IN (?,?,?,?)",
+        (site, device_id, actions.REJECTED, actions.EXPIRED, actions.BLOCKED, actions.SKIPPED)).fetchone()
     return row["t"] is not None and now - row["t"] < config.ASK_COOLDOWN_S
 
 
@@ -133,7 +135,10 @@ def tick(conn, site: str, now: float | None = None) -> None:
 
     if estop or actions.flag(conn, "safe_mode", site):
         _analyzing.pop(site, None)
+        _jobs.pop(site, None)
         return
+
+    _llm_plan(conn, site, now)
 
     # 4. Plan: only when the human gave a goal, and one question at a time.
     if not actions.active_goal(conn, site) or actions.pending_approval(conn, site):
@@ -144,6 +149,7 @@ def tick(conn, site: str, now: float | None = None) -> None:
     candidates = [w for w in detect_waste(conn, site, now)
                   if not recently_asked(conn, site, w["device"]["id"], now)]
     if not candidates:
+        _jobs.pop(site, None)
         if site in _analyzing:
             _analyzing.pop(site)
             if actions.get_phase(conn, site) == "analyzing":
@@ -155,6 +161,7 @@ def tick(conn, site: str, now: float | None = None) -> None:
     current = _analyzing.get(site)
     if not current or current["device_id"] != d["id"]:
         _analyzing[site] = {"device_id": d["id"], "since": now}
+        _jobs.pop(site, None)
         room_name = _room_name(conn, site, d["room"])
         extra = "، وشباكها مفتوح" if waste["window_open"] else ""
         db.audit(conn, site, "T0", "agent", "waste_detected",
@@ -164,24 +171,157 @@ def tick(conn, site: str, now: float | None = None) -> None:
     if now - current["since"] < config.ANALYZE_S:
         return
 
-    # Ask the Policy Guard before even asking the human.
-    decision = policy.check_switch(d, False, policy.AGENT, waste["room"], estop=estop)
-    _analyzing.pop(site, None)
-    if not decision.allowed:
-        conn.execute(
-            "INSERT INTO approvals (site, device_id, turn_on, created_ts, expires_ts, title, reason, status, decided_ts) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
-            (site, d["id"], 0, now, now, "blocked", decision.reason_ar, actions.BLOCKED, now))
-        db.audit(conn, site, "T0", "policy", "proposal_blocked",
-                 f"ما رح نقترح إطفاء {d['name']}: {decision.reason_ar}")
+    # Ask the Policy Guard before even asking the human (and before the LLM sees it).
+    allowed = []
+    for w in candidates:
+        decision = policy.check_switch(w["device"], False, policy.AGENT, w["room"], estop=estop)
+        if decision.allowed:
+            allowed.append(w)
+        elif w is waste:
+            _record_skip(conn, site, w["device"], actions.BLOCKED, decision.reason_ar, now)
+            db.audit(conn, site, "T0", "policy", "proposal_blocked",
+                     f"ما رح نقترح إطفاء {w['device']['name']}: {decision.reason_ar}")
+    if waste not in allowed:
+        _analyzing.pop(site, None)
         actions.set_phase(conn, site, "normal")
         return
 
     price = get_tariff(conn, site)["price_jod_per_kwh"]
+    choice = _llm_choice(conn, site, now, allowed, price)
+    if choice == "wait":
+        return
+    _analyzing.pop(site, None)
+
+    if choice and choice["action"] == "none":
+        _record_skip(conn, site, d, actions.SKIPPED, choice["reason"], now)
+        db.audit(conn, site, "T0", "llm", "no_action", f"قرّرنا ما نقترح إشي هلأ: {choice['reason']}")
+        actions.set_phase(conn, site, "normal")
+        return
+
+    if choice:
+        picked = [w for w in allowed if w["device"]["id"] == choice["device_id"]]
+        if picked:
+            waste, d = picked[0], picked[0]["device"]
+        else:  # the situation changed while the LLM was thinking
+            choice = None
     title, reason, details = explain(waste, price)
+    details["explained_by"] = "rules"
+    if choice:
+        title = choice["title"] or title
+        reason = choice["reason"] or reason
+        details["alternative"] = choice["alternative"] or details["alternative"]
+        details["explained_by"] = "llm"
     actions.request_approval(conn, site, d, False, title, reason, details)
-    db.audit(conn, site, "T1", "agent", "proposal",
+    db.audit(conn, site, "T1", "llm" if choice else "agent", "proposal",
              f"اقتراح: إطفاء {d['name']} (−{round(d['signature_w'])} واط). بانتظار الموافقة.", details)
+
+
+def _record_skip(conn, site, d, status, reason, now) -> None:
+    """A closed approval row, so the agent does not ask about this device again for a while."""
+    conn.execute(
+        "INSERT INTO approvals (site, device_id, turn_on, created_ts, expires_ts, title, reason, status, decided_ts) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
+        (site, d["id"], 0, now, now, status, reason, status, now))
+
+
+# ---------------- LLM layer (optional) ----------------
+# The LLM runs in a background thread so the 1-second loop never blocks.
+# It only reads a snapshot; its answer comes back here and goes through the
+# same Policy Guard and approval flow as the rule-based planner.
+
+_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="llm")
+_jobs: dict[str, dict] = {}        # decision jobs, per site
+_plan_jobs: dict[str, dict] = {}   # goal-plan jobs, per site
+
+
+def _submit(fn, *args) -> Future:
+    return _executor.submit(fn, *args)
+
+
+def snapshot(conn, site: str, now: float, wastes: list[dict], price: float) -> dict:
+    """Everything the LLM may look at, as plain JSON (read-only copy)."""
+    meter = db.latest_meter(conn, site) or {}
+    rooms = []
+    for r in db.rooms(conn, site):
+        x = db.latest_room(conn, site, r["id"]) or {}
+        rooms.append({"room_id": r["id"], "name": r["name"], "temp_c": x.get("temp_c"), "light": x.get("light"),
+                      "occupied": x.get("occupied"), "window_open": x.get("window_open")})
+    on = [{"device_id": d["id"], "name": d["name"], "room": d["room"], "kind": d["kind"],
+           "watts": round(d["signature_w"])} for d in db.devices(conn, site) if d["is_on"]]
+    tariff = get_tariff(conn, site)
+    tariff["month_kwh"] = meter.get("energy_kwh")
+    waste = [{"device_id": w["device"]["id"], "name": w["device"]["name"], "room": w["device"]["room"],
+              "watts": round(w["device"]["signature_w"]),
+              "watts_measured_by_meter": bool(w["device"]["signature_measured"]),
+              "room_empty_minutes": round(w["empty_s"] / 60, 1), "window_open": w["window_open"],
+              "room_temp_c": (w["room"] or {}).get("temp_c"),
+              "saving_jod_per_hour": round(w["device"]["signature_w"] / 1000 * price, 3)} for w in wastes]
+    return {"read_sensors": {"power_w": meter.get("power_w"), "rooms": rooms, "devices_on": on,
+                             "comfort_c": [config.COMFORT_MIN_TEMP_C, config.COMFORT_MAX_TEMP_C]},
+            "get_tariff": tariff, "detect_waste": waste}
+
+
+def _finish(conn, site: str, job: dict, kind: str):
+    """Collect a finished (or late) LLM job. Returns its answer, or None for fallback."""
+    f: Future = job["future"]
+    if not f.done():
+        f.cancel()
+        llm.mark_down()
+        db.audit(conn, site, "T0", "system", "llm_fallback", f"النموذج تأخّر ({kind}). كمّلنا بالقواعد.")
+        return None
+    try:
+        answer, result = f.result()
+    except Exception as e:
+        llm.mark_down()
+        db.audit(conn, site, "T0", "system", "llm_fallback",
+                 f"النموذج ما اشتغل ({kind}: {type(e).__name__}). كمّلنا بالقواعد.")
+        return None
+    llm.add_spend(conn, result)
+    if answer is None:
+        db.audit(conn, site, "T0", "system", "llm_fallback", f"جواب النموذج ما كان صالح ({kind}). كمّلنا بالقواعد.")
+    return answer
+
+
+def _llm_choice(conn, site: str, now: float, allowed: list[dict], price: float):
+    """'wait' while the LLM thinks, its choice when done, None to use the rules."""
+    job = _jobs.get(site)
+    if job is None:
+        if not llm.available(conn):
+            return None
+        goal = actions.active_goal(conn, site)
+        snap = snapshot(conn, site, now, allowed, price)
+        _jobs[site] = {"since": now, "future": _submit(llm.decide, llm.get_provider(), goal["text"], snap)}
+        job = _jobs[site]
+    if not job["future"].done() and now - job["since"] < config.LLM_TIMEOUT_S:
+        return "wait"
+    _jobs.pop(site, None)
+    return _finish(conn, site, job, "اقتراح")
+
+
+def _llm_plan(conn, site: str, now: float) -> None:
+    """When a goal arrives, let the LLM split it into its own plan (rule plan stays until then)."""
+    goal = actions.active_goal(conn, site)
+    plan = db.get_state(conn, f"plan:{site}", None)
+    if not goal or not plan or plan.get("goal_id") != goal["id"]:
+        return
+    job = _plan_jobs.get(site)
+    if job is None:
+        if plan.get("by") != "rules" or plan.get("llm_tried") or not llm.available(conn):
+            return
+        db.set_state(conn, f"plan:{site}", {**plan, "llm_tried": True})
+        snap = snapshot(conn, site, now, [], get_tariff(conn, site)["price_jod_per_kwh"])
+        _plan_jobs[site] = {"since": now, "goal_id": goal["id"],
+                            "future": _submit(llm.plan_goal, llm.get_provider(), goal["text"],
+                                              goal["bill_target_jd"], snap)}
+        return
+    if not job["future"].done() and now - job["since"] < config.LLM_TIMEOUT_S:
+        return
+    _plan_jobs.pop(site, None)
+    answer = _finish(conn, site, job, "خطة")
+    if answer and job["goal_id"] == goal["id"]:
+        db.set_state(conn, f"plan:{site}", {"goal_id": goal["id"], "by": "llm", **answer})
+        db.audit(conn, site, "T0", "llm", "plan", "النموذج قسّم الهدف لخطة: " + " · ".join(answer["steps"]),
+                 {"steps": answer["steps"], "summary": answer["summary"]})
 
 
 def _verify(conn, site: str, now: float) -> None:
@@ -217,6 +357,7 @@ def _room_name(conn, site: str, room_id: str) -> str:
 
 
 def tick_all() -> None:
+    weather.refresh_in_background()
     with db.connect() as conn:
         for site in config.load_sites():
             tick(conn, site)

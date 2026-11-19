@@ -4,10 +4,17 @@ import calendar
 import json
 import time
 
-from backend import actions, billing, config, db
+from backend import actions, billing, config, db, llm, weather
 
 CATEGORY = {"ac": "المكيّفات", "fan": "المكيّفات", "fridge": "الثلاجة", "heater": "سخّان الماء",
             "light": "الإنارة"}
+
+
+def _plan(conn, site, goal):
+    plan = db.get_state(conn, f"plan:{site}", None)
+    if not goal or not plan or plan.get("goal_id") != goal["id"]:
+        return None
+    return {"by": plan.get("by", "rules"), "steps": plan.get("steps", []), "summary": plan.get("summary", "")}
 
 
 def _history(conn, site: str, points: int = 60) -> list[dict]:
@@ -119,7 +126,10 @@ def build(conn, site: str) -> dict:
             "estop": actions.flag(conn, "estop", site),
             "safe_mode": actions.flag(conn, "safe_mode", site),
             "fault": actions.flag(conn, "fault", site),
+            "brain": llm.status(conn),
         },
+        "plan": _plan(conn, site, goal),
+        "weather": weather.cached(),
         "goal": goal and {"text": goal["text"], "bill_target_jd": goal["bill_target_jd"]},
         "steps": actions.GOAL_STEPS,
         "pending": pending_out,

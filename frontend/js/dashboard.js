@@ -135,6 +135,7 @@ function goal() {
     const t = st.goal.bill_target_jd;
     body = `<div style="font-size:clamp(20px,2.2vw,28px);font-weight:600;line-height:1.45;text-wrap:pretty">«${esc(st.goal.text)}»</div>
       ${t ? `<div class="muted">سقف الفاتورة: <span style="color:#B8F04A" class="mono">${fmt(t)} JD</span></div>` : ''}
+      ${planBox()}
       <div><button class="tb ghost" data-act="clear-goal" style="height:30px;font-size:12px">تغيير الهدف</button></div>`;
   } else {
     body = `<div class="muted">أعطِ الوكيل هدف (مش سؤال)، وهو بيقسّمه لخطوات لحاله:</div>
@@ -151,7 +152,29 @@ function goal() {
       <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:${ag.color}"><span style="width:8px;height:8px;border-radius:50%;background:${ag.color}"></span>${ag.label}</div>
     </div>
     ${body}
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">${steps}</div>`;
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">${steps}</div>
+    ${brainLine()}`;
+}
+
+// The agent's own plan for this goal (from the LLM, or the rule-based template).
+function planBox() {
+  const p = st.plan;
+  if (!p || !p.steps.length) return '';
+  const by = p.by === 'llm' ? 'خطة من النموذج الذكي' : 'خطة القواعد';
+  return `<div style="border:1px solid #2A2C25;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+      <div class="muted" style="font-size:12px">${by}</div>
+      ${p.steps.map((x, i) => `<div style="font-size:13.5px;line-height:1.5"><span class="mono" style="color:#B8F04A">${i + 1}.</span> ${esc(x)}</div>`).join('')}
+    </div>`;
+}
+
+// Which brain is planning right now, how much of the monthly LLM budget is used, and the weather.
+function brainLine() {
+  const b = st.agent.brain || {};
+  const w = st.weather || {};
+  const mode = b.mode === 'llm' ? `النموذج: <span class="mono">${esc(b.model || '')}</span>` : 'القواعد';
+  const spend = b.model ? ` · صرفنا <span class="mono" dir="ltr">$${fmt(b.spent_usd, 2)} / $${fmt(b.budget_usd, 0)}</span> هالشهر` : '';
+  const wx = w.available ? ` · برّا ${fmt(w.outdoor_temp_c, 1)}° (${esc(w.place || '')}، Open-Meteo)` : ' · الطقس: ما في نت، بنكمّل بدونه';
+  return `<div class="muted" style="font-size:12px;line-height:1.6" title="${esc(b.reason_ar || '')}">المخ: ${mode}${spend}${wx}</div>`;
 }
 
 function roomsMap() {
