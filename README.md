@@ -6,6 +6,17 @@ An AI agent that lowers a building's electricity use. It reads one power meter a
 
 ## Run it (no hardware needed)
 
+One command for the whole demo (backend + house + 10-room building):
+
+```bash
+pip install -r requirements.txt
+python scripts/run_demo.py --fresh
+```
+
+The demo script and backup plan (Arabic) are in `docs/demo/demo_script_ar.md`.
+
+Or step by step:
+
 ```bash
 pip install -r requirements.txt
 
@@ -59,7 +70,8 @@ python -m pytest -q
 | `mobile/` | owner's phone app (Flutter), see `mobile/README.md` |
 | `config/` | sites, rooms, devices, tariff |
 | `firmware/` | ESP32 sketches (Phase B) |
-| `docs/` | proposal, "how this works" notes, data sources, wiring |
+| `docs/` | proposal, "how this works" notes, demo script, data sources, wiring |
+| `scripts/` | `run_demo.py` (start everything), `record_demo_video.py` (backup video) |
 | `tests/` | Policy Guard, billing, agent flow, LLM layer (fake provider), anomaly detection, forecast, building, M&V and report |
 
 ## API (same for the ESP32 and the simulator)

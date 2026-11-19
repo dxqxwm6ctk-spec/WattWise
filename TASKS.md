@@ -53,4 +53,5 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Savings report: `/api/sites/{site}/report` (HTML, print to PDF); sample from the simulator in project files
 - [ ] "How this works" notes for every part (`docs/explain/`)
 - [ ] Phase 1 proposal text (Arabic) in `docs/proposal/` (draft written; placeholders for bill, measurement, team still open)
-- [ ] Demo script and backup plan (offline network, recorded video, pre-generated report)
+- [x] Demo script and backup plan (`docs/demo/demo_script_ar.md`), one-command launcher (`scripts/run_demo.py`), fonts vendored for offline, recorded backup video and pre-generated report in project files
+- [ ] Team rehearses the demo twice and times it
