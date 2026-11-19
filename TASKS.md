@@ -55,3 +55,5 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [ ] Phase 1 proposal text (Arabic) in `docs/proposal/` (draft written; placeholders for bill, measurement, team still open)
 - [x] Demo script and backup plan (`docs/demo/demo_script_ar.md`), one-command launcher (`scripts/run_demo.py`), fonts vendored for offline, recorded backup video and pre-generated report in project files
 - [ ] Team rehearses the demo twice and times it
+- [x] Optional online copy: `railway.json` + `scripts/cloud_start.py` (backend on `$PORT` + simulators), tested locally the Railway way
+- [ ] Online copy actually deployed on Railway (needs the user's Railway account; steps in `docs/deploy/railway_ar.md`)

@@ -44,6 +44,13 @@ Open:
 4. بعد ثواني بتطلع بطاقة «بدنا رأيك» على الهاتف. اضغط «إيه، طفّيه» أو «لا، خلّيه».
 5. شوف سجل القرارات والتوفير المُقاس بالفاتورة.
 
+## Online copy on Railway (optional)
+
+The demo never needs the internet. For an optional hosted copy, Railway reads
+`railway.json` and runs `python scripts/cloud_start.py` (backend on `$PORT` plus the
+simulators, synthetic data only). Set `WATTWISE_DB=/data/wattwise.db` with a volume
+at `/data` to keep the database. Steps in Arabic: `docs/deploy/railway_ar.md`.
+
 ## AI planner (optional)
 
 Without an API key everything runs on the rule-based planner (works offline).

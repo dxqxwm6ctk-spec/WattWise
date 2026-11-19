@@ -134,6 +134,8 @@ def connect(path: Path | None = None):
 
 def init_db() -> None:
     """Create tables and seed rooms/devices from config/sites.json (first run only)."""
+    # On a cloud host the database may live on a mounted volume (for example /data).
+    config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as conn:
         conn.executescript(SCHEMA)
         for site_id, site in config.load_sites().items():
