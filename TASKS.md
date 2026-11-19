@@ -51,5 +51,5 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [ ] M&V baseline model (temperature, occupancy, hour) + tests
 - [ ] Savings report (PDF/HTML)
 - [ ] "How this works" notes for every part (`docs/explain/`)
-- [ ] Phase 1 proposal text (Arabic) in `docs/proposal/`
+- [ ] Phase 1 proposal text (Arabic) in `docs/proposal/` (draft written; placeholders for bill, measurement, team still open)
 - [ ] Demo script and backup plan (offline network, recorded video, pre-generated report)
