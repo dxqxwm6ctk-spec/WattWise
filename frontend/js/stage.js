@@ -28,13 +28,13 @@ const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 6
 function bar() {
   const net = st.internet || {};
   const netPill = !net.checked
-    ? `<span class="pill" style="--c:#8E8C82"><i></i>بنفحص الإنترنت…</span>`
+    ? `<span class="pill" style="--c:#8E8C82"><i></i>جارٍ فحص الإنترنت…</span>`
     : net.online
       ? `<span class="pill big" style="--c:#B8F04A"><i></i>متصل بالإنترنت</span>`
-      : `<span class="pill big live" style="--c:#E8553F"><i></i>بدون إنترنت · شغّال محليًا${net.forced ? ' (محاكاة)' : ''}</span>`;
+      : `<span class="pill big live" style="--c:#E8553F"><i></i>دون إنترنت · يعمل محليًا${net.forced ? ' (محاكاة)' : ''}</span>`;
   const meterPill = st.online
     ? `<span class="pill live" style="--c:#B8F04A"><i></i>العدّاد متصل · <b class="mono" dir="ltr">${fmt(st.meter.power_w, 0)} W</b></span>`
-    : `<span class="pill" style="--c:#E8553F"><i></i>ما في قراءات · وضع آمن</span>`;
+    : `<span class="pill" style="--c:#E8553F"><i></i>لا توجد قراءات · الوضع الآمن</span>`;
   const brain = st.agent.brain || {};
   const brainPill = `<span class="pill" style="--c:${brain.mode === 'llm' ? '#8FC7FF' : '#F2B544'}" title="${esc(brain.reason_ar)}"><i></i>${brain.mode === 'llm' ? 'العقل: نموذج ذكاء اصطناعي' : 'العقل: قواعد محلية'}</span>`;
   const sim = st.source === 'simulator';
@@ -42,8 +42,8 @@ function bar() {
     <div class="brand"><div class="logo">W/</div><div><b>WattWise</b><small>${esc(st.site_name)} · شاشة العرض للحكّام</small></div></div>
     <div class="pills">${netPill}${meterPill}${brainPill}</div>
     <div class="pills">
-      <button class="btn warn" data-act="net" title="للتجربة فقط. قدّام الحكّام: افصلوا كيبل الإنترنت عن الراوتر.">${net.forced ? 'رجّع النت (محاكاة)' : 'افصل النت (محاكاة)'}</button>
-      ${sim ? `<button class="btn" data-act="waste">اصنع هدر (غرفة فاضية)</button>` : ''}
+      <button class="btn warn" data-act="net" title="للتجربة فقط. أمام الحكّام: افصلوا كابل الإنترنت عن الراوتر.">${net.forced ? 'إعادة الإنترنت (محاكاة)' : 'فصل الإنترنت (محاكاة)'}</button>
+      ${sim ? `<button class="btn" data-act="waste">اصنع هدرًا (غرفة فارغة)</button>` : ''}
       <a class="btn ghost" href="index.html?site=${encodeURIComponent(WW.site)}">اللوحة الكاملة</a>
       <button class="btn ghost" data-act="reset">إعادة الضبط</button>
       <button class="btn stop" data-act="estop">إيقاف طوارئ</button>
@@ -56,44 +56,44 @@ function offlineBanner() {
   const w = net.local_work || {};
   return `
     <div class="offline">
-      <div class="ttl"><i></i>انقطع الإنترنت من <span class="mono" dir="ltr">${mmss(net.since_s || 0)}</span> · وWattWise ما وقف${net.forced ? ' <span class="tag">محاكاة للتجربة</span>' : ''}</div>
-      <div class="sub">كل الذكاء الأساسي على اللابتوب والشبكة المحلية: القياس، كشف الهدر، بطاقة الموافقة على التلفون، الإطفاء الحقيقي، والتحقق بالعدّاد.</div>
+      <div class="ttl"><i></i>الإنترنت مقطوع منذ <span class="mono" dir="ltr">${mmss(net.since_s || 0)}</span> · وWattWise لم يتوقف${net.forced ? ' <span class="tag">محاكاة للتجربة</span>' : ''}</div>
+      <div class="sub">الذكاء الأساسي كله يعمل على اللابتوب والشبكة المحلية: القياس، وكشف الهدر، وبطاقة الموافقة على الهاتف، والإطفاء الحقيقي، والتحقق بالعدّاد.</div>
       <div class="cnt">
-        <div><b>${w.readings ?? 0}</b><span>قراءة عدّاد انحفظت</span></div>
-        <div><b>${w.detections ?? 0}</b><span>هدر أو استهلاك غريب انكشف</span></div>
-        <div><b>${w.actions ?? 0}</b><span>إجراء انفّذ بعد موافقة</span></div>
+        <div><b>${w.readings ?? 0}</b><span>قراءة عدّاد محفوظة</span></div>
+        <div><b>${w.detections ?? 0}</b><span>حالة هدر أو استهلاك غريب مكتشفة</span></div>
+        <div><b>${w.actions ?? 0}</b><span>إجراء نُفِّذ بعد الموافقة</span></div>
         <div><b>${w.verified ?? 0}</b><span>تحقّق بالعدّاد</span></div>
       </div>
       <div class="ok">
         ${(net.works_offline || []).map(x => `<span>${esc(x)}</span>`).join('')}
-        ${(net.needs_internet || []).map(x => `<span class="x">${esc(x)} (بيرجع لما يرجع النت)</span>`).join('')}
+        ${(net.needs_internet || []).map(x => `<span class="x">${esc(x)} (يعود مع عودة الإنترنت)</span>`).join('')}
       </div>
     </div>`;
 }
 
 const micOk = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-const EXAMPLES = ['بدي أوفّر ٢٠٪ هالشهر بدون ما أتضايق', 'خلّي الفاتورة تحت ٢٥ دينار', 'وفّر قد ما بتقدر وما تلمس الثلاجة'];
+const EXAMPLES = ['وفّر ٢٠٪ هذا الشهر دون المساس بالراحة', 'أبقِ الفاتورة تحت ٢٥ دينارًا', 'وفّر قدر الإمكان ولا تلمس الثلاجة'];
 
 function goalPanel() {
   const offline = st.internet && st.internet.checked && !st.internet.online;
   const g = st.goal, plan = st.plan;
   return `
-    <div class="h"><div class="t"><span class="n">1</span>عطِ الوكيل هدف (مش سؤال)</div>
-      ${g ? '<span class="tag">الهدف شغّال</span>' : ''}</div>
+    <div class="h"><div class="t"><span class="n">1</span>أعطِ الوكيل هدفًا (لا سؤالًا)</div>
+      ${g ? '<span class="tag">الهدف مفعّل</span>' : ''}</div>
     <div class="goal-row">
-      <input id="goal-in" class="goal-in" placeholder="مثلًا: بدي أوفّر ٢٠٪ هالشهر" value="${esc(ui.goal)}" autocomplete="off">
-      ${micOk ? `<button class="mic${ui.listening ? ' on' : ''}" data-act="mic" ${offline ? 'disabled title="الصوت بكروم بده إنترنت. اكتب الهدف."' : ''} aria-label="احكي الهدف">🎤</button>` : ''}
-      <button class="send" data-act="goal">ابعت</button>
+      <input id="goal-in" class="goal-in" placeholder="مثلًا: وفّر ٢٠٪ هذا الشهر" value="${esc(ui.goal)}" autocomplete="off">
+      ${micOk ? `<button class="mic${ui.listening ? ' on' : ''}" data-act="mic" ${offline ? 'disabled title="الإدخال الصوتي في كروم يحتاج إنترنت. اكتب الهدف."' : ''} aria-label="قل الهدف بصوتك">🎤</button>` : ''}
+      <button class="send" data-act="goal">إرسال</button>
     </div>
     <div class="chips">${EXAMPLES.map(e => `<button class="chip" data-act="example" data-text="${esc(e)}">${esc(e)}</button>`).join('')}</div>
     ${g ? `<div class="goal-now"><q>${esc(g.text)}</q>${plan && plan.summary ? `<p>${esc(plan.summary)}</p>` : ''}</div>` : ''}
-    <div class="note">${micOk ? (offline ? 'المايك بده إنترنت بمتصفح كروم، فهلأ بنكتب الهدف. الوكيل نفسه شغّال محليًا.' : 'اضغط 🎤 وخلّي الحكم يحكي الهدف بصوته (عربي).') : 'هالمتصفح ما بيدعم المايك. اكتب الهدف.'}</div>`;
+    <div class="note">${micOk ? (offline ? 'الميكروفون في كروم يحتاج إنترنت، لذا اكتب الهدف الآن. الوكيل نفسه يعمل محليًا.' : 'اضغط 🎤 ليقول الحكم الهدف بصوته (بالعربية).') : 'هذا المتصفح لا يدعم الميكروفون. اكتب الهدف.'}</div>`;
 }
 
 function planPanel() {
   if (!st.goal) {
-    return `<div class="h"><div class="t"><span class="n">2</span>الوكيل بيقسّم الهدف لخطوات</div></div>
-      <div class="muted" style="font-size:16px">بانتظار هدف. أول ما يوصل، بتشوفوا الخطوات هون وهي عم تتنفّذ.</div>`;
+    return `<div class="h"><div class="t"><span class="n">2</span>يقسّم الوكيل الهدف إلى خطوات</div></div>
+      <div class="muted" style="font-size:16px">بانتظار هدف. فور وصوله تظهر الخطوات هنا أثناء تنفيذها.</div>`;
   }
   const steps = WW.goalSteps(st).map((s, i) => `
     <div class="step ${s.tag === 'جارٍ' || s.tag === 'ينتظر' ? 'active' : ''}" style="--b:${s.border};--bg2:${s.bg};--tx:${s.text};--c:${s.color};animation-delay:${i * 0.08}s">
@@ -103,11 +103,11 @@ function planPanel() {
   const list = p && p.steps ? `
     <ul class="plan-list">${p.steps.map((x, i) => `<li style="animation-delay:${0.6 + i * 0.1}s"><span class="tag ${p.tags[i] === 'T1' ? 't1' : ''}">${p.tags[i]}</span>${esc(x)}</li>`).join('')}</ul>` : '';
   return `
-    <div class="h"><div class="t"><span class="n">2</span>الوكيل قسّم الهدف لخطوات</div>
+    <div class="h"><div class="t"><span class="n">2</span>قسّم الوكيل الهدف إلى خطوات</div>
       <span class="tag ${p && p.by === 'llm' ? 'llm' : ''}">${p && p.by === 'llm' ? 'خطة من النموذج' : 'خطة من القواعد'}</span></div>
     <div class="steps">${steps}</div>
     ${list}
-    <div class="note">T0 = تلقائي (قراءة، تحليل، تنبيه). T1 = بده موافقة إنسان قبل أي إطفاء.</div>`;
+    <div class="note">T0 = تلقائي (قراءة، تحليل، تنبيه). T1 = يحتاج موافقة بشرية قبل أي إطفاء.</div>`;
 }
 
 function approvePanel() {
@@ -117,21 +117,21 @@ function approvePanel() {
     const pct = (p.expires_in_s / p.timeout_s * 100).toFixed(1);
     card = `
       <div class="card pending">
-        <div style="display:flex;justify-content:space-between;color:#F2B544;font-weight:600"><span>📱 البطاقة وصلت على التلفون · بانتظار الحكم</span><span class="mono" dir="ltr">${p.expires_in_s}s</span></div>
+        <div style="display:flex;justify-content:space-between;color:#F2B544;font-weight:600"><span>📱 وصلت البطاقة إلى الهاتف · بانتظار الحكم</span><span class="mono" dir="ltr">${p.expires_in_s}s</span></div>
         <div class="ttl">${esc(p.title)}</div>
         <div class="why">${esc(p.reason)}</div>
-        <div class="why" style="margin-top:6px">بيوفّر ≈ <b class="mono" dir="ltr">${fmt(p.details.saving_jod_per_hour, 3)} JD/h</b> · ${p.details.signature_measured ? 'البصمة مقاسة بالعدّاد' : 'البصمة تقديرية لسا'}</div>
+        <div class="why" style="margin-top:6px">يوفّر ≈ <b class="mono" dir="ltr">${fmt(p.details.saving_jod_per_hour, 3)} JD/h</b> · ${p.details.signature_measured ? 'البصمة مقاسة بالعدّاد' : 'البصمة تقديرية حتى الآن'}</div>
         <div class="bar-t"><div style="width:${pct}%"></div></div>
-        <div class="note">إذا ما حدا ردّ قبل ما يخلص الوقت، ما بيصير إشي. السكوت مش موافقة.</div>
+        <div class="note">إن لم يردّ أحد قبل انتهاء الوقت فلن يحدث شيء. عدم الرد لا يعني الموافقة.</div>
         <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="btn ghost" data-act="reject" data-id="${p.id}">(احتياط) ارفض من هون</button>
-          <button class="btn ghost" data-act="approve" data-id="${p.id}">(احتياط) وافق من هون</button>
+          <button class="btn ghost" data-act="reject" data-id="${p.id}">(احتياطي) رفض من هنا</button>
+          <button class="btn ghost" data-act="approve" data-id="${p.id}">(احتياطي) موافقة من هنا</button>
         </div>
       </div>`;
   } else if (last) {
     const ok = last.status === 'approved';
     const verified = (st.log || []).find(l => l.tier === 'OK' && /العدّاد أكّد/.test(l.message));
-    const label = { approved: '✓ الحكم وافق والريليه طفّى الجهاز فعليًا', rejected: '✕ الحكم رفض، فما صار أي إطفاء', expired: '⏱ ما حدا ردّ، فما صار إشي (السكوت مش موافقة)', blocked: '⛔ الحارس منع الإجراء', cancelled: 'انلغى الطلب (وضع آمن أو إيقاف طوارئ)' }[last.status] || last.status;
+    const label = { approved: '✓ وافق الحكم وأطفأ الريليه الجهاز فعليًا', rejected: '✕ رفض الحكم، فلم يُطفأ شيء', expired: '⏱ لم يردّ أحد، فلم يحدث شيء (عدم الرد لا يعني الموافقة)', blocked: '⛔ الحارس منع الإجراء', cancelled: 'أُلغي الطلب (الوضع الآمن أو إيقاف الطوارئ)' }[last.status] || last.status;
     card = `
       <div class="card ${ok ? 'ok' : 'no'}">
         <div class="ttl" style="font-size:20px">${esc(label)}</div>
@@ -139,13 +139,13 @@ function approvePanel() {
       </div>`;
   }
   return `
-    <div class="h"><div class="t"><span class="n">3</span>الموافقة من تلفون الحكم</div></div>
+    <div class="h"><div class="t"><span class="n">3</span>الموافقة من هاتف الحكم</div></div>
     <div class="join">
-      <div class="qr"><img src="api/connect/qr.svg?path=${encodeURIComponent(phonePath())}" alt="QR يفتح صفحة الموافقة على التلفون"></div>
+      <div class="qr"><img src="api/connect/qr.svg?path=${encodeURIComponent(phonePath())}" alt="رمز QR يفتح صفحة الموافقة على الهاتف"></div>
       <div class="join-txt">
-        <span>امسح الكود بكاميرا التلفون وهو على نفس الـ Wi-Fi. بتفتح صفحة البيت، وأول ما يلاقي الوكيل هدر بتوصلك بطاقة "نطفيه؟".</span>
+        <span>امسح الرمز بكاميرا الهاتف وهو على شبكة الـ Wi-Fi نفسها. ستُفتح صفحة البيت، وعندما يجد الوكيل هدرًا تصلك بطاقة موافقة.</span>
         <span class="join-url">${esc((ui.connectUrl || '') + phonePath())}</span>
-        <span class="muted" style="font-size:13px">بدون إنترنت كمان: اللابتوب والتلفون على نفس الراوتر أو هوتسبوت.</span>
+        <span class="muted" style="font-size:13px">يعمل دون إنترنت أيضًا: يكفي أن يكون اللابتوب والهاتف على الراوتر نفسه أو نقطة اتصال.</span>
       </div>
     </div>
     ${card}`;
@@ -156,29 +156,29 @@ function savingsPanel() {
   const p = s.projection;
   return `
     <div class="h"><div class="t"><span class="n">4</span>التوفير المُقاس اليوم</div>
-      ${s.rate_w ? `<span class="pill live" style="--c:#B8F04A;height:30px"><i></i>عم نوفّر هلأ <b class="mono" dir="ltr">${s.rate_w} W</b></span>` : ''}</div>
+      ${s.rate_w ? `<span class="pill live" style="--c:#B8F04A;height:30px"><i></i>نوفّر الآن <b class="mono" dir="ltr">${s.rate_w} W</b></span>` : ''}</div>
     <div class="big"><span class="v" id="c-jod" data-keep>0.0000</span><span class="u">دينار</span></div>
     <div class="kpis">
-      <div class="kpi"><div class="v" id="c-co2" data-keep>0.000</div><div class="l">كغ CO₂ ما انبعثت</div></div>
+      <div class="kpi"><div class="v" id="c-co2" data-keep>0.000</div><div class="l">كغ CO₂ لم تنبعث</div></div>
       <div class="kpi"><div class="v" id="c-kwh" data-keep>0.000</div><div class="l">ك.و.س اليوم</div></div>
-      <div class="kpi"><div class="v mono" dir="ltr">${fmt(s.jod, 3)}</div><div class="l">دينار من أول التشغيل</div></div>
+      <div class="kpi"><div class="v mono" dir="ltr">${fmt(s.jod, 3)}</div><div class="l">دينار منذ بدء التشغيل</div></div>
     </div>
     <div class="proj">
-      <div class="ttl">لو ١٠٠٠ بيت أردني استعملوا WattWise</div>
+      <div class="ttl">لو استخدم ١٠٠٠ بيت أردني WattWise</div>
       ${p ? `
         <div class="row">
           <div><div class="v" dir="ltr">${Number(p.jod_year).toLocaleString('en')}</div><div class="l">دينار بالسنة</div></div>
           <div><div class="v" dir="ltr">${fmt(p.mwh_year, 1)}</div><div class="l">ميغاواط ساعة بالسنة</div></div>
           <div><div class="v" dir="ltr">${p.co2_t_year == null ? '—' : fmt(p.co2_t_year, 1)}</div><div class="l">طن CO₂ بالسنة</div></div>
         </div>
-        <div class="src">${esc(p.how_ar)}</div>` : `<div class="muted" style="font-size:15px">بيطلع الرقم أول ما العدّاد يأكّد أول توفير. ما بنعرض أرقام مش مقاسة.</div>`}
+        <div class="src">${esc(p.how_ar)}</div>` : `<div class="muted" style="font-size:15px">يظهر الرقم فور تأكيد العدّاد لأول توفير. لا نعرض أرقامًا غير مُقاسة.</div>`}
     </div>
-    <div class="src">بس الإجراءات اللي العدّاد أكّدها بتنحسب. السعر من شريحة هالبيت (${fmt(s.price_jod_per_kwh * 1000, 0)} فلس/ك.و.س). عامل CO₂: ${s.co2_kg_per_kwh ?? '—'} كغ/ك.و.س، المصدر: ${esc(s.co2_source || '')}</div>`;
+    <div class="src">تُحسب فقط الإجراءات التي أكّدها العدّاد. السعر حسب شريحة هذا البيت (${fmt(s.price_jod_per_kwh * 1000, 0)} فلس/ك.و.س). عامل CO₂: ${s.co2_kg_per_kwh ?? '—'} كغ/ك.و.س، المصدر: ${esc(s.co2_source || '')}</div>`;
 }
 
 function logPanel() {
   const lines = (st.log || []).slice(0, 6).map(l => `<div class="line"><span class="clk" dir="ltr">${esc(l.clock)}</span><span class="tag ${l.tier === 'T1' ? 't1' : ''}">${esc(l.tier)}</span><span>${esc(l.message)}</span></div>`).join('');
-  return `<div class="h"><div class="t">تفكير الوكيل لايف (سجل القرارات)</div></div>${lines || '<span class="muted">ما في إشي لسا.</span>'}`;
+  return `<div class="h"><div class="t">تفكير الوكيل مباشرة (سجل القرارات)</div></div>${lines || '<span class="muted">لا شيء بعد.</span>'}`;
 }
 
 // ---------------- animated numbers ----------------
@@ -234,8 +234,8 @@ function listen() {
     ui.goal = [...e.results].map(r => r[0].transcript).join(' ');
     const input = $('goal-in'); if (input) input.value = ui.goal;
   };
-  recog.onerror = e => toast(e.error === 'network' ? 'الصوت بكروم بده إنترنت. اكتب الهدف، والوكيل شغّال محليًا.' : 'المايك مش متاح هون. اكتب الهدف.');
-  recog.onend = () => { recog = null; ui.listening = false; renderAll(); if (ui.goal.trim()) toast('تأكّد من الكلام واضغط "ابعت".'); };
+  recog.onerror = e => toast(e.error === 'network' ? 'الإدخال الصوتي في كروم يحتاج إنترنت. اكتب الهدف، فالوكيل يعمل محليًا.' : 'الميكروفون غير متاح هنا. اكتب الهدف.');
+  recog.onend = () => { recog = null; ui.listening = false; renderAll(); if (ui.goal.trim()) toast('راجع النص ثم اضغط "إرسال".'); };
   ui.listening = true; renderAll();
   try { recog.start(); } catch (e) { recog = null; ui.listening = false; }
 }
@@ -243,10 +243,10 @@ function listen() {
 function sendGoal() {
   const input = $('goal-in');
   const text = (input ? input.value : ui.goal).trim();
-  if (!text) { toast('اكتب الهدف أو احكيه.'); return; }
+  if (!text) { toast('اكتب الهدف أو قله بصوتك.'); return; }
   ui.goal = '';
   if (input) { input.value = ''; input.blur(); }
-  return act(() => WW.post('/goal', { text }), 'الوكيل استلم الهدف وقسّمه لخطوات.');
+  return act(() => WW.post('/goal', { text }), 'استلم الوكيل الهدف وقسّمه إلى خطوات.');
 }
 
 WW.onAction({
@@ -255,7 +255,7 @@ WW.onAction({
   goal: () => sendGoal(),
   example: d => { ui.goal = d.text; const i = $('goal-in'); if (i) { i.value = d.text; i.focus(); } },
   net: () => act(() => WW.api('POST', '/api/internet/simulate', { offline: !(st.internet && st.internet.forced) })),
-  waste: () => act(() => WW.post('/scenario', { name: 'bedroom_empty_window' }), 'الغرفة صارت فاضية والجهاز شغّال. راقبوا الوكيل.'),
+  waste: () => act(() => WW.post('/scenario', { name: 'bedroom_empty_window' }), 'أصبحت الغرفة فارغة والجهاز يعمل. راقبوا الوكيل.'),
   reset: () => act(() => WW.post('/reset')),
   estop: () => act(() => WW.post('/estop')),
   approve: d => act(() => WW.post(`/approvals/${d.id}/approve`)),

@@ -6,7 +6,7 @@ const $ = id => document.getElementById(id);
 const SITE_SCALE = { home: { maxW: 4000, unit: 'kW' }, building: { maxW: 12000, unit: 'kW' }, lab: { maxW: 200, unit: 'W' } };
 const scale = SITE_SCALE[WW.site] || SITE_SCALE.home;
 const ui = {
-  confirmId: null, goalText: 'خلّي فاتورة هالشهر تحت 30 دينار بدون ما تزعّج حدا بالبيت',
+  confirmId: null, goalText: 'أبقِ فاتورة هذا الشهر تحت 30 دينارًا دون إزعاج أحد في البيت',
   cmd: { text: '', res: null, busy: false, msg: '' }, listening: false,
   heater: { hint: '', res: null, busy: false, msg: '' },
   why: { res: null, busy: false }, rep: { text: '', busy: false },
@@ -35,17 +35,17 @@ function toolbar() {
   const other = SITES.filter(([k]) => k !== WW.site)
     .map(([k, label]) => `<a class="tb link" href="index.html?site=${k}">← ${label}</a>`).join('');
   const scen = sim ? `
-    <button class="tb" data-act="scenario" data-name="bedroom_empty_window">${esc(st.demo_label || '١ · غرفة فاضية والشباك مفتوح')}</button>
+    <button class="tb" data-act="scenario" data-name="bedroom_empty_window">${esc(st.demo_label || '١ · غرفة فارغة والشباك مفتوح')}</button>
     <select class="tb ghost" id="scenario-pick" aria-label="سيناريوهات المحاكي">
-      <option value="">سيناريوهات ثانية…</option>
+      <option value="">سيناريوهات أخرى…</option>
       <option value="heat_wave">موجة حر</option>
-      <option value="holiday">عطلة (البيت فاضي)</option>
-      <option value="sensor_fault">عطل حسّاسات</option>
-      <option value="unknown_load">حمل غريب (جهاز مش مسجّل)</option>
-      <option value="ev_arrives">السيارة الكهربائية وصلت وعم تشحن</option>
-      <option value="overload">حمل زايد (تيار قريب من الحد)</option>
-      <option value="stranger_device">جهاز غريب ٦٠ واط بالمطبخ (بدون بصمة)</option>
-      <option value="normal">رجّع طبيعي</option>
+      <option value="holiday">عطلة (البيت فارغ)</option>
+      <option value="sensor_fault">عطل في الحسّاسات</option>
+      <option value="unknown_load">حمل غريب (جهاز غير مسجّل)</option>
+      <option value="ev_arrives">وصول السيارة الكهربائية وبدء الشحن</option>
+      <option value="overload">حمل زائد (تيار قريب من الحد)</option>
+      <option value="stranger_device">جهاز غريب ٦٠ واط في المطبخ (بلا بصمة)</option>
+      <option value="normal">العودة إلى الوضع الطبيعي</option>
     </select>` : '';
   return `${other}${scen}
     <a class="tb ghost" href="stage.html?site=${WW.site}">شاشة العرض للحكّام</a>
@@ -129,7 +129,7 @@ function hero() {
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">${mini}</div>
     </div>
     <div style="flex:1.3 1 320px;min-width:0;display:flex;flex-direction:column;gap:10px">
-      <div class="label" style="display:flex;justify-content:space-between"><span>BY ROOM</span><span>مين عم يسحب هلأ</span></div>
+      <div class="label" style="display:flex;justify-content:space-between"><span>BY ROOM</span><span>الاستهلاك حسب الغرفة</span></div>
       <div style="flex:1;min-height:190px;display:flex;align-items:flex-end;gap:10px;padding-top:8px;border-bottom:1px solid #2A2C25">${bars}</div>
       <div style="display:flex;gap:10px">${names}</div>
     </div>`;
@@ -146,9 +146,9 @@ function goal() {
       <div style="font-size:13.5px;line-height:1.45;color:${s.text}">${esc(s.label)}</div>
     </div>`).join('');
   const form = `<div class="goal-form">
-      <input class="text" id="goal-text" value="${esc(ui.goalText)}" aria-label="اكتب هدفك بكلامك العادي"
-        placeholder="اكتب هدفك بكلامك: مثلاً بدي الفاتورة ما تتعدى ٢٥ دينار وما بدي حدا يحس بشي">
-      <button class="btn-lime" data-act="set-goal">${st.goal ? 'غيّر الهدف' : 'حوّله لخطة'}</button>
+      <input class="text" id="goal-text" value="${esc(ui.goalText)}" aria-label="اكتب هدفك بكلماتك"
+        placeholder="مثلًا: أريد ألّا تتجاوز الفاتورة ٢٥ دينارًا دون أن يشعر أحد بفرق">
+      <button class="btn-lime" data-act="set-goal">${st.goal ? 'غيّر الهدف' : 'حوّله إلى خطة'}</button>
     </div>`;
   let body;
   if (st.goal) {
@@ -157,7 +157,7 @@ function goal() {
       ${t ? `<div class="muted">سقف الفاتورة: <span style="color:#B8F04A" class="mono">${fmt(t)} JD</span></div>` : ''}
       ${form}${planBox()}`;
   } else {
-    body = `<div class="muted">أعطِ الوكيل هدف (مش سؤال) بكلامك العادي، وهو بيفهم الرقم وبيقسّمه لخطوات لحاله:</div>${form}`;
+    body = `<div class="muted">أعطِ الوكيل هدفًا (لا سؤالًا) بكلماتك، وسيفهم الرقم ويقسّمه إلى خطوات بنفسه:</div>${form}`;
   }
   return `
     <div class="head">
@@ -174,7 +174,7 @@ function goal() {
 function planBox() {
   const p = st.plan;
   if (!p || !p.steps.length) return '';
-  const by = p.by === 'llm' ? 'فهمها النموذج الذكي · بتتنفّذ عبر حارس السياسات' : 'قواعد بسيطة · بدون AI';
+  const by = p.by === 'llm' ? 'خطة من النموذج الذكي · تُنفَّذ عبر حارس السياسات' : 'خطة من القواعد · دون ذكاء اصطناعي';
   const tag = i => (p.tags || [])[i] === 'T1'
     ? '<span class="mono" style="font-size:11px;color:#F2B544;flex:none;min-width:92px">T1 · بموافقتك</span>'
     : '<span class="mono" style="font-size:11px;color:#B8F04A;flex:none;min-width:92px">T0 · تلقائي</span>';
@@ -190,14 +190,14 @@ function anomalyBox() {
   const a = st.anomaly;
   if (!a) return '';
   if (!a.open) {
-    const learning = a.ready ? 'كشف الشذوذ: الاستهلاك ضمن الطبيعي' : `كشف الشذوذ: عم نتعلّم الطبيعي (${a.samples} قراءة)`;
+    const learning = a.ready ? 'كشف الشذوذ: الاستهلاك ضمن الطبيعي' : `كشف الشذوذ: نتعلّم النمط الطبيعي (${a.samples} قراءة)`;
     return `<div class="muted" style="font-size:12px">${learning}</div>`;
   }
   const what = a.kind === 'extra'
-    ? `العدّاد ≈ <span class="mono">${a.power_w}</span> واط والمتوقع ≈ <span class="mono">${a.expected_w}</span> واط: زيادة ≈ <span class="mono">${a.residual_w}</span> واط ما بنعرف مصدرها.`
-    : `العدّاد أقل من المتوقع بـ≈ <span class="mono">${-a.residual_w}</span> واط: ممكن جهاز فاصل أو معطّل.`;
+    ? `العدّاد ≈ <span class="mono">${a.power_w}</span> واط والمتوقع ≈ <span class="mono">${a.expected_w}</span> واط: زيادة ≈ <span class="mono">${a.residual_w}</span> واط مصدرها غير معروف.`
+    : `العدّاد أقل من المتوقع بنحو <span class="mono">${-a.residual_w}</span> واط: ربما يوجد جهاز مفصول أو معطّل.`;
   return `<div style="border:1px solid #F2B544;background:rgba(242,181,68,.08);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px">
-      <div style="color:#F2B544;font-weight:600;font-size:13.5px">⚠ شذوذ بالاستهلاك (تنبيه بس، ما بنطفي إشي)</div>
+      <div style="color:#F2B544;font-weight:600;font-size:13.5px">⚠ استهلاك غير طبيعي (تنبيه فقط، لن نُطفئ شيئًا)</div>
       <div style="font-size:13.5px;line-height:1.6">${what}</div>
     </div>`;
 }
@@ -207,9 +207,9 @@ function brainLine() {
   const b = st.agent.brain || {};
   const w = st.weather || {};
   const mode = b.mode === 'llm' ? `النموذج: <span class="mono">${esc(b.model || '')}</span>` : 'القواعد';
-  const spend = b.model ? ` · صرفنا <span class="mono" dir="ltr">$${fmt(b.spent_usd, 2)} / $${fmt(b.budget_usd, 0)}</span> هالشهر` : '';
-  const wx = w.available ? ` · برّا ${fmt(w.outdoor_temp_c, 1)}° (${esc(w.place || '')}، Open-Meteo)` : ' · الطقس: ما في نت، بنكمّل بدونه';
-  return `<div class="muted" style="font-size:12px;line-height:1.6" title="${esc(b.reason_ar || '')}">المخ: ${mode}${spend}${wx}</div>`;
+  const spend = b.model ? ` · التكلفة <span class="mono" dir="ltr">$${fmt(b.spent_usd, 2)} / $${fmt(b.budget_usd, 0)}</span> هذا الشهر` : '';
+  const wx = w.available ? ` · في الخارج ${fmt(w.outdoor_temp_c, 1)}° (${esc(w.place || '')}، Open-Meteo)` : ' · الطقس: لا إنترنت، نكمل دونه';
+  return `<div class="muted" style="font-size:12px;line-height:1.6" title="${esc(b.reason_ar || '')}">العقل: ${mode}${spend}${wx}</div>`;
 }
 
 function roomsMap() {
@@ -221,9 +221,9 @@ function roomsMap() {
         <span style="color:${d.is_on ? '#ECEBE4' : '#6F6D64'}">${esc(d.name)}</span>
         <span style="margin-inline-start:auto;font-family:var(--mono);font-size:11px;color:${d.tier === 'T2' ? '#E8553F' : '#6F6D64'}">${d.tier}</span>
       </div>`).join('');
-    const occ = r.occupied === null ? '—' : r.occupied ? 'مشغولة' : 'فاضية';
+    const occ = r.occupied === null ? '—' : r.occupied ? 'مشغولة' : 'فارغة';
     const contact = WW.site === 'lab' ? 'باب' : 'شباك';
-    const win = r.window_open === null ? '' : `<span style="font-size:11.5px;padding:3px 9px;border-radius:10px;background:#1E201B;color:${r.window_open ? '#F2B544' : '#8E8C82'}">${contact} ${r.window_open ? 'مفتوح' : 'مسكّر'} · محاكى</span>`;
+    const win = r.window_open === null ? '' : `<span style="font-size:11.5px;padding:3px 9px;border-radius:10px;background:#1E201B;color:${r.window_open ? '#F2B544' : '#8E8C82'}">${contact} ${r.window_open ? 'مفتوح' : 'مغلق'} · محاكى</span>`;
     return `
       <div style="border-radius:16px;border:1px solid ${hot ? '#5A4518' : '#23251F'};background:${hot ? '#1E1A10' : '#181A15'};padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
@@ -241,7 +241,7 @@ function roomsMap() {
   return `
     <div class="head">
       <div class="label">${esc(lbl('map', 'الغرف'))}</div>
-      <div style="font-size:11px;color:#6F6D64">إشغال مشغول/فاضي فقط، بلا كاميرات وبلا تتبّع أشخاص</div>
+      <div style="font-size:11px;color:#6F6D64">الإشغال فقط (مشغولة/فارغة)، بلا كاميرات ولا تتبّع للأشخاص</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${cards}</div>`;
 }
@@ -252,20 +252,20 @@ function devicesGrid() {
   const confirm = confirmDev ? `
     <div style="border-radius:14px;border:1px solid #5A4518;background:#1E1A10;padding:16px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
       <div style="flex:1 1 300px;display:flex;flex-direction:column;gap:4px">
-        <span style="font-size:15px;font-weight:600;color:#F2B544">متأكد بدك تطفي ${esc(confirmDev.name)}؟</span>
-        <span style="font-size:13px;line-height:1.6;color:#D9D7CF">تطبيق الموافقة على الهاتف رح ينقطع، والوكيل بيدخل الوضع الآمن: ما بيطلب موافقة وما بينفّذ ولا إجراء لحد ما يرجع الاتصال.</span>
+        <span style="font-size:15px;font-weight:600;color:#F2B544">هل تريد إطفاء ${esc(confirmDev.name)} فعلًا؟</span>
+        <span style="font-size:13px;line-height:1.6;color:#D9D7CF">سينقطع تطبيق الموافقة على الهاتف، ويدخل الوكيل الوضع الآمن: لن يطلب موافقة ولن ينفّذ أي إجراء حتى يعود الاتصال.</span>
       </div>
       <div style="display:flex;gap:8px">
-        <button data-act="confirm-cancel" class="tb ghost" style="height:40px">لا، خلّيه</button>
-        <button data-act="confirm-off" data-id="${esc(confirmDev.id)}" style="height:40px;white-space:nowrap;padding:0 16px;border-radius:10px;border:none;background:#F2B544;color:#0C0D0A;font-size:14px;font-weight:600;cursor:pointer">طفّيه</button>
+        <button data-act="confirm-cancel" class="tb ghost" style="height:40px">لا، اتركه</button>
+        <button data-act="confirm-off" data-id="${esc(confirmDev.id)}" style="height:40px;white-space:nowrap;padding:0 16px;border-radius:10px;border:none;background:#F2B544;color:#0C0D0A;font-size:14px;font-weight:600;cursor:pointer">أطفئه</button>
       </div>
     </div>` : '';
-  const learning = st.learn ? `<div style="border-radius:14px;border:1px dashed #4C6A20;background:#151A0F;padding:12px 16px;font-size:13px;color:#D9D7CF">عم تضيف جهاز جديد من تطبيق الهاتف ← كمّل الخطوات هناك. العدّاد هون رح يبيّن بصمته وقت القياس.</div>` : '';
+  const learning = st.learn ? `<div style="border-radius:14px;border:1px dashed #4C6A20;background:#151A0F;padding:12px 16px;font-size:13px;color:#D9D7CF">تجري إضافة جهاز جديد من تطبيق الهاتف، فأكمل الخطوات هناك. سيُظهر العدّاد هنا بصمته أثناء القياس.</div>` : '';
   const cards = st.devices.map(d => {
     const on = d.is_on, locked = d.tier === 'T2';
-    const state = locked ? 'محمي · دايمًا شغّال' : on ? 'شغّال' : 'مطفي';
-    const note = (d.added ? 'جديد · ' : '') + (locked ? 'T2 · ممنوع بالكود' : d.sensitive ? 'حساس · بيقطع تطبيق الموافقة' : !d.allow ? 'يدوي فقط · الوكيل ما بيقترح' : 'T1 · تحكم يدوي')
-      + (d.agent_off ? ' · طفاه الوكيل بموافقتك' : '');
+    const state = locked ? 'محمي · يعمل دائمًا' : on ? 'يعمل' : 'مطفأ';
+    const note = (d.added ? 'جديد · ' : '') + (locked ? 'T2 · ممنوع برمجيًا' : d.sensitive ? 'حساس · إطفاؤه يقطع تطبيق الموافقة' : !d.allow ? 'يدوي فقط · لا يقترحه الوكيل' : 'T1 · تحكم يدوي')
+      + (d.agent_off ? ' · أطفأه الوكيل بموافقتك' : '');
     const ac = '';   // on/off only: the AC set temperature is not controlled from the UI
     return `
       <div style="border-radius:14px;border:1px solid ${locked ? '#3A2A26' : on ? '#2E3A1C' : '#23251F'};background:#181A15;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0">
@@ -282,22 +282,22 @@ function devicesGrid() {
           <span style="font-family:var(--mono);font-size:13px;color:${on ? '#ECEBE4' : '#5E5C55'}" dir="ltr">${d.est_w} W${d.signature_measured ? '' : ' *'}${d.signature_pf != null ? ` · PF ${Number(d.signature_pf).toFixed(2)}` : ''}</span>
           ${ac}
         </div>
-        ${d.plug ? `<span style="font-size:11px;color:${d.plug.online ? '#9CC85A' : '#E8553F'}">🔌 ${d.plug.simulated && d.plug.model ? esc(d.plug.model) : esc(d.plug.brand_name) + (d.plug.model ? ' · ' + esc(d.plug.model) : '')} · ${d.plug.online ? (d.plug.meters ? 'القراءة من المقبس نفسه' : 'تشغيل وإطفاء بس') : 'المقبس مش متصل'}</span>` : ''}
+        ${d.plug ? `<span style="font-size:11px;color:${d.plug.online ? '#9CC85A' : '#E8553F'}">🔌 ${d.plug.simulated && d.plug.model ? esc(d.plug.model) : esc(d.plug.brand_name) + (d.plug.model ? ' · ' + esc(d.plug.model) : '')} · ${d.plug.online ? (d.plug.meters ? 'القراءة من المقبس نفسه' : 'تشغيل وإطفاء فقط') : 'المقبس غير متصل'}</span>` : ''}
         <span style="font-size:11px;color:#6F6D64">${note}</span>
       </div>`;
   }).join('');
   return `
     <div class="head">
-      <div class="label">DEVICES · تحكّم يدوي بكل جهاز</div>
+      <div class="label">DEVICES · التحكم اليدوي بالأجهزة</div>
       <div style="display:flex;align-items:center;gap:12px">
-        <span style="font-size:12px;color:#8E8C82">${onCount} شغّال من ${st.devices.length}</span>
+        <span style="font-size:12px;color:#8E8C82">يعمل ${onCount} من ${st.devices.length}</span>
         <button class="btn-lime" data-act="open-plug" style="height:34px;font-size:13px">🔌 + مقبس ذكي</button>
-        <button class="tb ghost" data-act="open-wiz" style="height:34px;font-size:13px">+ جهاز بالعدّاد</button>
+        <button class="tb ghost" data-act="open-wiz" style="height:34px;font-size:13px">+ جهاز عبر العدّاد</button>
       </div>
     </div>
     ${learning}${confirm}${commandBar()}
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px">${cards}</div>
-    <div class="note">* بصمة تقديرية من لوحة الجهاز، لسا ما قسناها على العدّاد.</div>`;
+    <div class="note">* بصمة تقديرية من لوحة بيانات الجهاز، لم تُقَس على العدّاد بعد.</div>`;
 }
 
 // Typed or spoken orders. The server understands them, the Policy Guard checks each
@@ -313,18 +313,18 @@ function commandBar() {
     const canRun = r.items.some(i => i.ok);
     result = `<div style="display:flex;flex-direction:column;gap:8px">
         <span style="font-size:14px;line-height:1.6;color:#ECEBE4">${esc(r.clarify || r.reply)}</span>${items}
-        <span style="font-size:11.5px;color:#A9A79D">فهمته بالقواعد البسيطة (بدون AI). حارس السياسات فحص كل إجراء.</span>
+        <span style="font-size:11.5px;color:#A9A79D">فُهم الأمر بالقواعد (دون ذكاء اصطناعي)، وفحص حارس السياسات كل إجراء.</span>
         <div style="display:flex;gap:8px">
-          ${canRun ? '<button class="btn-lime" style="height:38px;font-size:13px" data-act="cmd-run">إيه، نفّذ</button>' : ''}
+          ${canRun ? '<button class="btn-lime" style="height:38px;font-size:13px" data-act="cmd-run">نعم، نفّذ</button>' : ''}
           <button class="btn-ghost" data-act="cmd-cancel">لا</button>
         </div></div>`;
   }
   return `<div class="cmd-box">
       <div style="display:flex;flex-wrap:wrap;gap:8px">
-        <input class="field grow" id="cmd-text" value="${esc(c.text)}" aria-label="احكي أو اكتب أمرك للوكيل"
-          placeholder="احكي مع الوكيل: طفّي مكيّف النوم، شغّل إنارة الصالون، طفّي المكيّف بعد نص ساعة">
-        ${micOk ? `<button class="mic${ui.listening ? ' on' : ''}" data-act="cmd-mic" aria-label="${ui.listening ? 'عم بسمعك، اضغط للإيقاف' : 'احكي'}">🎤</button>` : ''}
-        <button class="btn-lime" style="height:42px" data-act="cmd-parse">${c.busy ? 'عم أفهم…' : 'نفّذ'}</button>
+        <input class="field grow" id="cmd-text" value="${esc(c.text)}" aria-label="تحدّث أو اكتب أمرك للوكيل"
+          placeholder="مثلًا: أطفئ مكيّف غرفة النوم، شغّل إنارة الصالون، أطفئ المكيّف بعد نصف ساعة">
+        ${micOk ? `<button class="mic${ui.listening ? ' on' : ''}" data-act="cmd-mic" aria-label="${ui.listening ? 'أستمع إليك، اضغط للإيقاف' : 'تحدّث'}">🎤</button>` : ''}
+        <button class="btn-lime" style="height:42px" data-act="cmd-parse">${c.busy ? 'جارٍ الفهم…' : 'نفّذ'}</button>
       </div>${result}
       ${c.msg ? `<span style="font-size:13px;color:#B8F04A">${esc(c.msg)}</span>` : ''}
     </div>`;
@@ -338,7 +338,7 @@ function listen() {
   recog = new SR();
   recog.lang = 'ar-JO'; recog.interimResults = false; recog.maxAlternatives = 1;
   recog.onresult = e => { ui.cmd.text = e.results[0][0].transcript; parseCommand(); };
-  recog.onerror = () => toast('المايك مش متاح هون. اكتب الأمر بدالو.');
+  recog.onerror = () => toast('الميكروفون غير متاح هنا. اكتب الأمر بدلًا من ذلك.');
   recog.onend = () => { recog = null; ui.listening = false; renderAll(); };
   ui.listening = true; renderAll();
   try { recog.start(); } catch (e) { recog = null; ui.listening = false; }
@@ -353,7 +353,7 @@ async function parseCommand() {
 }
 
 // Timers and daily schedules (on/off only), and the smart water-heater schedule.
-const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (متوقّع مش مقاس)` : '';
+const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (تقديري، غير مُقاس)` : '';
 
 function heaterPanel() {
   const h = ui.heater, hr = h.res;
@@ -363,16 +363,16 @@ function heaterPanel() {
       <span style="font-size:14px;line-height:1.6;color:#ECEBE4">${esc(hr.reply)}</span>
       ${hr.items.map(i => `<div class="sub-box"><span class="mono" style="font-size:13px" dir="ltr">${esc(i.on_time)} → ${esc(i.off_time)}</span>
         <span style="font-size:12.5px;color:#D9D7CF">${esc(i.why)}</span><span style="font-size:11.5px;color:#A9A79D">${estText(i.estimate)}</span></div>`).join('')}
-      <span style="font-size:12.5px;color:#C8E68A">المجموع ≈ ${fmt(hr.total.kwh, 1)} ك.و.س باليوم ≈ ${fmt(hr.total.jod, 2)} دينار (متوقّع مش مقاس)</span>
+      <span style="font-size:12.5px;color:#C8E68A">المجموع ≈ ${fmt(hr.total.kwh, 1)} ك.و.س يوميًا ≈ ${fmt(hr.total.jod, 2)} دينار (تقديري، غير مُقاس)</span>
       <div style="display:flex;gap:8px">
-        ${hr.items.length ? '<button class="btn-lime" style="height:38px;font-size:13px" data-act="heater-apply">إيه، اعتمده</button>' : ''}
+        ${hr.items.length ? '<button class="btn-lime" style="height:38px;font-size:13px" data-act="heater-apply">نعم، اعتمده</button>' : ''}
         <button class="btn-ghost" data-act="heater-cancel">لا</button>
       </div></div>`;
   return `<div class="panel green">
       <span class="panel-title">سخّان الماء الذكي</span>
-      <span style="font-size:12.5px;line-height:1.6;color:#A9A79D">السخّان من أكبر الأحمال. بدل ما يضل شغّال، الوكيل بيقترح يسخّن بالساعة اللي قبل الحمّام بس، والحارس بيمنع أي فترة أطول من ٣ ساعات.</span>
-      <input class="field" id="heater-hint" value="${esc(h.hint)}" aria-label="متى بتحمّموا؟" placeholder="متى بتحمّموا؟ مثلاً: الصبح ٦ ونص والمسا ٩">
-      <button class="btn-lime" data-act="heater-suggest">${h.busy ? 'عم نخطّط…' : 'اقترحلي جدول للسخّان'}</button>
+      <span style="font-size:12.5px;line-height:1.6;color:#A9A79D">السخّان من أكبر الأحمال. بدل تشغيله طوال اليوم، يقترح الوكيل تشغيله في الساعة التي تسبق الاستحمام فقط، ويمنع الحارس أي فترة أطول من ٣ ساعات.</span>
+      <input class="field" id="heater-hint" value="${esc(h.hint)}" aria-label="متى تستحمّون؟" placeholder="متى تستحمّون؟ مثلًا: الصباح ٦:٣٠ والمساء ٩">
+      <button class="btn-lime" data-act="heater-suggest">${h.busy ? 'جارٍ التخطيط…' : 'اقترح جدولًا للسخّان'}</button>
       ${proposal}
       ${h.msg ? `<span style="font-size:13px;line-height:1.6;color:#B8F04A">${esc(h.msg)}</span>` : ''}
     </div>`;
@@ -384,7 +384,7 @@ function schedSection() {
   return `
     <div class="head">
       <div class="label">SCHEDULES · جدولة الأجهزة</div>
-      <div style="font-size:11px;color:#6F6D64">تشغيل وإطفاء بس · بتشتغل بالسيرفر · بتراجعها وبتأكّدها قبل الحفظ · الحارس بيفحص كل مرة${st.source === 'simulator' ? ' · ساعة المحاكي ×60' : ''}</div>
+      <div style="font-size:11px;color:#6F6D64">تشغيل وإطفاء فقط · تعمل على الخادم · تراجعها وتؤكّدها قبل الحفظ · يفحصها الحارس كل مرة${st.source === 'simulator' ? ' · ساعة المحاكي ×60' : ''}</div>
     </div>
     ${WWSched.render({ theme: 'dark', layout: 'side' })}
     ${heater ? `<div style="display:flex;flex-wrap:wrap;gap:12px">${heater}</div>` : ''}`;
@@ -397,34 +397,34 @@ function teachSection() {
   if (!ui.teach.room || !st.rooms.some(r => r.id === ui.teach.room)) ui.teach.room = st.rooms[0] && st.rooms[0].id;
   const room = s ? s.room : ui.teach.room;
   const chips = st.rooms.map(r => `<button class="chip ${r.id === room ? 'sel' : ''}" data-act="teach-room" data-id="${esc(r.id)}"${s ? ' disabled' : ''}>${esc(r.name)}</button>`).join('');
-  const status = !s ? 'جاهز. اختار الغرفة واكبس «علّمني».'
-    : s.status === 'listening' ? `عم بسمع للعدّاد على قاطع ${esc(s.room_name)}… (${s.candidates} جهاز لحد هلأ)`
-      : s.status === 'asking' ? 'بستنّى تأكّد أو تصحّح.' : 'بستنّى موافقتك على الحفظ.';
+  const status = !s ? 'جاهز. اختر الغرفة واضغط «علّمني».'
+    : s.status === 'listening' ? `أستمع إلى العدّاد على قاطع ${esc(s.room_name)}… (${s.candidates} جهاز حتى الآن)`
+      : s.status === 'asking' ? 'بانتظار تأكيدك أو تصحيحك.' : 'بانتظار موافقتك على الحفظ.';
   const buttons = !s
-    ? `<button class="btn-lime" style="height:36px;font-size:13px" data-act="teach-start">علّمني أجهزة هالغرفة</button>`
-    : `${s.status === 'listening' ? '<button class="btn-lime" style="height:36px;font-size:13px" data-act="teach-done">خلصت</button>' : ''}
-       <button class="btn-ghost" data-act="teach-cancel">وقّف بدون حفظ</button>`;
+    ? `<button class="btn-lime" style="height:36px;font-size:13px" data-act="teach-start">علّمني أجهزة هذه الغرفة</button>`
+    : `${s.status === 'listening' ? '<button class="btn-lime" style="height:36px;font-size:13px" data-act="teach-done">انتهيت</button>' : ''}
+       <button class="btn-ghost" data-act="teach-cancel">إيقاف دون حفظ</button>`;
   const msgs = t.messages.map(m => `
     <div style="align-self:${m.role === 'ai' ? 'flex-start' : 'flex-end'};max-width:88%;white-space:pre-wrap;font-size:13.5px;line-height:1.6;padding:9px 12px;border-radius:12px;
       background:${m.role === 'ai' ? '#1E201B' : '#2E3A1C'};color:${m.role === 'ai' ? '#ECEBE4' : '#E6F5C8'}">${esc(m.text)}</div>`).join('')
-    || '<div style="font-size:12.5px;color:#6F6D64">لسّا ما في محادثة.</div>';
-  const quick = t.waiting_for === 'teach_confirm' ? ['صح'] : ['teach_save', 'label_save'].includes(t.waiting_for) ? ['احفظ', 'لا'] : t.waiting_for === 'label' ? ['تجاهل'] : [];
+    || '<div style="font-size:12.5px;color:#6F6D64">لا توجد محادثة بعد.</div>';
+  const quick = t.waiting_for === 'teach_confirm' ? ['صحيح'] : ['teach_save', 'label_save'].includes(t.waiting_for) ? ['احفظ', 'لا'] : t.waiting_for === 'label' ? ['تجاهل'] : [];
   const fps = t.fingerprints.map(f => `
     <div style="display:flex;align-items:center;gap:8px;font-size:13px">
       <span style="width:7px;height:7px;border-radius:50%;background:${f.is_on ? '#B8F04A' : '#4A4C44'};flex:none"></span>
       <span>${esc(f.name)}</span><span style="color:#8E8C82;font-size:12px">${esc(f.room_name)}</span>
       <span class="mono" style="margin-inline-start:auto;font-size:11.5px;color:#A9A79D" dir="ltr">${fmt(f.watts, 0)}W${f.pf != null ? ' · pf ' + fmt(f.pf, 2) : ''}</span>
       <button class="btn-ghost btn-sm" data-act="fp-del" data-id="${f.id}" title="احذف البصمة">×</button>
-    </div>`).join('') || '<div style="font-size:12.5px;color:#6F6D64">ما في بصمات محفوظة. البصمة بتنحفظ بس إذا وافقت.</div>';
+    </div>`).join('') || '<div style="font-size:12.5px;color:#6F6D64">لا توجد بصمات محفوظة. لا تُحفظ البصمة إلا بموافقتك.</div>';
   const unk = t.unknown.length ? `<span style="font-size:12px;padding:3px 10px;border-radius:10px;background:#1E1A10;color:#F2B544">⚠️ ${t.unknown.length} جهاز مجهول</span>` : '';
   return `
     <div class="head">
-      <div class="label">TEACH · علّم الـAI أجهزة الغرفة</div>
-      <div style="display:flex;gap:8px;align-items:center">${unk}<span style="font-size:11px;color:#6F6D64">بصمة كل جهاز = قفزة الواط + معامل القدرة (pf) · ما بينحفظ إشي بدون موافقتك</span></div>
+      <div class="label">TEACH · تعريف أجهزة الغرفة</div>
+      <div style="display:flex;gap:8px;align-items:center">${unk}<span style="font-size:11px;color:#6F6D64">بصمة الجهاز = قفزة الواط + معامل القدرة (PF) · لا يُحفظ شيء دون موافقتك</span></div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">
       <div class="panel" style="flex:1 1 260px">
-        <span class="panel-title">١ · وين العدّاد؟</span>
+        <span class="panel-title">١ · أين العدّاد؟</span>
         <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
         <div style="font-size:12.5px;color:#A9A79D;line-height:1.6">${status}</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px">${buttons}</div>
@@ -432,12 +432,12 @@ function teachSection() {
         <div style="display:flex;flex-direction:column;gap:8px">${fps}</div>
       </div>
       <div class="panel" style="flex:2 1 380px">
-        <span class="panel-title">٢ · المحادثة مع الـAI</span>
+        <span class="panel-title">٢ · المحادثة مع الذكاء الاصطناعي</span>
         <div id="teach-chat" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto;padding:4px">${msgs}</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">${quick.map(q => `<button class="chip" data-act="teach-quick" data-text="${esc(q)}">${esc(q)}</button>`).join('')}</div>
         <div style="display:flex;gap:8px">
-          <input class="field grow" id="teach-text" placeholder="جاوب الـAI… مثلًا: الأول لابتوب، الثاني ضو المكتب" value="${esc(ui.teach.text)}">
-          <button class="btn-lime" data-act="teach-send">${ui.teach.busy ? '…' : 'ابعث'}</button>
+          <input class="field grow" id="teach-text" placeholder="اكتب ردّك… مثلًا: الأول لابتوب، الثاني مصباح المكتب" value="${esc(ui.teach.text)}">
+          <button class="btn-lime" data-act="teach-send">${ui.teach.busy ? '…' : 'إرسال'}</button>
         </div>
       </div>
     </div>`;
@@ -466,26 +466,26 @@ function analystSection() {
       <div style="font-size:11.5px;color:#A9A79D">${esc(w.note)}</div></div>`;
   const report = !rep.text ? '' : `<div class="report-text">${esc(rep.text)}</div>
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-        <a class="btn-ghost" style="display:inline-flex;align-items:center;text-decoration:none;color:#B8F04A;border-color:#4C6A20" href="/api/sites/${WW.site}/weekly.txt" download>نزّل الملف</a>
+        <a class="btn-ghost" style="display:inline-flex;align-items:center;text-decoration:none;color:#B8F04A;border-color:#4C6A20" href="/api/sites/${WW.site}/weekly.txt" download>تنزيل الملف</a>
         <a class="btn-ghost" style="display:inline-flex;align-items:center;text-decoration:none" href="/api/sites/${WW.site}/report" target="_blank" rel="noopener">تقرير التوفير للطباعة (PDF)</a>
       </div>`;
   return `
     <div class="head">
       <div class="label">ANALYST · محلّل الفاتورة والتقارير</div>
-      <div style="font-size:11px;color:#6F6D64">الأرقام محسوبة بالكود من القياسات، وما في إشي بيتنفّذ بدون موافقة</div>
+      <div style="font-size:11px;color:#6F6D64">الأرقام محسوبة برمجيًا من القياسات، ولا يُنفَّذ شيء دون موافقة</div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">
       <div class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <span class="panel-title">ليش الفاتورة هيك؟</span>
-          <button class="btn-lime" style="height:36px;font-size:13px" data-act="why">${ui.why.busy ? 'عم نحلّل…' : w ? 'حلّل من جديد' : 'ليش الفاتورة هيك؟'}</button>
+          <span class="panel-title">لماذا الفاتورة بهذا المبلغ؟</span>
+          <button class="btn-lime" style="height:36px;font-size:13px" data-act="why">${ui.why.busy ? 'جارٍ التحليل…' : w ? 'أعد التحليل' : 'لماذا الفاتورة بهذا المبلغ؟'}</button>
         </div>${why}
       </div>
       <div class="panel">${billPanel()}</div>
       <div class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <span class="panel-title">التقرير الأسبوعي</span>
-          <button class="btn-lime" style="height:36px;font-size:13px" data-act="report">${rep.busy ? 'عم نجهّز…' : rep.text ? 'جهّز تقرير جديد' : 'جهّز التقرير الأسبوعي'}</button>
+          <button class="btn-lime" style="height:36px;font-size:13px" data-act="report">${rep.busy ? 'جارٍ التجهيز…' : rep.text ? 'جهّز تقريرًا جديدًا' : 'جهّز التقرير الأسبوعي'}</button>
         </div>${report}
       </div>
     </div>`;
@@ -517,14 +517,14 @@ function billPanel() {
       <span class="panel-title">حلّل صورة الفاتورة</span>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <label class="btn-lime" style="height:36px;font-size:13px;display:inline-flex;align-items:center;cursor:pointer;${noPhoto ? 'opacity:.5;pointer-events:none' : ''}">
-          ${b.busy ? 'عم نقرأ…' : '📷 ارفع صورة'}<input id="bill-file" type="file" accept="image/*" hidden></label>
-        <button class="btn-ghost" style="height:36px" data-act="bill-toggle-manual">اكتب الأرقام بإيدك</button>
+          ${b.busy ? 'جارٍ القراءة…' : '📷 ارفع صورة'}<input id="bill-file" type="file" accept="image/*" hidden></label>
+        <button class="btn-ghost" style="height:36px" data-act="bill-toggle-manual">أدخل الأرقام يدويًا</button>
       </div>
     </div>
     ${noPhoto ? `<div style="font-size:12px;line-height:1.55;color:#F2B544">${esc(b.status.reason_ar)}</div>` : ''}
     ${b.msg ? `<div style="font-size:12.5px;line-height:1.55;color:#F2B544">${esc(b.msg)}</div>` : ''}
     ${manual}${result}
-    <div style="font-size:11px;color:#6F6D64">الصورة بتنقرأ مرة وحدة وما بتنحفظ. بنحتفظ بس بالأرقام (ك.و.س، الأيام، المبلغ).</div>`;
+    <div style="font-size:11px;color:#6F6D64">تُقرأ الصورة مرة واحدة ولا تُحفظ، ونحتفظ بالأرقام فقط (ك.و.س، الأيام، المبلغ).</div>`;
 }
 
 async function billSend(promise) {
@@ -549,12 +549,12 @@ function forecastBlock() {
       <span class="mono" style="font-size:10.5px;color:#8E8C82">${x.hour}</span>
     </div>`).join('');
   const a = f.accuracy;
-  const acc = a.hours ? `دقّتنا: خطأ ≈ ${fmt(a.mean_err_pct, 0)}% (آخر ${a.hours} ساعة، مقارنة بالعدّاد)` : 'دقّتنا: لسا عم نقيسها (بعد أول ساعة كاملة)';
+  const acc = a.hours ? `الدقة: خطأ ≈ ${fmt(a.mean_err_pct, 0)}% (آخر ${a.hours} ساعة، مقارنة بالعدّاد)` : 'الدقة: تُقاس بعد أول ساعة كاملة';
   return `<div style="display:flex;flex-direction:column;gap:8px">
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:#8E8C82"><span>التوقّع للـ${f.steps.length} ساعات الجاية (kW)</span>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:#8E8C82"><span>توقّع الساعات الـ${f.steps.length} القادمة (kW)</span>
         <span dir="ltr" class="mono" style="color:#D9D7CF">${fmt(f.kwh, 1)} kWh ≈ ${fmt(f.jod, 2)} JD</span></div>
       <div style="display:flex;align-items:flex-end;gap:6px;height:86px">${bars}</div>
-      <div style="font-size:11.5px;color:#8E8C82">${acc}${f.profile_hours ? '' : ' · لسا ما في تاريخ يومي، فالتوقّع = الاستهلاك الحالي'}</div>
+      <div style="font-size:11.5px;color:#8E8C82">${acc}${f.profile_hours ? '' : ' · لا يوجد سجل يومي بعد، لذا التوقّع = الاستهلاك الحالي'}</div>
     </div>`;
 }
 
@@ -581,7 +581,7 @@ function bill() {
       <div style="display:flex;padding:3px;border-radius:10px;background:#1B1D17;gap:2px">${opts}</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:4px">
-      <span style="font-size:12px;color:#8E8C82">لحد اليوم · ${fmt(b.kwh_now)} ك.و.س</span>
+      <span style="font-size:12px;color:#8E8C82">حتى اليوم · ${fmt(b.kwh_now)} ك.و.س</span>
       <span style="font-family:var(--mono);font-size:34px;font-weight:500" dir="ltr">${fmt(b.bill_now, 2)} <span style="font-size:15px;color:#8E8C82">JD</span></span>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">
@@ -600,10 +600,10 @@ function bill() {
     ${forecastBlock()}
     ${mvLine()}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-top:6px;border-top:1px solid #1E201B">
-      <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px;color:#B8F04A" dir="ltr">${fmt(s.jod, 3)}</span><span style="font-size:11.5px;color:#8E8C82">دينار وفّرناها (مُقاس · بسعر شريحتك)</span></div>
+      <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px;color:#B8F04A" dir="ltr">${fmt(s.jod, 3)}</span><span style="font-size:11.5px;color:#8E8C82">دينار مُوفَّر (مُقاس · بسعر شريحتك)</span></div>
       <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px" dir="ltr">${fmt(s.kwh, 2)}</span><span style="font-size:11.5px;color:#8E8C82">ك.و.س · ${s.co2_kg === null ? '—' : fmt(s.co2_kg, 2)} كغ CO₂</span></div>
     </div>
-    <div class="note">${esc(b.source || '')} المعروض قيمة الطاقة بس، بدون الدعم النقدي أو أي رسوم ثانية.${st.source === 'simulator' ? ' الاستهلاك هون من المحاكي (بيانات تركيبية).' : ''}${s.co2_kg === null ? ' معامل CO₂ لسا مش مُعبّى.' : ''}</div>`;
+    <div class="note">${esc(b.source || '')} المعروض هو قيمة الطاقة فقط، دون الدعم النقدي أو أي رسوم أخرى.${st.source === 'simulator' ? ' الاستهلاك هنا من المحاكي (بيانات تركيبية).' : ''}${s.co2_kg === null ? ' معامل CO₂ لم يُحدَّد بعد.' : ''}</div>`;
 }
 
 // Warnings from the agent (the same ones the phone app shows as notifications).
@@ -612,7 +612,7 @@ function alertsSection() {
   const col = l => ({ danger: '#E8553F', warn: '#F2B544' }[l] || '#8FC7FF');
   const rows = al.items.map(a => {
     const off = !a.active || a.user_state;
-    const status = !a.active ? 'انتهى' : a.user_state === 'acted' ? 'انبعت طلب موافقة' : a.user_state === 'dismissed' ? 'تجاهلته' : '';
+    const status = !a.active ? 'انتهى' : a.user_state === 'acted' ? 'أُرسل طلب موافقة' : a.user_state === 'dismissed' ? 'تم التجاهل' : '';
     return `<div style="display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #1E201B;opacity:${off ? 0.55 : 1}">
       <span style="font-family:var(--mono);font-size:12px;color:#6F6D64" dir="ltr">${esc(a.clock)}</span>
       <div style="display:flex;flex-direction:column;gap:2px">
@@ -621,17 +621,17 @@ function alertsSection() {
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         ${status ? `<span class="muted" style="font-size:11.5px">${status}</span>` : ''}
-        ${a.can_act ? `<button class="btn-lime" style="height:34px" data-act="alert-act" data-id="${a.id}">طفّيه؟</button>` : ''}
+        ${a.can_act ? `<button class="btn-lime" style="height:34px" data-act="alert-act" data-id="${a.id}">أطفئه؟</button>` : ''}
         ${a.active && !a.user_state ? `<button class="tb ghost" style="height:34px" data-act="alert-dismiss" data-id="${a.id}">تجاهل</button>` : ''}
       </div>
     </div>`;
-  }).join('') || '<div class="muted">ما في تنبيهات. كل إشي ضمن الطبيعي.</div>';
+  }).join('') || '<div class="muted">لا توجد تنبيهات. كل شيء طبيعي.</div>';
   const perm = ('Notification' in window) && Notification.permission === 'default'
     ? '<button class="tb ghost" style="height:32px" data-act="alert-perm">فعّل إشعارات المتصفح</button>' : '';
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
       <div class="label">ALERTS · تنبيهات الوكيل</div>
-      <div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:#6F6D64">تنبيه بس (T0). «طفّيه؟» بيبعت طلب موافقة، ما بيطفي لحاله.</span>${perm}</div>
+      <div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:#6F6D64">تنبيه فقط (T0). زر «أطفئه؟» يرسل طلب موافقة ولا يُطفئ شيئًا بنفسه.</span>${perm}</div>
     </div>${rows}`;
 }
 
@@ -660,11 +660,11 @@ function auditLog() {
       <span style="font-family:var(--mono);font-size:12px;color:#6F6D64" dir="ltr">${esc(e.clock)}</span>
       <span style="font-family:var(--mono);font-size:11px;color:${color(e.tier)}">${tierLabel(e.tier)}</span>
       <span style="font-size:13.5px;line-height:1.55;color:#D9D7CF;text-wrap:pretty">${esc(e.message)}</span>
-    </div>`).join('') || '<div class="muted">ما في قرارات لسا.</div>';
+    </div>`).join('') || '<div class="muted">لا توجد قرارات بعد.</div>';
   return `
     <div style="display:flex;justify-content:space-between;align-items:baseline">
       <div class="label">AUDIT LOG · سجل القرارات</div>
-      <div style="font-size:11px;color:#6F6D64">كل قرار، سببه، موافقته، ونتيجته</div>
+      <div style="font-size:11px;color:#6F6D64">كل قرار وسببه وحالة الموافقة والنتيجة</div>
     </div>${rows}`;
 }
 
@@ -708,7 +708,7 @@ function renderAll() {
   $('mode-sub').textContent = st.source !== 'simulator'
     ? 'غرفة المختبر · قراءات حقيقية من ESP32 + PZEM-004T'
     : WW.site === 'building'
-      ? 'نفس الوكيل ونفس الكود على مبنى بـ١٠ غرف · بيانات تركيبية من المحاكي'
+      ? 'الوكيل نفسه والكود نفسه على مبنى من ١٠ غرف · بيانات تركيبية من المحاكي'
       : 'تصوّر للتوسّع من غرفة المختبر لبيت كامل · بيانات تركيبية من المحاكي';
   if (!document.activeElement || document.activeElement.id !== 'scenario-pick') WW.render($('toolbar'), toolbar());
   WW.render($('hero'), hero());
@@ -770,7 +770,7 @@ WW.onAction({
   'cmd-cancel': () => { ui.cmd.res = null; renderAll(); },
   'cmd-run': () => act(async () => {
     const r = await WW.post('/command/run', { text: ui.cmd.text });
-    ui.cmd = { text: '', res: null, busy: false, msg: r.done.length ? 'تم: ' + r.done.join('، ') : 'ما تنفّذ إشي.' };
+    ui.cmd = { text: '', res: null, busy: false, msg: r.done.length ? 'تم: ' + r.done.join('، ') : 'لم يُنفَّذ شيء.' };
   }),
   'heater-suggest': async () => {
     ui.heater.busy = true; ui.heater.msg = ''; renderAll();
@@ -781,7 +781,7 @@ WW.onAction({
     const r = ui.heater.res;
     await WW.post('/heater/apply', { device_id: r.device_id, windows: r.items.map(i => ({ on_time: i.on_time, off_time: i.off_time })) });
     ui.heater = { hint: ui.heater.hint, res: null, busy: false,
-      msg: `انحفظ جدول السخّان ✓ بيستهلك ≈ ${fmt(r.total.kwh, 1)} ك.و.س باليوم (≈ ${fmt(r.total.jod, 2)} دينار، متوقّع مش مقاس).` };
+      msg: `حُفظ جدول السخّان ✓ يستهلك ≈ ${fmt(r.total.kwh, 1)} ك.و.س يوميًا (≈ ${fmt(r.total.jod, 2)} دينار، تقديري وغير مُقاس).` };
   }),
   'heater-cancel': () => { ui.heater.res = null; renderAll(); },
   why: async () => {
@@ -791,7 +791,7 @@ WW.onAction({
   },
   'bill-toggle-manual': () => { ui.bill.manual = !ui.bill.manual; renderAll(); },
   'bill-manual': () => {
-    if (!(Number(ui.bill.kwh) > 0)) { ui.bill.msg = 'اكتب الكيلوواط ساعة (ك.و.س) من الفاتورة.'; renderAll(); return; }
+    if (!(Number(ui.bill.kwh) > 0)) { ui.bill.msg = 'أدخل الاستهلاك بالكيلوواط ساعة (ك.و.س) من الفاتورة.'; renderAll(); return; }
     return billSend(WW.billManual(ui.bill));
   },
   report: async () => {
@@ -814,7 +814,7 @@ WW.onAction({
     return act(() => WW.post(`/devices/${d.id}/setpoint`, { value: dev.setpoint + Number(d.delta) }));
   },
   tariff: d => act(() => WW.post('/tariff', { type: d.type })),
-  'alert-act': d => act(async () => { await WW.post(`/alerts/${d.id}/act`); toast('انبعت طلب الموافقة للتلفون. ما بنطفي إشي قبل موافقتك.'); }),
+  'alert-act': d => act(async () => { await WW.post(`/alerts/${d.id}/act`); toast('أُرسل طلب الموافقة إلى الهاتف. لن نُطفئ شيئًا قبل موافقتك.'); }),
   'alert-dismiss': d => act(() => WW.post(`/alerts/${d.id}/dismiss`)),
   'alert-perm': () => Notification.requestPermission().then(renderAll),
   'open-wiz': () => {

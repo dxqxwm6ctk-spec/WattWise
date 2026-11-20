@@ -4,23 +4,23 @@
 const { esc, fmt } = WW;
 const $ = id => document.getElementById(id);
 
-const OWNER = 'أهلين 👋';   // generic greeting: no personal data
+const OWNER = 'أهلًا 👋';   // generic greeting: no personal data
 const MAX_W = { lab: 200, building: 12000 }[WW.site] || 4000;
 const TYPES = [
-  { k: 'ac', label: 'مكيّف' }, { k: 'light', label: 'إنارة' }, { k: 'heater', label: 'دفاية / سخّان' },
-  { k: 'tv', label: 'تلفزيون / شاشة' }, { k: 'washer', label: 'غسالة / جلاية' }, { k: 'pc', label: 'كمبيوتر' },
+  { k: 'ac', label: 'مكيّف' }, { k: 'light', label: 'إنارة' }, { k: 'heater', label: 'مدفأة / سخّان' },
+  { k: 'tv', label: 'تلفزيون / شاشة' }, { k: 'washer', label: 'غسالة ملابس / صحون' }, { k: 'pc', label: 'كمبيوتر' },
   { k: 'router', label: 'راوتر / إنترنت' }, { k: 'fridge', label: 'ثلاجة / فريزر', locked: true },
-  { k: 'medical', label: 'جهاز طبي', locked: true }, { k: 'other', label: 'إشي ثاني' },
+  { k: 'medical', label: 'جهاز طبي', locked: true }, { k: 'other', label: 'جهاز آخر' },
 ];
 const TIPS = [
-  'السخّان: شغّليه قبل الحمّام بساعة بدل ما يضل شغّال طول اليوم.',
-  'سكّري الشبابيك والمكيّف شغّال، منبّهك تلقائيًا لما نلاحظ.',
-  'حرارة المكيّف ٢٤° بدل ٢٢° مريحة وبتقلّل الاستهلاك.',
+  'السخّان: شغّله قبل الاستحمام بساعة بدل تركه يعمل طوال اليوم.',
+  'أغلق الشبابيك أثناء تشغيل المكيّف، وسننبّهك تلقائيًا إن لاحظنا غير ذلك.',
+  'ضبط المكيّف على ٢٤° بدل ٢٢° مريح ويقلّل الاستهلاك.',
 ];
 
 const ui = {
   tab: 'home', wiz: null, confirmId: null,
-  goalText: 'خلّي فاتورة هالشهر تحت 30 دينار بدون ما تزعّج حدا بالبيت',
+  goalText: 'أبقِ فاتورة هذا الشهر تحت 30 دينارًا دون إزعاج أحد في البيت',
   cmd: { text: '', res: null, busy: false, msg: '' }, listening: false,
   heater: { hint: '', res: null, busy: false, msg: '' },
   why: { res: null, busy: false }, rep: { text: '', busy: false },
@@ -42,17 +42,17 @@ function statusCard() {
   const a = st.agent, last = st.last_approval;
   const dev = last && last.device_name ? last.device_name : 'الجهاز';
   let m;
-  if (!st.online) m = ['#A23A26', '#F0C2B8', 'ما في قراءات', 'انقطعت القراءات، فكل إشي رجع طبيعي وما في إجراء تلقائي.'];
-  else if (a.estop) m = ['#A23A26', '#F0C2B8', 'WattWise موقوف', 'كل الأجهزة رجعت طبيعي. ما رح نقترح إشي لحد ما تشغّليه.'];
-  else if (a.safe_mode) m = ['#A23A26', '#F0C2B8', 'ما في اتصال', 'الراوتر مطفي، فما بنطلب موافقة وما بننفّذ إشي.'];
-  else if (!st.goal) m = ['#8A5A00', '#E8B23A', 'بانتظار هدف', 'أعطِ الوكيل هدف من لوحة التحكم عشان يبلّش.'];
+  if (!st.online) m = ['#A23A26', '#F0C2B8', 'لا توجد قراءات', 'انقطعت القراءات، فعادت الأجهزة إلى وضعها الطبيعي دون إجراءات تلقائية.'];
+  else if (a.estop) m = ['#A23A26', '#F0C2B8', 'WattWise متوقف', 'عادت كل الأجهزة إلى وضعها الطبيعي. لن نقترح شيئًا حتى تعيد تشغيله.'];
+  else if (a.safe_mode) m = ['#A23A26', '#F0C2B8', 'لا يوجد اتصال', 'الراوتر مطفأ، لذا لن نطلب موافقة ولن ننفّذ شيئًا.'];
+  else if (!st.goal) m = ['#8A5A00', '#E8B23A', 'بانتظار هدف', 'أعطِ الوكيل هدفًا من لوحة التحكم ليبدأ.'];
   else m = {
-    analyzing: ['#8A5A00', '#E8B23A', 'عم نفكّر', 'لاحظنا جهاز شغّال بغرفة فاضية. ثواني ونرجعلك.'],
-    executing: ['#4A6418', '#D6E8B0', 'عم نطفيه', 'وصلتنا موافقتك.'],
-    verified: ['#4A6418', '#B8DB7A', 'تم ✓', `طفينا ${dev} والعدّاد أكّد. التوفير بيبيّن تحت بالفاتورة.`],
-    rejected: ['#A23A26', '#F0C2B8', 'تمام، ما لمسنا إشي', `${dev} بقي متل ما بدك.`],
-    expired: ['#A23A26', '#F0C2B8', 'ما وصلنا رد', 'فما عملنا إشي. السكوت عنا مش موافقة.'],
-  }[a.phase] || ['#4A6418', '#D6E8B0', 'كل إشي تمام', 'البيت ماشي طبيعي وما في هدر هلأ.'];
+    analyzing: ['#8A5A00', '#E8B23A', 'جارٍ التحليل', 'لاحظنا جهازًا يعمل في غرفة فارغة. لحظات ونعود إليك.'],
+    executing: ['#4A6418', '#D6E8B0', 'جارٍ الإطفاء', 'وصلت موافقتك.'],
+    verified: ['#4A6418', '#B8DB7A', 'تم ✓', `أطفأنا ${dev} وأكّد العدّاد ذلك. يظهر التوفير في قسم الفاتورة.`],
+    rejected: ['#A23A26', '#F0C2B8', 'حسنًا، لم نغيّر شيئًا', `بقي ${dev} كما هو.`],
+    expired: ['#A23A26', '#F0C2B8', 'لم يصل رد', 'لذا لم نفعل شيئًا. عدم الرد لا يعني الموافقة.'],
+  }[a.phase] || ['#4A6418', '#D6E8B0', 'كل شيء على ما يرام', 'البيت يعمل بشكل طبيعي ولا يوجد هدر الآن.'];
   return `
     <div style="border-radius:20px;background:#FFFFFF;border:1.5px solid ${m[1]};padding:14px 16px;display:flex;flex-direction:column;gap:4px">
       <span style="font-size:14px;font-weight:700;color:${m[0]}">${m[2]}</span>
@@ -66,11 +66,11 @@ function anomalyCard() {
   // Already shown as a warning card (alertCards) unless the human dismissed it.
   if (((st.alerts || {}).items || []).some(x => x.active && ['unknown_device', 'anomaly'].includes(x.kind))) return '';
   const msg = a.kind === 'extra'
-    ? `في جهاز عم يسحب ≈ ${a.residual_w} واط وما بنعرفه. شيكي إذا في إشي شغّال ومش لازم.`
-    : `الاستهلاك أقل من المتوقع بـ≈ ${-a.residual_w} واط. ممكن جهاز فاصل أو معطّل.`;
+    ? `جهاز غير معروف يستهلك ≈ ${a.residual_w} واط. تحقّق إن كان هناك جهاز يعمل دون حاجة.`
+    : `الاستهلاك أقل من المتوقع بنحو ${-a.residual_w} واط. ربما يوجد جهاز مفصول أو معطّل.`;
   return `
     <div style="border-radius:20px;background:#FFF4D9;border:1.5px solid #E8B23A;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
-      <span style="font-size:14px;font-weight:700;color:#8A5A00">استهلاك غريب</span>
+      <span style="font-size:14px;font-weight:700;color:#8A5A00">استهلاك غير معتاد</span>
       <span style="font-size:14px;line-height:1.7;color:#4A4840">${msg}</span>
     </div>`;
 }
@@ -85,8 +85,8 @@ function alertCards() {
       <span style="font-size:14px;font-weight:700;color:${c[2]}">${esc(a.title)}</span>
       <span style="font-size:14px;line-height:1.7;color:#4A4840">${esc(a.body)}</span>
       <div style="display:flex;gap:8px">
-        ${a.can_act ? `<button data-act="alert-act" data-id="${a.id}" class="btn-dark" style="height:42px;flex:1.4;font-size:15px">طفّيه؟</button>` : ''}
-        <button data-act="alert-dismiss" data-id="${a.id}" style="height:42px;flex:1;border-radius:14px;border:1.5px solid ${c[1]};background:transparent;font-size:14px;cursor:pointer">تمام</button>
+        ${a.can_act ? `<button data-act="alert-act" data-id="${a.id}" class="btn-dark" style="height:42px;flex:1.4;font-size:15px">أطفئه؟</button>` : ''}
+        <button data-act="alert-dismiss" data-id="${a.id}" style="height:42px;flex:1;border-radius:14px;border:1.5px solid ${c[1]};background:transparent;font-size:14px;cursor:pointer">تجاهل</button>
       </div>
     </div>`;
   }).join('');
@@ -98,22 +98,22 @@ function approvalCard() {
   return `
     <div style="border-radius:24px;background:#FFF4D9;border:1.5px solid #E8B23A;padding:16px;display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="display:flex;align-items:center;gap:8px;font-size:13px;color:#8A5A00;font-weight:600"><span style="width:8px;height:8px;border-radius:50%;background:#E8A21A;animation:ww-pulse 1s infinite"></span>بدنا رأيك</span>
+        <span style="display:flex;align-items:center;gap:8px;font-size:13px;color:#8A5A00;font-weight:600"><span style="width:8px;height:8px;border-radius:50%;background:#E8A21A;animation:ww-pulse 1s infinite"></span>نحتاج موافقتك</span>
         <span class="mono" style="font-size:13px;color:#8A5A00" dir="ltr">${p.expires_in_s}s</span>
       </div>
       <div style="font-size:19px;font-weight:700;line-height:1.35">${esc(p.title)}</div>
       <div style="font-size:14px;line-height:1.7;color:#4A4536">${esc(p.reason)}</div>
-      ${p.details.alternative ? `<div style="font-size:13px;line-height:1.6;color:#6B4A00">إذا لا: ${esc(p.details.alternative)}</div>` : ''}
+      ${p.details.alternative ? `<div style="font-size:13px;line-height:1.6;color:#6B4A00">البديل: ${esc(p.details.alternative)}</div>` : ''}
       <div style="padding:10px 12px;border-radius:12px;background:#FBE7B5;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:13px;color:#6B4A00">بيوفّر تقريبًا</span>
+        <span style="font-size:13px;color:#6B4A00">التوفير التقريبي</span>
         <span class="mono" style="font-size:15px;font-weight:600" dir="ltr">${fmt(p.details.saving_jod_per_hour, 3)} JD / hr</span>
       </div>
       <div style="height:4px;border-radius:2px;background:#F1D58E;overflow:hidden"><div style="height:100%;width:${pct}%;background:#E8A21A;transition:width 1s linear"></div></div>
       <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px">
-        <button data-act="reject" data-id="${p.id}" style="height:54px;border-radius:18px;border:1.5px solid #D9C38A;background:transparent;color:#1A1B16;font-size:16px;font-weight:600;cursor:pointer">لا، خلّيه</button>
-        <button data-act="approve" data-id="${p.id}" class="btn-dark" style="height:54px;font-size:16px">إيه، طفّيه</button>
+        <button data-act="reject" data-id="${p.id}" style="height:54px;border-radius:18px;border:1.5px solid #D9C38A;background:transparent;color:#1A1B16;font-size:16px;font-weight:600;cursor:pointer">لا، اتركه</button>
+        <button data-act="approve" data-id="${p.id}" class="btn-dark" style="height:54px;font-size:16px">نعم، أطفئه</button>
       </div>
-      <span style="font-size:11.5px;color:#8A7A55;text-align:center">إذا ما رديتي، ما رح نعمل إشي</span>
+      <span style="font-size:11.5px;color:#8A7A55;text-align:center">إن لم تردّ، لن نفعل شيئًا</span>
     </div>`;
 }
 
@@ -163,7 +163,7 @@ function homeTab() {
             <span style="font-size:11px;color:#A9A79D">الحمل الآن</span>
             <div style="display:flex;align-items:baseline;gap:4px" dir="ltr"><span class="mono" style="font-size:28px;font-weight:600;line-height:1">${kw}</span><span class="mono" style="font-size:11px;color:#A9A79D">${MAX_W > 1000 ? 'kW' : 'W'}</span></div>
             <div style="display:flex;gap:2px;padding:4px;border-radius:7px;background:#0A0B08;border:1px solid #2A2C25" dir="ltr">${odo}</div>
-            <span style="font-size:10px;color:#8E8C82">ك.و.س هالشهر</span>
+            <span style="font-size:10px;color:#8E8C82">ك.و.س هذا الشهر</span>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:3px">
@@ -172,7 +172,7 @@ function homeTab() {
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid #2A2C25">
           <div style="display:flex;justify-content:space-between;align-items:baseline">
-            <span style="font-size:12px;color:#A9A79D">الفاتورة لحد الآن</span>
+            <span style="font-size:12px;color:#A9A79D">الفاتورة حتى الآن</span>
             <span class="mono" style="font-size:12px;white-space:nowrap" dir="ltr"><span style="font-size:18px;font-weight:600">${fmt(b.bill_now, 2)}</span> JD</span>
           </div>
           ${goalJd ? `
@@ -197,7 +197,7 @@ function wizard() {
   const t = TYPES.find(x => x.k === z.type);
   const chip = sel => `border:1.5px solid ${sel ? '#1A1B16' : '#E2DFD4'};background:${sel ? '#1A1B16' : '#FFFFFF'};color:${sel ? '#F3F1EA' : '#1A1B16'}`;
   const canNext = [!!z.type, !!z.room, learnedW > 0, true][z.step];
-  const titles = ['شو نوع الجهاز؟', 'وين حطّيتيه؟', 'خلّينا نتعرّف عليه', 'شو مسموح لـWattWise؟'];
+  const titles = ['ما نوع الجهاز؟', 'أين يوجد؟', 'لنتعرّف عليه', 'ما المسموح لـWattWise؟'];
   let body = '';
   if (z.step === 0) {
     body = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${TYPES.map(x =>
@@ -207,34 +207,34 @@ function wizard() {
     body = `<div style="display:flex;flex-direction:column;gap:12px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${st.rooms.map(r =>
         `<button data-act="wiz-room" data-id="${esc(r.id)}" style="min-height:48px;border-radius:16px;${chip(z.room === r.id)};font-size:14px;font-weight:600;cursor:pointer">${esc(r.name)}</button>`).join('')}</div>
-      <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:#77756C">سمّيه (اختياري)
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:#77756C">الاسم (اختياري)
         <input id="wiz-name" value="${esc(z.name)}" placeholder="${esc(ph)}" style="height:50px;border-radius:16px;border:1.5px solid #E2DFD4;background:#FFFFFF;padding:0 14px;font-size:15px;color:#1A1B16;outline:none">
       </label></div>`;
   } else if (z.step === 2) {
     body = `<div style="display:flex;flex-direction:column;gap:12px">
       <div style="border-radius:20px;background:#FFFFFF;padding:16px;display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:1.7">
-        <span>١. تأكّدي إنو الجهاز موصول بمقبس ذكي (بيركّبه كهربائي).</span>
-        <span>٢. لما تكوني جاهزة، شغّلي الجهاز من زرّه واضغطي «شغّلته».</span>
-        <span style="color:#77756C;font-size:13px">WattWise بيقيس قفزة الواط على العدّاد الرئيسي، هاي بصمة الجهاز.</span>
+        <span>١. تأكّد أن الجهاز موصول بمقبس ذكي (يركّبه كهربائي).</span>
+        <span>٢. عندما تكون جاهزًا، شغّل الجهاز من زرّه ثم اضغط «شغّلته».</span>
+        <span style="color:#77756C;font-size:13px">يقيس WattWise قفزة الواط على العدّاد الرئيسي، وهذه هي بصمة الجهاز.</span>
       </div>
       ${!measuring && !learnedW ? `<button data-act="wiz-learn" class="btn-dark" style="height:56px;font-size:16px">شغّلته</button>` : ''}
-      ${measuring ? `<div style="height:56px;border-radius:18px;background:#E6F5C8;display:flex;align-items:center;justify-content:center;gap:10px;font-size:15px;color:#4A6418;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;background:#5E7A1C;animation:ww-pulse 0.8s infinite"></span>عم نقيس…</div>` : ''}
+      ${measuring ? `<div style="height:56px;border-radius:18px;background:#E6F5C8;display:flex;align-items:center;justify-content:center;gap:10px;font-size:15px;color:#4A6418;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;background:#5E7A1C;animation:ww-pulse 0.8s infinite"></span>جارٍ القياس…</div>` : ''}
       ${learnedW ? `<div style="border-radius:20px;background:#E6F5C8;padding:16px;display:flex;justify-content:space-between;align-items:center">
           <div style="display:flex;flex-direction:column;gap:2px">
             <span style="font-size:13px;color:#4A6418">تعرّفنا عليه ✓</span>
             <span class="mono" style="font-size:26px;font-weight:500" dir="ltr">+${learnedW} W</span>
-            <span style="font-size:12px;color:#4A6418">≈ ${fmt(learnedW / 1000 * st.bill.price_jod_per_kwh, 3)} دينار بالساعة</span>
+            <span style="font-size:12px;color:#4A6418">≈ ${fmt(learnedW / 1000 * st.bill.price_jod_per_kwh, 3)} دينار في الساعة</span>
           </div>
-          <button data-act="wiz-learn" style="height:44px;padding:0 14px;border-radius:14px;border:1.5px solid #B8DB7A;background:transparent;font-size:13px;font-weight:600;cursor:pointer">قيس مرة ثانية</button>
+          <button data-act="wiz-learn" style="height:44px;padding:0 14px;border-radius:14px;border:1.5px solid #B8DB7A;background:transparent;font-size:13px;font-weight:600;cursor:pointer">أعد القياس</button>
         </div>` : ''}
       </div>`;
   } else {
     body = t && t.locked
-      ? `<div style="border-radius:20px;background:#FBE3DD;padding:16px;font-size:14px;line-height:1.7;color:#7A2A1C">هاد جهاز حرج (T2). رح نراقب استهلاكه بس، وما حدا (ولا الوكيل ولا التطبيق) بيقدر يطفيه. محمي بالكود.</div>`
+      ? `<div style="border-radius:20px;background:#FBE3DD;padding:16px;font-size:14px;line-height:1.7;color:#7A2A1C">هذا جهاز حرج (T2). سنراقب استهلاكه فقط، ولا يمكن لأحد (لا الوكيل ولا التطبيق) إطفاؤه. محمي برمجيًا.</div>`
       : `<div style="border-radius:20px;background:#FFFFFF;padding:16px;display:flex;align-items:center;gap:12px">
           <div style="flex:1;display:flex;flex-direction:column;gap:4px">
-            <span style="font-size:15px;font-weight:600">الوكيل يقترح إطفاءه لما يلاقي هدر</span>
-            <span style="font-size:12.5px;line-height:1.6;color:#77756C">دايمًا بيسألك قبل. إذا سكّرتيها، بيضل التحكم يدوي بس.</span>
+            <span style="font-size:15px;font-weight:600">يقترح الوكيل إطفاءه عند وجود هدر</span>
+            <span style="font-size:12.5px;line-height:1.6;color:#77756C">يسألك دائمًا قبل أي إجراء. إن عطّلت هذا الخيار، يبقى التحكم يدويًا فقط.</span>
           </div>
           <button data-act="wiz-allow" style="width:52px;height:32px;border-radius:16px;border:none;background:${z.allow ? '#1A1B16' : '#D8D5CA'};position:relative;cursor:pointer;flex:none;padding:0">
             <span style="position:absolute;top:4px;${z.allow ? 'left' : 'right'}:4px;width:24px;height:24px;border-radius:50%;background:${z.allow ? '#B8F04A' : '#FFFFFF'};box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span>
@@ -251,7 +251,7 @@ function wizard() {
       ${body}
       <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:8px;padding-top:4px">
         <button data-act="wiz-back" class="btn-line" style="height:52px;font-size:15px">${z.step === 0 ? 'إلغاء' : 'رجوع'}</button>
-        <button data-act="wiz-next" style="height:52px;border-radius:18px;border:none;background:${canNext ? '#1A1B16' : '#D8D5CA'};color:${canNext ? '#F3F1EA' : '#8E8C82'};font-size:15px;font-weight:700;cursor:pointer">${z.step === 3 ? 'ضيف الجهاز' : 'التالي'}</button>
+        <button data-act="wiz-next" style="height:52px;border-radius:18px;border:none;background:${canNext ? '#1A1B16' : '#D8D5CA'};color:${canNext ? '#F3F1EA' : '#8E8C82'};font-size:15px;font-weight:700;cursor:pointer">${z.step === 3 ? 'إضافة الجهاز' : 'التالي'}</button>
       </div>
     </div>`;
 }
@@ -268,7 +268,7 @@ function devicesTab() {
         <div style="display:flex;align-items:center;gap:12px">
           <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
             <span style="font-size:15px;font-weight:600">${esc(d.name)}</span>
-            <span style="font-size:12px;color:#77756C">${esc(d.room_name)} · ${locked ? 'محمي · دايمًا شغّال' : on ? 'شغّال' : 'مطفي'}</span>
+            <span style="font-size:12px;color:#77756C">${esc(d.room_name)} · ${locked ? 'محمي · يعمل دائمًا' : on ? 'يعمل' : 'مطفأ'}</span>
           </div>
           <button data-act="toggle" data-id="${esc(d.id)}" aria-label="${esc(d.name)}" style="width:52px;height:32px;border-radius:16px;border:none;background:${locked ? '#F0C2B8' : on ? '#1A1B16' : '#D8D5CA'};position:relative;cursor:pointer;flex:none;padding:0">
             <span style="position:absolute;top:4px;${on ? 'left' : 'right'}:4px;width:24px;height:24px;border-radius:50%;background:${locked ? '#D9432E' : on ? '#B8F04A' : '#FFFFFF'};box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span>
@@ -279,19 +279,19 @@ function devicesTab() {
   }).join('');
   return `
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button data-act="open-plug" style="height:52px;border-radius:18px;border:none;background:#1A1B16;color:#F3F1EA;font-size:15px;font-weight:700;cursor:pointer">🔌 + ضيفي مقبس ذكي (Wi-Fi)</button>
-      <button data-act="open-wiz" style="height:52px;border-radius:18px;border:1.5px dashed #B9B6AA;background:transparent;color:#1A1B16;font-size:15px;font-weight:600;cursor:pointer">+ ضيفي جهاز بالعدّاد الرئيسي</button>
-      ${st.agent.safe_mode ? `<div style="border-radius:18px;background:#FFF4D9;border:1.5px solid #E8B23A;padding:14px 16px;font-size:13.5px;line-height:1.6;color:#6B4A00">الراوتر مطفي، بالحقيقة التطبيق رح ينقطع هون. WattWise بوضع آمن وما رح ينفّذ إشي.</div>` : ''}
+      <button data-act="open-plug" style="height:52px;border-radius:18px;border:none;background:#1A1B16;color:#F3F1EA;font-size:15px;font-weight:700;cursor:pointer">🔌 + إضافة مقبس ذكي (Wi-Fi)</button>
+      <button data-act="open-wiz" style="height:52px;border-radius:18px;border:1.5px dashed #B9B6AA;background:transparent;color:#1A1B16;font-size:15px;font-weight:600;cursor:pointer">+ إضافة جهاز عبر العدّاد الرئيسي</button>
+      ${st.agent.safe_mode ? `<div style="border-radius:18px;background:#FFF4D9;border:1.5px solid #E8B23A;padding:14px 16px;font-size:13.5px;line-height:1.6;color:#6B4A00">الراوتر مطفأ، وفي الواقع سينقطع التطبيق هنا. WattWise في الوضع الآمن ولن ينفّذ شيئًا.</div>` : ''}
       ${confirmDev ? `
       <div style="border-radius:20px;background:#FFF4D9;border:1.5px solid #E8B23A;padding:16px;display:flex;flex-direction:column;gap:10px">
-        <span style="font-size:15px;font-weight:700">نطفي ${esc(confirmDev.name)}؟</span>
-        <span style="font-size:13.5px;line-height:1.6;color:#4A4536">رح ينقطع التطبيق ولا رح توصلك طلبات موافقة لحد ما ترجعي تشغّليه من الجهاز نفسه.</span>
+        <span style="font-size:15px;font-weight:700">إطفاء ${esc(confirmDev.name)}؟</span>
+        <span style="font-size:13.5px;line-height:1.6;color:#4A4536">سينقطع التطبيق ولن تصلك طلبات موافقة حتى تعيد تشغيله من الجهاز نفسه.</span>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <button data-act="confirm-cancel" style="height:48px;border-radius:16px;border:1.5px solid #D9C38A;background:transparent;font-size:15px;font-weight:600;cursor:pointer">لا</button>
-          <button data-act="confirm-off" data-id="${esc(confirmDev.id)}" class="btn-dark" style="height:48px;font-size:15px">إيه، طفّيه</button>
+          <button data-act="confirm-off" data-id="${esc(confirmDev.id)}" class="btn-dark" style="height:48px;font-size:15px">نعم، أطفئه</button>
         </div>
       </div>` : ''}
-      <span class="sub">${onCount} شغّال من ${st.devices.length}</span>
+      <span class="sub">يعمل ${onCount} من ${st.devices.length}</span>
       ${items}
     </div>`;
 }
@@ -311,32 +311,32 @@ function billTab() {
     <div style="display:flex;flex-direction:column;gap:6px">
       <div style="display:flex;justify-content:space-between;font-size:14px"><span>${esc(x.name)}</span><span class="mono" dir="ltr">${fmt(x.jod, 2)} JD</span></div>
       <div style="height:6px;border-radius:3px;background:#ECE9DF;overflow:hidden;display:flex"><div style="width:${x.pct}%;background:#1A1B16"></div></div>
-    </div>`).join('') || '<span class="sub">لسا ما في بيانات كفاية.</span>';
+    </div>`).join('') || '<span class="sub">لا توجد بيانات كافية بعد.</span>';
   return `
     <div style="display:flex;flex-direction:column;gap:12px">
       ${billExtras()}
       <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:12px">
-        <span class="sub">نوع اشتراكك (موجود على فاتورتك)</span>
+        <span class="sub">نوع اشتراكك (مذكور في فاتورتك)</span>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;border-radius:16px;background:#F3F1EA">${opts}</div>
         <span style="font-size:12.5px;line-height:1.6;color:#77756C">${esc(b.who)}</span>
         <div style="display:flex;flex-direction:column;gap:6px">${tiers}</div>
         <span style="font-size:13px;line-height:1.6">${esc(b.message)}</span>
       </div>
       <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:14px">
-        <span class="sub">وين بتروح المصاري؟ (حسب بصمة كل جهاز)</span>
+        <span class="sub">توزيع التكلفة (حسب بصمة كل جهاز)</span>
         ${breakdown}
       </div>
       <div style="border-radius:22px;background:#E6F5C8;padding:18px;display:flex;flex-direction:column;gap:6px">
-        <span style="font-size:13px;color:#4A6418">وفّرنا معك (مُقاس فعليًا)</span>
+        <span style="font-size:13px;color:#4A6418">التوفير (مُقاس فعليًا)</span>
         <span class="mono" style="font-size:30px;font-weight:500" dir="ltr">${fmt(s.jod, 3)} JD</span>
         <span style="font-size:12.5px;color:#4A6418">${fmt(s.kwh, 2)} ك.و.س · ${s.co2_kg === null ? '—' : fmt(s.co2_kg, 2)} كغ CO₂ أقل</span>
       </div>
       ${st.forecast ? `<div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:6px">
-        <span class="sub">المتوقّع بالـ${st.forecast.steps.length} ساعات الجاية</span>
+        <span class="sub">المتوقّع للساعات الـ${st.forecast.steps.length} القادمة</span>
         <span class="mono" style="font-size:22px;font-weight:500" dir="ltr">${fmt(st.forecast.jod, 2)} JD · ${fmt(st.forecast.kwh, 1)} kWh</span>
-        <span style="font-size:12.5px;color:#77756C">${st.forecast.accuracy.hours ? `خطأ التوقّع ≈ ${fmt(st.forecast.accuracy.mean_err_pct, 0)}% (مقاس بالعدّاد)` : 'لسا عم نقيس دقّة التوقّع'}</span>
+        <span style="font-size:12.5px;color:#77756C">${st.forecast.accuracy.hours ? `خطأ التوقّع ≈ ${fmt(st.forecast.accuracy.mean_err_pct, 0)}% (مقاس بالعدّاد)` : 'جارٍ قياس دقة التوقّع'}</span>
       </div>` : ''}
-      <span class="sub" style="padding-top:4px">نصايح (ما بننفّذها لحالنا)</span>
+      <span class="sub" style="padding-top:4px">نصائح (لا ننفّذها تلقائيًا)</span>
       ${TIPS.map(t => `<div class="box" style="font-size:14px;line-height:1.65">${t}</div>`).join('')}
     </div>`;
 }
@@ -345,7 +345,7 @@ function billTab() {
 
 const micOk = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 const field = 'height:48px;border-radius:16px;border:1.5px solid #E2DFD4;background:#FFFFFF;padding:0 14px;font-size:15px;font-family:inherit;color:#1A1B16;outline:none;min-width:0';
-const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (متوقّع مش مقاس)` : '';
+const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (تقديري، غير مُقاس)` : '';
 
 // Typed or spoken order: the server understands it, the Policy Guard checks it, you confirm.
 function commandCard() {
@@ -357,13 +357,13 @@ function commandCard() {
         <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:14px">${esc(i.label)}</span><span style="font-size:12px;color:#77756C">${esc(i.why)}</span></span></div>`).join('')}
       <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px">
         <button data-act="cmd-cancel" class="btn-line" style="height:48px;border-radius:16px;font-size:15px">لا</button>
-        ${r.items.some(i => i.ok) ? '<button data-act="cmd-run" class="btn-dark" style="height:48px;border-radius:16px;font-size:15px">إيه، نفّذ</button>' : ''}
+        ${r.items.some(i => i.ok) ? '<button data-act="cmd-run" class="btn-dark" style="height:48px;border-radius:16px;font-size:15px">نعم، نفّذ</button>' : ''}
       </div></div>`;
   return `<div style="border-radius:22px;background:#FFFFFF;padding:14px;display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;gap:8px">
-        <input id="cmd-text" value="${esc(c.text)}" aria-label="احكي أو اكتب أمرك للوكيل" placeholder="قول: طفّي مكيّف النوم" style="flex:1;${field}">
-        ${micOk ? `<button data-act="cmd-mic" aria-label="احكي" style="width:48px;height:48px;border-radius:16px;border:1.5px solid #1A1B16;background:${ui.listening ? '#E8553F' : 'transparent'};color:${ui.listening ? '#fff' : 'inherit'};font-size:18px;cursor:pointer;flex:none">🎤</button>` : ''}
-        <button data-act="cmd-parse" class="btn-dark" style="height:48px;padding:0 14px;border-radius:16px;font-size:14px;flex:none">${c.busy ? 'عم أفهم…' : 'نفّذ'}</button>
+        <input id="cmd-text" value="${esc(c.text)}" aria-label="تحدّث أو اكتب أمرك للوكيل" placeholder="مثلًا: أطفئ مكيّف غرفة النوم" style="flex:1;${field}">
+        ${micOk ? `<button data-act="cmd-mic" aria-label="تحدّث" style="width:48px;height:48px;border-radius:16px;border:1.5px solid #1A1B16;background:${ui.listening ? '#E8553F' : 'transparent'};color:${ui.listening ? '#fff' : 'inherit'};font-size:18px;cursor:pointer;flex:none">🎤</button>` : ''}
+        <button data-act="cmd-parse" class="btn-dark" style="height:48px;padding:0 14px;border-radius:16px;font-size:14px;flex:none">${c.busy ? 'جارٍ الفهم…' : 'نفّذ'}</button>
       </div>${result}
       ${c.msg ? `<span style="font-size:13.5px;color:#4A6418;font-weight:600">${esc(c.msg)}</span>` : ''}
     </div>`;
@@ -374,18 +374,18 @@ function schedTab() {
   const hasHeater = st.devices.some(d => d.kind === 'heater' && d.tier === 'T1' && !d.sensitive);
   const heater = !hasHeater ? '' : `<div style="border-radius:22px;background:#E6F5C8;padding:18px;display:flex;flex-direction:column;gap:10px">
       <span style="font-size:17px;font-weight:700">سخّان الماء الذكي</span>
-      <span style="font-size:13px;line-height:1.65;color:#4A6418">من أكبر الأحمال. بنسخّنه قبل الحمّام بس، وما بيشتغل أكثر من ٣ ساعات متواصلة.</span>
-      <input id="heater-hint" value="${esc(h.hint)}" aria-label="متى بتحمّموا؟" placeholder="متى بتحمّموا؟ مثلاً: الصبح ٦ ونص" style="${field};border-color:#B8DB7A">
-      <button data-act="heater-suggest" class="btn-dark" style="height:50px;border-radius:16px;font-size:15px">${h.busy ? 'عم نخطّط…' : 'اقترحلي جدول للسخّان'}</button>
+      <span style="font-size:13px;line-height:1.65;color:#4A6418">من أكبر الأحمال. نشغّله قبل الاستحمام فقط، ولا يعمل أكثر من ٣ ساعات متواصلة.</span>
+      <input id="heater-hint" value="${esc(h.hint)}" aria-label="متى تستحمّون؟" placeholder="متى تستحمّون؟ مثلًا: الصباح ٦:٣٠" style="${field};border-color:#B8DB7A">
+      <button data-act="heater-suggest" class="btn-dark" style="height:50px;border-radius:16px;font-size:15px">${h.busy ? 'جارٍ التخطيط…' : 'اقترح جدولًا للسخّان'}</button>
       ${hr ? `<div style="display:flex;flex-direction:column;gap:8px">
         <span style="font-size:14px;line-height:1.6">${esc(hr.reply)}</span>
         ${hr.items.map(i => `<div style="padding:10px 12px;border-radius:12px;background:#FFFFFF;display:flex;flex-direction:column;gap:2px">
           <span class="mono" style="font-size:14px;font-weight:600" dir="ltr">${esc(i.on_time)} → ${esc(i.off_time)}</span>
           <span style="font-size:13px">${esc(i.why)}</span><span style="font-size:12px;color:#5E5C55">${estText(i.estimate)}</span></div>`).join('')}
-        <span style="font-size:13px;color:#4A6418;font-weight:600">المجموع ≈ ${fmt(hr.total.kwh, 1)} ك.و.س باليوم ≈ ${fmt(hr.total.jod, 2)} دينار (متوقّع مش مقاس)</span>
+        <span style="font-size:13px;color:#4A6418;font-weight:600">المجموع ≈ ${fmt(hr.total.kwh, 1)} ك.و.س يوميًا ≈ ${fmt(hr.total.jod, 2)} دينار (تقديري، غير مُقاس)</span>
         <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px">
           <button data-act="heater-cancel" class="btn-line" style="height:48px;border-radius:16px;font-size:15px;border-color:#B8DB7A">لا</button>
-          ${hr.items.length ? '<button data-act="heater-apply" class="btn-dark" style="height:48px;border-radius:16px;font-size:15px">إيه، اعتمده</button>' : ''}
+          ${hr.items.length ? '<button data-act="heater-apply" class="btn-dark" style="height:48px;border-radius:16px;font-size:15px">نعم، اعتمده</button>' : ''}
         </div></div>` : ''}
       ${h.msg ? `<span style="font-size:13.5px;line-height:1.6;color:#4A6418;font-weight:600">${esc(h.msg)}</span>` : ''}
     </div>`;
@@ -410,14 +410,14 @@ function billExtras() {
       }).join('')}</div>`;
   return `
     <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
-      <span class="sub">هدفك بكلامك</span>
+      <span class="sub">هدفك بكلماتك</span>
       ${st.goal ? `<span style="font-size:15px;font-weight:600;line-height:1.5">«${esc(st.goal.text)}»</span>` : ''}
-      <input id="goal-text" value="${esc(ui.goalText)}" aria-label="اكتب هدفك بكلامك العادي" placeholder="مثلاً: بدي الفاتورة تحت ٢٥ دينار" style="${field};height:50px">
-      <button data-act="set-goal" class="btn-dark" style="height:50px;border-radius:16px;font-size:15px">${st.goal ? 'غيّر الهدف' : 'حوّله لخطة'}</button>
+      <input id="goal-text" value="${esc(ui.goalText)}" aria-label="اكتب هدفك بكلماتك" placeholder="مثلًا: الفاتورة تحت ٢٥ دينارًا" style="${field};height:50px">
+      <button data-act="set-goal" class="btn-dark" style="height:50px;border-radius:16px;font-size:15px">${st.goal ? 'غيّر الهدف' : 'حوّله إلى خطة'}</button>
       ${plan}
     </div>
     <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
-      <button data-act="why" class="btn-line" style="height:50px;border-radius:16px;border-color:#1A1B16;font-size:15px;font-weight:700">${ui.why.busy ? 'عم نحلّل…' : w ? 'حلّل من جديد' : 'ليش الفاتورة هيك؟'}</button>
+      <button data-act="why" class="btn-line" style="height:50px;border-radius:16px;border-color:#1A1B16;font-size:15px;font-weight:700">${ui.why.busy ? 'جارٍ التحليل…' : w ? 'أعد التحليل' : 'لماذا الفاتورة بهذا المبلغ؟'}</button>
       ${w ? `<div style="display:flex;flex-direction:column;gap:8px">
         <span style="font-size:14px;line-height:1.65">${esc(w.headline)}</span>
         ${w.causes.map(c => `<div style="padding:10px 12px;border-radius:12px;background:#F3F1EA;display:flex;flex-direction:column;gap:2px">
@@ -427,9 +427,9 @@ function billExtras() {
     </div>
     ${billCard()}
     <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
-      <button data-act="report" class="btn-line" style="height:50px;border-radius:16px;border-color:#1A1B16;font-size:15px;font-weight:700">${rep.busy ? 'عم نجهّز…' : rep.text ? 'جهّز تقرير جديد' : 'جهّز التقرير الأسبوعي'}</button>
+      <button data-act="report" class="btn-line" style="height:50px;border-radius:16px;border-color:#1A1B16;font-size:15px;font-weight:700">${rep.busy ? 'جارٍ التجهيز…' : rep.text ? 'جهّز تقريرًا جديدًا' : 'جهّز التقرير الأسبوعي'}</button>
       ${rep.text ? `<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.75;padding:12px;border-radius:12px;background:#F3F1EA;max-height:220px;overflow:auto">${esc(rep.text)}</div>
-        <a href="/api/sites/${WW.site}/weekly.txt" download class="btn-dark" style="height:46px;border-radius:14px;font-size:14px;display:grid;place-items:center;text-decoration:none">نزّل الملف</a>` : ''}
+        <a href="/api/sites/${WW.site}/weekly.txt" download class="btn-dark" style="height:46px;border-radius:14px;font-size:14px;display:grid;place-items:center;text-decoration:none">تنزيل الملف</a>` : ''}
     </div>`;
 }
 
@@ -459,12 +459,12 @@ function billCard() {
   return `
     <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
       <span class="sub">حلّل فاتورتك من صورة</span>
-      <div style="display:flex;gap:8px">${pick('bill-cam', b.busy ? 'عم نقرأ…' : '📷 صوّر الفاتورة', true)}${pick('bill-gal', 'من المعرض', false)}</div>
+      <div style="display:flex;gap:8px">${pick('bill-cam', b.busy ? 'جارٍ القراءة…' : '📷 صوّر الفاتورة', true)}${pick('bill-gal', 'من المعرض', false)}</div>
       ${noPhoto ? `<span style="font-size:12.5px;line-height:1.55;color:#8A5A00">${esc(b.status.reason_ar)}</span>`
-        : `<button data-act="bill-toggle-manual" style="background:none;border:none;color:#5E5C55;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit">أو اكتب الأرقام بإيدك</button>`}
+        : `<button data-act="bill-toggle-manual" style="background:none;border:none;color:#5E5C55;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit">أو أدخل الأرقام يدويًا</button>`}
       ${b.msg ? `<span style="font-size:12.5px;line-height:1.55;color:#8A5A00">${esc(b.msg)}</span>` : ''}
       ${manual}${result}
-      <span style="font-size:11px;color:#77756C">الصورة بتنقرأ مرة وحدة وما بتنحفظ. بنحتفظ بس بالأرقام.</span>
+      <span style="font-size:11px;color:#77756C">تُقرأ الصورة مرة واحدة ولا تُحفظ، ونحتفظ بالأرقام فقط.</span>
     </div>`;
 }
 
@@ -486,7 +486,7 @@ function listen() {
   recog = new SR();
   recog.lang = 'ar-JO'; recog.interimResults = false; recog.maxAlternatives = 1;
   recog.onresult = e => { ui.cmd.text = e.results[0][0].transcript; parseCommand(); };
-  recog.onerror = () => showError('المايك مش متاح هون. اكتب الأمر بدالو.');
+  recog.onerror = () => showError('الميكروفون غير متاح هنا. اكتب الأمر بدلًا من ذلك.');
   recog.onend = () => { recog = null; ui.listening = false; renderAll(); };
   ui.listening = true; renderAll();
   try { recog.start(); } catch (e) { recog = null; ui.listening = false; }
@@ -507,7 +507,7 @@ const newHandlers = {
   'cmd-cancel': () => { ui.cmd.res = null; renderAll(); },
   'cmd-run': () => act(async () => {
     const r = await WW.post('/command/run', { text: ui.cmd.text });
-    ui.cmd = { text: '', res: null, busy: false, msg: r.done.length ? 'تم: ' + r.done.join('، ') : 'ما تنفّذ إشي.' };
+    ui.cmd = { text: '', res: null, busy: false, msg: r.done.length ? 'تم: ' + r.done.join('، ') : 'لم يُنفَّذ شيء.' };
   }),
   'heater-suggest': async () => {
     ui.heater.busy = true; ui.heater.msg = ''; renderAll();
@@ -518,7 +518,7 @@ const newHandlers = {
     const r = ui.heater.res;
     await WW.post('/heater/apply', { device_id: r.device_id, windows: r.items.map(i => ({ on_time: i.on_time, off_time: i.off_time })) });
     ui.heater = { hint: ui.heater.hint, res: null, busy: false,
-      msg: `انحفظ جدول السخّان ✓ بيستهلك ≈ ${fmt(r.total.kwh, 1)} ك.و.س باليوم (≈ ${fmt(r.total.jod, 2)} دينار، متوقّع مش مقاس).` };
+      msg: `حُفظ جدول السخّان ✓ يستهلك ≈ ${fmt(r.total.kwh, 1)} ك.و.س يوميًا (≈ ${fmt(r.total.jod, 2)} دينار، تقديري وغير مُقاس).` };
   }),
   'heater-cancel': () => { ui.heater.res = null; renderAll(); },
   why: async () => {
@@ -528,7 +528,7 @@ const newHandlers = {
   },
   'bill-toggle-manual': () => { ui.bill.manual = !ui.bill.manual; renderAll(); },
   'bill-manual': () => {
-    if (!(Number(ui.bill.kwh) > 0)) { ui.bill.msg = 'اكتب الكيلوواط ساعة (ك.و.س) من الفاتورة.'; renderAll(); return; }
+    if (!(Number(ui.bill.kwh) > 0)) { ui.bill.msg = 'أدخل الاستهلاك بالكيلوواط ساعة (ك.و.س) من الفاتورة.'; renderAll(); return; }
     return billSend(WW.billManual(ui.bill));
   },
   report: async () => {
@@ -561,20 +561,20 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target
 function safetyTab() {
   const c = st.comfort;
   const rules = [
-    'الوكيل ما بيطفي ولا جهاز بدون موافقتك. إنتِ بتقدري تتحكمي بأي جهاز يدويًا.',
-    `ما رح نخلّي حرارة أي غرفة مشغولة تطلع برّا ${fmt(c.min_c)}–${fmt(c.max_c)}°.`,
-    'إذا انقطع النت أو الراوتر أو صار عطل، كل إشي بيضل طبيعي وما في إجراء تلقائي.',
-    'بنعرف إذا الغرفة فيها حدا أو لا بس، بلا كاميرات.',
+    'لا يُطفئ الوكيل أي جهاز دون موافقتك، ويمكنك التحكم بأي جهاز يدويًا.',
+    `تبقى حرارة أي غرفة مشغولة ضمن ${fmt(c.min_c)}–${fmt(c.max_c)}°.`,
+    'إذا انقطع الإنترنت أو الراوتر أو حدث عطل، يبقى كل شيء على وضعه الطبيعي دون أي إجراء تلقائي.',
+    'نعرف فقط إن كانت الغرفة مشغولة أم فارغة، بلا كاميرات.',
   ];
   return `
     <div style="display:flex;flex-direction:column;gap:10px">
-      <span class="sub">إشي ما بنلمسه أبدًا</span>
-      <div class="box" style="font-size:14px;line-height:1.7">الثلاجة، إنذار الحريق، والأجهزة الطبية وإنارة الطوارئ: ممنوعة بالكود، حتى لو وافقتي.</div>
+      <span class="sub">أجهزة لا نلمسها أبدًا</span>
+      <div class="box" style="font-size:14px;line-height:1.7">الثلاجة وإنذار الحريق والأجهزة الطبية وإنارة الطوارئ: ممنوعة برمجيًا، حتى لو وافقت.</div>
       <span class="sub" style="padding-top:4px">قواعد البيت</span>
       ${rules.map((r, i) => `<div class="box" style="display:flex;gap:12px"><span class="mono" style="font-size:11px;color:#5E7A1C;padding-top:3px">0${i + 1}</span><span style="font-size:14px;line-height:1.6">${r}</span></div>`).join('')}
       ${st.agent.estop
-        ? `<button data-act="reset" class="btn-dark" style="height:58px;border-radius:20px;font-size:16px">رجّع شغّل WattWise</button>`
-        : `<button data-act="estop" style="height:58px;border-radius:20px;border:none;background:#D9432E;color:#fff;font-size:16px;font-weight:700;cursor:pointer">وقّف WattWise هلأ</button>`}
+        ? `<button data-act="reset" class="btn-dark" style="height:58px;border-radius:20px;font-size:16px">أعد تشغيل WattWise</button>`
+        : `<button data-act="estop" style="height:58px;border-radius:20px;border:none;background:#D9432E;color:#fff;font-size:16px;font-weight:700;cursor:pointer">أوقف WattWise الآن</button>`}
     </div>`;
 }
 

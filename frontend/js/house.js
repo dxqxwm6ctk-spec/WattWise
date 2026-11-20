@@ -132,7 +132,7 @@ function update() {
     const hot = r.temp_c != null && r.temp_c > st.comfort.max_c, cold = r.temp_c != null && r.temp_c < st.comfort.min_c;
     L.classList.toggle('sel', ui.room === r.id);
     const occ = L.querySelector('.rl-occ');
-    occ.textContent = r.occupied == null ? '' : r.occupied ? '● فيها حدا' : '○ فاضية';
+    occ.textContent = r.occupied == null ? '' : r.occupied ? '● مشغولة' : '○ فارغة';
     occ.className = 'rl-occ ' + (r.occupied ? 'on' : 'off');
     const tEl = L.querySelector('.rl-temp');
     tEl.textContent = r.temp_c == null ? '' : fmt(r.temp_c, 1) + '°';
@@ -151,7 +151,7 @@ function update() {
     c.classList.toggle('on', d.is_on); c.classList.toggle('off', !d.is_on && !locked); c.classList.toggle('pend', pend === d.id); c.classList.toggle('sel', ui.device === d.id);
     c.classList.toggle('agent-off', d.agent_off > 0); c.classList.toggle('locked', locked);
     c.querySelector('.chip-w').textContent = d.kind === 'ev' && st.ev && st.ev.charging ? `${fmt(st.ev.power_w / 1000, 1)} kW`
-      : d.is_on ? (d.est_w >= 1000 ? `${fmt(d.est_w / 1000, 1)} kW` : `${d.est_w} W`) : (locked ? '' : 'مطفي');
+      : d.is_on ? (d.est_w >= 1000 ? `${fmt(d.est_w / 1000, 1)} kW` : `${d.est_w} W`) : (locked ? '' : 'مطفأ');
     c.querySelector('.chip-badge').textContent = locked ? '🔒' : !d.allow ? '⚠' : d.agent_off === 2 ? '✓' : d.agent_off === 1 ? '…' : '';
   }
   renderCar();
@@ -170,8 +170,8 @@ function renderCar() {
   const el = $('car-card');
   if (!el || !st.ev) return;
   const e = st.ev, soc = e.soc_pct == null ? null : Math.round(e.soc_pct);
-  const state = e.charging ? `⚡ عم تشحن · <b class="mono" dir="ltr">${fmt(e.power_w / 1000, 1)} kW</b>`
-    : e.resume_at ? `⏸ موقوف · بيكمّل <b class="mono" dir="ltr">${esc(e.resume_at)}</b>` : soc != null && soc >= 99 ? '✓ مشحونة' : 'مش عم تشحن';
+  const state = e.charging ? `⚡ تشحن · <b class="mono" dir="ltr">${fmt(e.power_w / 1000, 1)} kW</b>`
+    : e.resume_at ? `⏸ متوقف · يستأنف <b class="mono" dir="ltr">${esc(e.resume_at)}</b>` : soc != null && soc >= 99 ? '✓ مشحونة' : 'لا تشحن';
   const eta = !e.charging ? '' : e.minutes_to_target > 0 ? `${Math.floor(e.minutes_to_target / 60)}س ${e.minutes_to_target % 60}د لـ ${e.target_soc}٪` : `وصلت ${e.target_soc}٪`;
   WW.render(el, `
     <div class="car-top"><span>🚗 السيارة</span><span class="mono" dir="ltr">${soc == null ? '—' : soc + '%'}</span></div>
@@ -187,13 +187,13 @@ function renderHud() {
   WW.render($('hud-meter'), `
     <div class="label">الآن</div>
     <div class="hud-big mono" dir="ltr">${mw >= 1000 ? fmt(mw / 1000, 2) + '<small>kW</small>' : fmt(mw, 0) + '<small>W</small>'}</div>
-    <div class="hud-sub">وفّرنا (مقاس بالعدّاد): <b class="mono" dir="ltr">${fmt(s.kwh, 2)} kWh</b> · <b class="mono" dir="ltr">${fmt(s.jod, 3)} JD</b>${s.co2_kg != null ? ` · <b class="mono" dir="ltr">${fmt(s.co2_kg, 2)} kg CO₂</b>` : ''}</div>`);
+    <div class="hud-sub">التوفير (مُقاس بالعدّاد): <b class="mono" dir="ltr">${fmt(s.kwh, 2)} kWh</b> · <b class="mono" dir="ltr">${fmt(s.jod, 3)} JD</b>${s.co2_kg != null ? ` · <b class="mono" dir="ltr">${fmt(s.co2_kg, 2)} kg CO₂</b>` : ''}</div>`);
   const a = WW.agentLabel(st);
-  const brain = st.agent.brain && st.agent.brain.mode === 'llm' ? 'نموذج ذكاء اصطناعي + حارس سياسات' : 'وضع القواعد (بدون إنترنت) + حارس سياسات';
+  const brain = st.agent.brain && st.agent.brain.mode === 'llm' ? 'نموذج ذكاء اصطناعي + حارس سياسات' : 'وضع القواعد (دون إنترنت) + حارس سياسات';
   WW.render($('hud-agent'), `
     <div class="label">الوكيل</div>
     <div class="hud-state"><i class="dot" style="background:${a.color}"></i>${esc(a.label)}</div>
-    <div class="hud-sub">${st.goal ? 'الهدف: ' + esc(st.goal.text) : 'ما في هدف لسا. اكبس «كيف بيشتغل؟» وابدأ.'}</div>
+    <div class="hud-sub">${st.goal ? 'الهدف: ' + esc(st.goal.text) : 'لا يوجد هدف بعد. اضغط «كيف يعمل؟» للبدء.'}</div>
     <div class="hud-sub dim">${esc(brain)}</div>`);
   $('data-note').textContent = st.source === 'simulator'
     ? 'بيانات اصطناعية من المحاكي (Digital Twin)' : 'قراءات حقيقية من ESP32 + PZEM';
@@ -222,13 +222,13 @@ function renderApproval() {
       <div class="ap-bar"><i style="width:${pct}%"></i></div>
       <div class="ap-btns">
         <button class="btn-lime" data-act="approve" data-id="${p.id}">موافق</button>
-        <button class="btn-ghost" data-act="reject" data-id="${p.id}">ارفض</button>
+        <button class="btn-ghost" data-act="reject" data-id="${p.id}">رفض</button>
       </div>
-      <div class="note">إذا خلصت المهلة بدون رد ← ما بصير إشي. السكوت مش موافقة.</div>`;
+      <div class="note">إن انتهت المهلة دون رد فلن يحدث شيء. عدم الرد لا يعني الموافقة.</div>`;
   } else {
-    const msg = !la ? 'ما في طلبات. الوكيل بيطلب موافقتك قبل ما يطفي أي جهاز.'
-      : { approved: `آخر طلب: وافقت ✓ (${esc(la.device_name || '')})`, rejected: `آخر طلب: رفضت ← ما صار إشي (${esc(la.device_name || '')})`,
-          expired: 'آخر طلب: خلصت المهلة ← ما صار إشي', blocked: 'آخر طلب: حارس السياسات منع التنفيذ', cancelled: 'آخر طلب: انلغى' }[la.status] || '';
+    const msg = !la ? 'لا توجد طلبات. يطلب الوكيل موافقتك قبل إطفاء أي جهاز.'
+      : { approved: `آخر طلب: وافقت ✓ (${esc(la.device_name || '')})`, rejected: `آخر طلب: رفضت، فلم يحدث شيء (${esc(la.device_name || '')})`,
+          expired: 'آخر طلب: انتهت المهلة، فلم يحدث شيء', blocked: 'آخر طلب: حارس السياسات منع التنفيذ', cancelled: 'آخر طلب: أُلغي' }[la.status] || '';
     html = `<div class="label">الموافقة</div><div class="ap-idle">${msg}</div>`;
   }
   WW.render($('p-approval'), html);
@@ -242,33 +242,33 @@ function renderRoom() {
   const devs = st.devices.filter(d => d.room === room.id);
   const list = devs.map(d => {
     const locked = d.tier === 'T2';
-    const status = locked ? 'ممنوع: جهاز حرج، محمي بالكود' : !d.allow ? 'حسّاس: بدّه تأكيد' : d.agent_off === 2 ? 'طفّاه الوكيل وتأكّد العدّاد' : d.agent_off === 1 ? 'طفّاه الوكيل، عم نتأكّد…' : '';
+    const status = locked ? 'ممنوع: جهاز حرج محمي برمجيًا' : !d.allow ? 'حسّاس: يحتاج تأكيدًا' : d.agent_off === 2 ? 'أطفأه الوكيل وأكّد العدّاد' : d.agent_off === 1 ? 'أطفأه الوكيل، جارٍ التحقق…' : '';
     return `
       <div class="dv${ui.device === d.id ? ' sel' : ''}" data-act="device" data-id="${esc(d.id)}">
         <div class="dv-ico${d.is_on ? ' on' : ''}">${icon(d.kind)}</div>
         <div class="dv-txt">
           <div class="dv-name">${esc(d.name)}</div>
-          <div class="dv-sub"><span class="mono" dir="ltr">${d.is_on ? d.est_w + ' W' : '0 W'}</span> · بصمة <span class="mono" dir="ltr">${d.signature_w} W</span>${d.signature_measured ? ' (مقاسة)' : ' (تقدير)'}${d.setpoint != null ? ` · <span class="mono" dir="ltr">${fmt(d.setpoint, 0)}°</span>` : ''}</div>
+          <div class="dv-sub"><span class="mono" dir="ltr">${d.is_on ? d.est_w + ' W' : '0 W'}</span> · بصمة <span class="mono" dir="ltr">${d.signature_w} W</span>${d.signature_measured ? ' (مقاسة)' : ' (تقديرية)'}${d.setpoint != null ? ` · <span class="mono" dir="ltr">${fmt(d.setpoint, 0)}°</span>` : ''}</div>
           ${status ? `<div class="dv-st">${status}</div>` : ''}
         </div>
-        <button class="switch${d.is_on ? ' on' : ''}${locked ? ' lock' : ''}" data-act="toggle" data-id="${esc(d.id)}" aria-label="${d.is_on ? 'طفّي' : 'شغّل'} ${esc(d.name)}"><i></i></button>
+        <button class="switch${d.is_on ? ' on' : ''}${locked ? ' lock' : ''}" data-act="toggle" data-id="${esc(d.id)}" aria-label="${d.is_on ? 'إطفاء' : 'تشغيل'} ${esc(d.name)}"><i></i></button>
       </div>`;
   }).join('');
   const conf = ui.confirm && st.devices.find(d => d.id === ui.confirm);
   WW.render($('p-room'), `
     <div class="head"><div class="label">الغرفة</div><div class="room-name">${esc(room.name)}</div></div>
     <div class="conds">
-      <div><span>الحركة (PIR)</span><b>${room.occupied == null ? '—' : room.occupied ? 'فيها حدا' : 'فاضية'}</b></div>
+      <div><span>الحركة (PIR)</span><b>${room.occupied == null ? '—' : room.occupied ? 'مشغولة' : 'فارغة'}</b></div>
       <div><span>الحرارة</span><b class="mono" dir="ltr">${room.temp_c == null ? '—' : fmt(room.temp_c, 1) + '°C'}</b></div>
       <div><span>الإضاءة</span><b class="mono" dir="ltr">${room.light == null ? '—' : fmt(room.light, 0) + ' lx'}</b></div>
-      <div><span>الشباك</span><b>${room.window_open == null ? '—' : room.window_open ? 'مفتوح' : 'مسكّر'}</b></div>
+      <div><span>الشباك</span><b>${room.window_open == null ? '—' : room.window_open ? 'مفتوح' : 'مغلق'}</b></div>
       <div><span>الاستهلاك</span><b class="mono" dir="ltr">${fmt(room.power_w, 0)} W</b></div>
       <div><span>حدود الراحة</span><b class="mono" dir="ltr">${st.comfort.min_c}–${st.comfort.max_c}°C</b></div>
     </div>
-    ${conf ? `<div class="confirm">«${esc(conf.name)}» جهاز حسّاس. متأكد بدك تطفيه؟
-      <div class="ap-btns"><button class="btn-amber" data-act="confirm-off" data-id="${esc(conf.id)}">طفّيه</button><button class="btn-ghost" data-act="confirm-cancel">لا</button></div></div>` : ''}
-    <div class="dvs">${list || '<div class="note">ما في أجهزة بهالغرفة.</div>'}</div>
-    <div class="note">أنت صاحب البيت: كبستك هي الموافقة، وبتنسجّل بسجل القرارات. الوكيل نفسه ما بيطفي إشي إلا بعد موافقتك.</div>`);
+    ${conf ? `<div class="confirm">«${esc(conf.name)}» جهاز حسّاس. هل تريد إطفاءه فعلًا؟
+      <div class="ap-btns"><button class="btn-amber" data-act="confirm-off" data-id="${esc(conf.id)}">أطفئه</button><button class="btn-ghost" data-act="confirm-cancel">لا</button></div></div>` : ''}
+    <div class="dvs">${list || '<div class="note">لا توجد أجهزة في هذه الغرفة.</div>'}</div>
+    <div class="note">أنت صاحب البيت: ضغطتك هي الموافقة، وتُسجَّل في سجل القرارات. أما الوكيل فلا يُطفئ شيئًا إلا بعد موافقتك.</div>`);
 }
 
 // ---------- NILM-lite: recognise the last step on the meter ----------
@@ -299,21 +299,21 @@ function lastStep() {
 
 function renderPrint() {
   const h = st.history || [];
-  if (h.length < 2) { WW.render($('p-print'), '<div class="label">بصمة الأجهزة</div><div class="note">عم نستنى قراءات العدّاد…</div>'); return; }
+  if (h.length < 2) { WW.render($('p-print'), '<div class="label">بصمة الأجهزة</div><div class="note">بانتظار قراءات العدّاد…</div>'); return; }
   const W = 300, H = 90;
   const vals = h.map(x => x.power_w);
   const lo = Math.min(...vals) * 0.95, hi = Math.max(...vals) * 1.05 + 1;
   const X = i => (i / (h.length - 1) * W).toFixed(1), Y = v => (H - (v - lo) / (hi - lo) * H).toFixed(1);
   const line = vals.map((v, i) => `${i ? 'L' : 'M'}${X(i)} ${Y(v)}`).join('');
   const s = lastStep();
-  let mark = '', text = 'لما جهاز يشتغل أو يطفى، العدّاد بيعمل «درجة» بالواط. حجم الدرجة هو بصمة الجهاز.';
+  let mark = '', text = 'عند تشغيل جهاز أو إطفائه تظهر على العدّاد «درجة» بالواط، وحجمها هو بصمة الجهاز.';
   if (s) {
     const x = X(s.i);
     mark = `<line x1="${x}" x2="${x}" y1="0" y2="${H}" class="pm-line"/><circle cx="${x}" cy="${Y(vals[s.i])}" r="4" class="pm-dot"/>`;
     const sign = s.d < 0 ? '−' : '+';
     text = s.match
-      ? `آخر درجة: <b class="mono" dir="ltr">${sign}${Math.abs(Math.round(s.d))} W</b> ← بتطابق بصمة <b>${esc(s.match.dev.name)}</b> (<span class="mono" dir="ltr">${s.match.dev.signature_w} W</span>، فرق ${Math.round(s.match.err * 100)}٪). يعني ${s.d < 0 ? 'انطفى' : 'اشتغل'}.`
-      : `آخر درجة: <b class="mono" dir="ltr">${sign}${Math.abs(Math.round(s.d))} W</b> ← ما بتطابق ولا بصمة معروفة. ممكن جهاز جديد أو غريب.`;
+      ? `آخر درجة: <b class="mono" dir="ltr">${sign}${Math.abs(Math.round(s.d))} W</b> ← تطابق بصمة <b>${esc(s.match.dev.name)}</b> (<span class="mono" dir="ltr">${s.match.dev.signature_w} W</span>، فرق ${Math.round(s.match.err * 100)}٪)، أي أنه ${s.d < 0 ? 'انطفأ' : 'اشتغل'}.`
+      : `آخر درجة: <b class="mono" dir="ltr">${sign}${Math.abs(Math.round(s.d))} W</b> ← لا تطابق أي بصمة معروفة. ربما جهاز جديد أو غريب.`;
   }
   WW.render($('p-print'), `
     <div class="head"><div class="label">بصمة الأجهزة · NILM-lite</div><div class="note">عدّاد واحد للبيت كله</div></div>
@@ -322,40 +322,40 @@ function renderPrint() {
 }
 
 // ---------- guided tour: explains the whole process using the REAL system ----------
-const GOAL_TEXT = 'خفّض استهلاك البيت ١٥٪ هالأسبوع بدون ما نكسر حدود الراحة';
+const GOAL_TEXT = 'خفّض استهلاك البيت ١٥٪ هذا الأسبوع دون تجاوز حدود الراحة';
 const TOUR = [
-  { t: 'هاد بيت رقمي (Digital Twin)', spot: ['#stage'], cam: () => scene3d.home(),
-    body: () => `كل غرفة فيها حسّاسات (حركة، حرارة، إضاءة) وأجهزة. الخطوط المضيئة هي الكهربا طالعة من <b>عدّاد واحد</b> لكل جهاز شغّال، وكل ما زاد الاستهلاك بتسرع. ${st.source === 'simulator' ? 'هون البيانات اصطناعية من المحاكي، وبنفس الـ API تبع الجهاز الحقيقي.' : 'هون القراءات حقيقية من ESP32 والعدّاد PZEM.'}` },
-  { t: '١ · بنعطي الوكيل هدف، مش سؤال', spot: ['#hud-agent', '.pipe'], cam: () => scene3d.home(),
-    body: () => st.goal ? `الهدف الحالي: «${esc(st.goal.text)}». الوكيل قسّمه لحاله لـ${st.steps.length} خطوات، شوفها فوق.`
-      : `اكبس الزر وبنعطيه هدف: «${GOAL_TEXT}». هو بيقسّمه لخطوات لحاله.`,
+  { t: 'هذا بيت رقمي (Digital Twin)', spot: ['#stage'], cam: () => scene3d.home(),
+    body: () => `في كل غرفة حسّاسات (حركة، حرارة، إضاءة) وأجهزة. الخطوط المضيئة هي الكهرباء الخارجة من <b>عدّاد واحد</b> إلى كل جهاز يعمل، وتزداد سرعتها كلما زاد الاستهلاك. ${st.source === 'simulator' ? 'البيانات هنا تركيبية من المحاكي، وتمرّ عبر الـ API نفسه الذي يستخدمه الجهاز الحقيقي.' : 'القراءات هنا حقيقية من ESP32 والعدّاد PZEM.'}` },
+  { t: '١ · نعطي الوكيل هدفًا، لا سؤالًا', spot: ['#hud-agent', '.pipe'], cam: () => scene3d.home(),
+    body: () => st.goal ? `الهدف الحالي: «${esc(st.goal.text)}». قسّمه الوكيل بنفسه إلى ${st.steps.length} خطوات تظهر في الأعلى.`
+      : `اضغط الزر لنعطيه هدفًا: «${GOAL_TEXT}». وسيقسّمه إلى خطوات بنفسه.`,
     action: () => !st.goal && { label: 'أعطِ الوكيل الهدف', run: () => WW.post('/goal', { text: GOAL_TEXT }) } },
-  { t: '٢ · بيقرأ العدّاد والحسّاسات', spot: ['.pin.meter', '#hud-meter', '.pin.room'], cam: () => scene3d.focusPoint(scene3d.anchors.meter, 7),
-    body: () => `العدّاد الآن: <b class="mono" dir="ltr">${fmt(st.meter.power_w, 0)} W</b>، فولتية <b class="mono" dir="ltr">${fmt(st.meter.voltage_v, 0)} V</b>. فوق كل غرفة: فيها حدا ولا لأ (حسّاس الحركة بيعطي بس فاضية/مشغولة، بدون كاميرات)، والحرارة، والاستهلاك.` },
-  { t: '٣ · بيعرف كل جهاز من بصمته', spot: ['#p-print'], cam: () => scene3d.home(),
-    body: () => `ما عنا عدّاد لكل جهاز. لما جهاز ينطفي، العدّاد بينزل «درجة». الوكيل بيقارن حجم الدرجة مع البصمات اللي تعلّمها وبيعرف مين الجهاز. هاد اسمه NILM.` },
-  { t: '٤ · بيكشف الهدر', spot: () => [demoRoomSel(), '#p-room'], cam: () => scene3d.focusRoom(demoRoomId()),
+  { t: '٢ · يقرأ العدّاد والحسّاسات', spot: ['.pin.meter', '#hud-meter', '.pin.room'], cam: () => scene3d.focusPoint(scene3d.anchors.meter, 7),
+    body: () => `العدّاد الآن: <b class="mono" dir="ltr">${fmt(st.meter.power_w, 0)} W</b>، والجهد <b class="mono" dir="ltr">${fmt(st.meter.voltage_v, 0)} V</b>. فوق كل غرفة: الإشغال (حسّاس الحركة يعطي فقط فارغة/مشغولة، بلا كاميرات)، والحرارة، والاستهلاك.` },
+  { t: '٣ · يتعرّف على كل جهاز من بصمته', spot: ['#p-print'], cam: () => scene3d.home(),
+    body: () => `لا يوجد عدّاد لكل جهاز. عند إطفاء جهاز تنخفض قراءة العدّاد «درجة»، فيقارن الوكيل حجمها بالبصمات التي تعلّمها ويعرف أي جهاز هو. تُسمّى هذه التقنية NILM.` },
+  { t: '٤ · يكشف الهدر', spot: () => [demoRoomSel(), '#p-room'], cam: () => scene3d.focusRoom(demoRoomId()),
     body: () => { const w = st.rooms.find(r => r.waste);
-      return w ? `لقى هدر بـ<b>${esc(w.name)}</b>: فاضية وفي جهاز شغّال. لاحظ الغرفة صارت حمرا.`
-        : st.source === 'simulator' ? 'اكبس الزر وبنعمل هدر: غرفة فاضية والمكيّف شغّال والشباك مفتوح. استنى ثواني والوكيل بيكتشفه.'
-        : 'بالمختبر: غطّي حسّاس الحركة (الغرفة فاضية) والمروحة شغّالة، واستنى شوي.'; },
-    action: () => st.source === 'simulator' && !st.pending && { label: 'اعمل هدر', run: () => WW.post('/scenario', { name: 'bedroom_empty_window' }) } },
-  { t: '٥ · بيطلب موافقتك قبل أي إجراء', spot: ['#p-approval'], cam: () => scene3d.focusRoom(demoRoomId()),
-    body: () => st.pending ? `هاي بطاقة الموافقة (نفسها بتطلع عالتلفون، والجهاز بيزمّر). <b>اكبس موافق أو ارفض بنفسك.</b> إذا رفضت أو سكتت ← ما بصير إشي.`
-      : st.last_approval ? `آخر قرار: ${esc({ approved: 'وافقت', rejected: 'رفضت، فما صار إشي', expired: 'خلصت المهلة، فما صار إشي', blocked: 'حارس السياسات منعه', cancelled: 'انلغى' }[st.last_approval.status] || '')}.`
-      : 'لسا ما في طلب. ارجع خطوة واعمل هدر، أو استنى الوكيل.' },
-  { t: '٦ · الريليه بينفّذ والعدّاد بيتأكّد', spot: () => [pendingOrLastDevSel(), '#p-print', '.pin.meter'], cam: () => scene3d.focusRoom(demoRoomId()),
+      return w ? `وجد هدرًا في <b>${esc(w.name)}</b>: الغرفة فارغة وفيها جهاز يعمل. لاحظ أن الغرفة أصبحت حمراء.`
+        : st.source === 'simulator' ? 'اضغط الزر لنصنع هدرًا: غرفة فارغة والمكيّف يعمل والشباك مفتوح. انتظر ثوانٍ وسيكتشفه الوكيل.'
+        : 'في المختبر: غطِّ حسّاس الحركة (لتبدو الغرفة فارغة) والمروحة تعمل، ثم انتظر قليلًا.'; },
+    action: () => st.source === 'simulator' && !st.pending && { label: 'اصنع هدرًا', run: () => WW.post('/scenario', { name: 'bedroom_empty_window' }) } },
+  { t: '٥ · يطلب موافقتك قبل أي إجراء', spot: ['#p-approval'], cam: () => scene3d.focusRoom(demoRoomId()),
+    body: () => st.pending ? `هذه بطاقة الموافقة (تظهر نفسها على الهاتف، ويُصدر الجهاز صوت تنبيه). <b>اضغط موافق أو رفض بنفسك.</b> إن رفضت أو لم تردّ فلن يحدث شيء.`
+      : st.last_approval ? `آخر قرار: ${esc({ approved: 'وافقت', rejected: 'رفضت، فلم يحدث شيء', expired: 'انتهت المهلة، فلم يحدث شيء', blocked: 'حارس السياسات منعه', cancelled: 'أُلغي' }[st.last_approval.status] || '')}.`
+      : 'لا يوجد طلب بعد. ارجع خطوة واصنع هدرًا، أو انتظر الوكيل.' },
+  { t: '٦ · الريليه ينفّذ والعدّاد يتحقّق', spot: () => [pendingOrLastDevSel(), '#p-print', '.pin.meter'], cam: () => scene3d.focusRoom(demoRoomId()),
     body: () => { const s = lastStep(); const v = st.devices.find(d => d.agent_off === 2);
-      return `بعد موافقتك، الوكيل بيبعت أمر للريليه، والجهاز بينطفي فعليًا (شوف الأنيميشن وقف والخط انطفى). بعدها بيقيس العدّاد: ${s && s.match ? `نزل <b class="mono" dir="ltr">${Math.abs(Math.round(s.d))} W</b> وطابق بصمة ${esc(s.match.dev.name)}.` : 'لازم يشوف نزول بحجم بصمة الجهاز.'} ${v ? `✓ ${esc(v.name)}: متأكّد بالعدّاد.` : ''}`; } },
+      return `بعد موافقتك، يرسل الوكيل أمرًا إلى الريليه فينطفئ الجهاز فعليًا (لاحظ توقّف الحركة وانطفاء الخط). ثم يقيس العدّاد: ${s && s.match ? `انخفض بمقدار <b class="mono" dir="ltr">${Math.abs(Math.round(s.d))} W</b> وطابق بصمة ${esc(s.match.dev.name)}.` : 'يجب أن يرى انخفاضًا بحجم بصمة الجهاز.'} ${v ? `✓ ${esc(v.name)}: تأكّد بالعدّاد.` : ''}`; } },
   { t: '🚗 · شاحن السيارة الكهربائية', when: () => !!st.ev, spot: ['.pin.car', '.pin[data-pin^="dev:ev"]'],
     cam: () => scene3d.anchors.car && scene3d.focusPoint(scene3d.anchors.car, 8),
     body: () => { const e = st.ev;
       return e.charging
-        ? `السيارة عم تشحن <b class="mono" dir="ltr">${fmt(e.power_w / 1000, 1)} kW</b>. الوكيل عرف إنه الشاحن من <b>البصمة</b>: درجة +${fmt((e.recognized_step_w || 0) / 1000, 1)} kW على العدّاد. البطارية ${Math.round(e.soc_pct || 0)}٪ ${e.minutes_to_target > 0 ? `وبدها ${Math.floor(e.minutes_to_target / 60)} س و ${e.minutes_to_target % 60} د لـ ${e.target_soc}٪.` : `ووصلت الهدف (${e.target_soc}٪).`} بيبعتلك إشعار لما يبلّش ولما يخلص (kWh والدنانير). وبالمسا إذا البيت قرّب من حد القاطع، بيقترح يأجّل الشحن لنص الليل، <b>بشرط</b> السيارة تكون جاهزة قبل ${esc(e.ready_by)}، وبيستنى موافقتك.`
-        : `اكبس الزر: السيارة بتوصل والبطارية ٣٠٪ وبتنشبك عالشاحن (7.4 kW). شوف الكابل بيضوي والعدّاد بيقفز، والوكيل بيعرفها من بصمتها.`; },
-    action: () => st.ev && !st.ev.charging && st.source === 'simulator' && { label: 'السيارة وصلت', run: () => WW.post('/scenario', { name: 'ev_arrives' }) } },
-  { t: '٧ · التوفير مقاس، والأمان بالكود', spot: ['#hud-meter', '.chip.locked'], cam: () => scene3d.home(),
-    body: () => `التوفير اللي بنعرضه بس اللي العدّاد قاسه: <b class="mono" dir="ltr">${fmt(st.savings.kwh, 2)} kWh</b> = <b class="mono" dir="ltr">${fmt(st.savings.jod, 3)} JD</b>. الأجهزة اللي عليها 🔒 (ثلاجة، إنذار حريق) ممنوع حدا يطفيها، والمنع مكتوب بالكود مش بالذكاء الاصطناعي. وزر الطوارئ بيرجّع كل إشي طبيعي.` },
+        ? `السيارة تشحن بقدرة <b class="mono" dir="ltr">${fmt(e.power_w / 1000, 1)} kW</b>. تعرّف الوكيل على الشاحن من <b>البصمة</b>: درجة +${fmt((e.recognized_step_w || 0) / 1000, 1)} kW على العدّاد. البطارية ${Math.round(e.soc_pct || 0)}٪ ${e.minutes_to_target > 0 ? `وتحتاج ${Math.floor(e.minutes_to_target / 60)} س و${e.minutes_to_target % 60} د للوصول إلى ${e.target_soc}٪.` : `ووصلت إلى الهدف (${e.target_soc}٪).`} يرسل إشعارًا عند بدء الشحن وانتهائه (kWh والدنانير). وفي المساء، إذا اقترب البيت من حد القاطع، يقترح تأجيل الشحن إلى منتصف الليل، <b>بشرط</b> أن تكون السيارة جاهزة قبل ${esc(e.ready_by)}، وينتظر موافقتك.`
+        : `اضغط الزر: تصل السيارة ببطارية ٣٠٪ وتُوصَل بالشاحن (7.4 kW). لاحظ إضاءة الكابل وقفزة العدّاد، وكيف يتعرّف الوكيل عليها من بصمتها.`; },
+    action: () => st.ev && !st.ev.charging && st.source === 'simulator' && { label: 'وصول السيارة', run: () => WW.post('/scenario', { name: 'ev_arrives' }) } },
+  { t: '٧ · التوفير مُقاس، والأمان برمجي', spot: ['#hud-meter', '.chip.locked'], cam: () => scene3d.home(),
+    body: () => `لا نعرض إلا التوفير الذي قاسه العدّاد: <b class="mono" dir="ltr">${fmt(st.savings.kwh, 2)} kWh</b> = <b class="mono" dir="ltr">${fmt(st.savings.jod, 3)} JD</b>. الأجهزة التي عليها 🔒 (الثلاجة، إنذار الحريق) لا يمكن لأحد إطفاؤها، والمنع مكتوب في الكود لا في الذكاء الاصطناعي. وزر الطوارئ يعيد كل شيء إلى وضعه الطبيعي.` },
 ];
 
 function demoRoomId() {
@@ -381,14 +381,14 @@ function renderTour() {
   const dots = TOUR.map((_, i) => `<button class="td${i === ui.tour ? ' on' : ''}" data-act="tour-go" data-step="${i}" aria-label="خطوة ${i + 1}"></button>`).join('');
   WW.render($('tour'), `
     <div class="tour-card">
-      <div class="tour-top"><div class="tour-dots">${dots}</div><button class="tour-x" data-act="tour-close" aria-label="سكّر">✕</button></div>
+      <div class="tour-top"><div class="tour-dots">${dots}</div><button class="tour-x" data-act="tour-close" aria-label="إغلاق">✕</button></div>
       <div class="tour-t">${step.t}</div>
       <div class="tour-b">${step.body()}</div>
       <div class="tour-btns">
         ${act ? `<button class="btn-lime" data-act="tour-do">${act.label}</button>` : ''}
         <span class="grow"></span>
         <button class="btn-ghost" data-act="tour-prev" ${ui.tour === 0 ? 'disabled' : ''}>السابق</button>
-        <button class="btn-ghost" data-act="${ui.tour === TOUR.length - 1 ? 'tour-close' : 'tour-next'}">${ui.tour === TOUR.length - 1 ? 'خلصنا' : 'التالي'}</button>
+        <button class="btn-ghost" data-act="${ui.tour === TOUR.length - 1 ? 'tour-close' : 'tour-next'}">${ui.tour === TOUR.length - 1 ? 'إنهاء' : 'التالي'}</button>
       </div>
     </div>`);
   $('tour').hidden = false;
@@ -423,18 +423,18 @@ WW.onAction({
     if (!dev) return;
     ui.device = dev.id; ui.room = dev.room;
     if (dev.sensitive && dev.is_on) { ui.confirm = dev.id; update(); return; }
-    return act(() => WW.post(`/devices/${dev.id}/toggle`, { on: !dev.is_on }), `${dev.is_on ? 'طفّيت' : 'شغّلت'} ${dev.name}`);
+    return act(() => WW.post(`/devices/${dev.id}/toggle`, { on: !dev.is_on }), `${dev.is_on ? 'أطفأت' : 'شغّلت'} ${dev.name}`);
   },
   'confirm-off': d => { ui.confirm = null; return act(() => WW.post(`/devices/${d.id}/toggle`, { on: false, confirmed: true })); },
   'confirm-cancel': () => { ui.confirm = null; update(); },
-  approve: d => act(() => WW.post(`/approvals/${d.id}/approve`), 'وافقت ✓ الريليه عم ينفّذ'),
-  reject: d => act(() => WW.post(`/approvals/${d.id}/reject`), 'رفضت ← ما صار إشي'),
+  approve: d => act(() => WW.post(`/approvals/${d.id}/approve`), 'وافقت ✓ الريليه ينفّذ'),
+  reject: d => act(() => WW.post(`/approvals/${d.id}/reject`), 'رفضت، فلم يحدث شيء'),
   'tour-open': () => { ui.tour = 0; update(); },
   'tour-go': d => { ui.tour = Number(d.step); update(); },
   'tour-next': () => { ui.tour = Math.min(TOUR.length - 1, ui.tour + 1); update(); },
   'tour-prev': () => { ui.tour = Math.max(0, ui.tour - 1); update(); },
   'tour-close': () => closeTour(),
-  'tour-do': () => { const a = TOUR[ui.tour].action && TOUR[ui.tour].action(); if (a) return act(a.run, 'تمام ✓'); },
+  'tour-do': () => { const a = TOUR[ui.tour].action && TOUR[ui.tour].action(); if (a) return act(a.run, 'تم ✓'); },
 });
 document.addEventListener('keydown', ev => {
   if (ui.tour === null) return;
@@ -448,13 +448,13 @@ async function refresh() {
   try {
     st = await WW.getState();
   } catch (e) {
-    $('site-sub').textContent = 'ما في اتصال بالسيرفر… بنحاول كمان مرة';
+    $('site-sub').textContent = 'لا اتصال بالخادم… نعيد المحاولة';
     return;
   }
   const sig = ($('scene').clientWidth < 600 ? 'n|' : 'w|') + st.rooms.map(r => r.id).join() + '|' + st.devices.map(d => d.id + d.room + d.kind).join();
   if (sig !== built) { built = sig; build(); }
   $('site-name').textContent = '· ' + st.site_name;
-  $('site-sub').textContent = `${st.clock}${st.source === 'simulator' ? ' · محاكاة ×60' : ' · جهاز حقيقي'} · ${st.online ? 'متصل' : 'ما في قراءات (وضع آمن)'}`;
+  $('site-sub').textContent = `${st.clock}${st.source === 'simulator' ? ' · محاكاة ×60' : ' · جهاز حقيقي'} · ${st.online ? 'متصل' : 'لا توجد قراءات (الوضع الآمن)'}`;
   update();
 }
 
