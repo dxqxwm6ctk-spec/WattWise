@@ -360,6 +360,8 @@ def reset_demo(conn, site: str) -> None:
     conn.execute("DELETE FROM schedules WHERE site=?", (site,))
     conn.execute("DELETE FROM timers WHERE site=?", (site,))
     anomaly.clear(conn, site)
+    conn.execute("DELETE FROM alerts WHERE site=?", (site,))
+    db.set_state(conn, f"on_since:{site}", {})
     _close_pending(conn, site, CANCELLED)
     restore_normal(conn, site)
     for d in config.load_sites()[site]["devices"]:
@@ -389,6 +391,9 @@ def set_scenario(conn, site: str, name: str) -> None:
         db.audit(conn, site, "MANUAL", "human", "manual_switch", f"شبكنا السيارة على {evd['name']} (محاكاة).")
     if name == "bedroom_empty_window" and demo:
         db.set_device(conn, site, demo["device"], is_on=1, agent_off=AGENT_OFF_NONE)
+    if name == "overload":   # the big loads come on together (current near the limit)
+        for dev_id in config.load_sites()[site].get("overload_devices", []):
+            db.set_device(conn, site, dev_id, is_on=1, agent_off=AGENT_OFF_NONE)
     if get_phase(conn, site) not in ("pending", "executing"):
         set_phase(conn, site, "normal")
     text = SCENARIOS[name]
@@ -406,6 +411,7 @@ SCENARIOS = {
     "sensor_fault": "عطل حسّاسات: المحاكي بيوقف يبعت قراءات شوي.",
     "unknown_load": "حمل غريب: جهاز مش مسجّل (≈ 700 واط) انشغل بالبيت.",
     "ev_arrives": "السيارة الكهربائية وصلت والبطارية ٣٠٪، وصاحب البيت شبكها عالشاحن.",
+    "overload": "حمل زايد: السخّان والغسالة اشتغلوا مع المكيّفات، التيار قرّب من حد القاطع (محاكى).",
 }
 
 

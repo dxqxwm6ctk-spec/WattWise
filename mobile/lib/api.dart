@@ -52,6 +52,10 @@ class WattWiseApi {
   Future<void> addDevice({required String kind, required String room, required String name, required bool allow}) =>
       post('/devices', {'kind': kind, 'room': room, 'name': name, 'allow': allow});
 
+  // --- warnings: "طفّيه؟" only creates an approval request, it switches nothing ---
+  Future<void> alertAct(int id) => post('/alerts/$id/act');
+  Future<void> alertDismiss(int id) => post('/alerts/$id/dismiss');
+
   // --- goal, commands, schedules, analysis (new design) ---
   Future<void> setGoal(String text) => post('/goal', {'text': text});
   Future<Map<String, dynamic>> parseCommand(String text) => post('/command/parse', {'text': text});

@@ -70,6 +70,9 @@ ASK_COOLDOWN_S = _env_float("ASK_COOLDOWN_S", 120)
 # If a site sends nothing for this long, treat it as a sensor/connection fault.
 STALE_READING_S = _env_float("STALE_READING_S", 15)
 
+# A warning that cleared can come back only after this long (no notification spam).
+ALERT_COOLDOWN_S = _env_float("ALERT_COOLDOWN_S", 300)
+
 # How often the agent loop runs.
 AGENT_INTERVAL_S = _env_float("AGENT_INTERVAL_S", 1)
 

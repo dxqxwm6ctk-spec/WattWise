@@ -64,6 +64,8 @@ function statusCard() {
 function anomalyCard() {
   const a = st.anomaly;
   if (!a || !a.open) return '';
+  // Already shown as a warning card (alertCards) unless the human dismissed it.
+  if (((st.alerts || {}).items || []).some(x => x.active && ['unknown_device', 'anomaly'].includes(x.kind))) return '';
   const msg = a.kind === 'extra'
     ? `في جهاز عم يسحب ≈ ${a.residual_w} واط وما بنعرفه. شيكي إذا في إشي شغّال ومش لازم.`
     : `الاستهلاك أقل من المتوقع بـ≈ ${-a.residual_w} واط. ممكن جهاز فاصل أو معطّل.`;
@@ -72,6 +74,23 @@ function anomalyCard() {
       <span style="font-size:14px;font-weight:700;color:#8A5A00">استهلاك غريب</span>
       <span style="font-size:14px;line-height:1.7;color:#4A4840">${msg}</span>
     </div>`;
+}
+
+// Agent warnings that are still true (high use, near the next tier, danger...).
+function alertCards() {
+  const items = ((st.alerts || {}).items || []).filter(a => a.active && !a.user_state);
+  return items.map(a => {
+    const c = a.level === 'danger' ? ['#FBE3DD', '#D9432E', '#7A2A1C'] : ['#FFF4D9', '#E8B23A', '#8A5A00'];
+    return `
+    <div style="border-radius:20px;background:${c[0]};border:1.5px solid ${c[1]};padding:14px 16px;display:flex;flex-direction:column;gap:6px">
+      <span style="font-size:14px;font-weight:700;color:${c[2]}">${esc(a.title)}</span>
+      <span style="font-size:14px;line-height:1.7;color:#4A4840">${esc(a.body)}</span>
+      <div style="display:flex;gap:8px">
+        ${a.can_act ? `<button data-act="alert-act" data-id="${a.id}" class="btn-dark" style="height:42px;flex:1.4;font-size:15px">طفّيه؟</button>` : ''}
+        <button data-act="alert-dismiss" data-id="${a.id}" style="height:42px;flex:1;border-radius:14px;border:1.5px solid ${c[1]};background:transparent;font-size:14px;cursor:pointer">تمام</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function approvalCard() {
@@ -164,6 +183,7 @@ function homeTab() {
         </div>
       </div>
       ${st.pending ? approvalCard() : statusCard()}
+      ${alertCards()}
       ${anomalyCard()}
     </div>`;
 }
@@ -655,6 +675,8 @@ WW.onAction({
   ...newHandlers,
   tab: d => { ui.tab = d.k; renderAll(); },
   approve: d => act(() => WW.post(`/approvals/${d.id}/approve`)),
+  'alert-act': d => act(() => WW.post(`/alerts/${d.id}/act`)),
+  'alert-dismiss': d => act(() => WW.post(`/alerts/${d.id}/dismiss`)),
   reject: d => act(() => WW.post(`/approvals/${d.id}/reject`)),
   estop: () => act(() => WW.post('/estop')),
   reset: () => act(() => WW.post('/reset')),

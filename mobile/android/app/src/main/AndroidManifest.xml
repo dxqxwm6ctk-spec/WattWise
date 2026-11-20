@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- Only for the mic button: speech becomes text, then the owner still has to approve. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Local notifications for the agent's warnings (no push server, works offline). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="WattWise"
         android:usesCleartextTraffic="true"

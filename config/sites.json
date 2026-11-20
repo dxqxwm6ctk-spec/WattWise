@@ -32,6 +32,8 @@
              "sim": {"arrive_soc": 30},
              "source": "Simulated home wallbox: 7.4 kW = 230 V x 32 A single phase (IEC 61851 Mode 3). 60 kWh battery is a synthetic assumption for a mid-size EV. main_breaker_w: 40 A x 230 V, an assumed house main breaker; set it to the real one. No real car data."},
       "demo_waste": {"room": "bedroom", "device": "bedAc", "label": "١ · غرفة النوم فاضية والشباك مفتوح"},
+      "limits": {"max_current_a": 25, "_note": "Simulated main breaker of the digital-twin house (synthetic, for the overload warning demo)."},
+      "overload_devices": ["heater", "washer"],
       "labels": {"mode": "وضع البيت", "goal": "هدف العيلة", "map": "HOME MAP · غرف البيت", "meter": "عدّاد البيت", "max_w": 4000}
     },
     "lab": {
@@ -44,6 +46,7 @@
         {"id": "lamp", "name": "اللمبة", "room": "lab", "kind": "light", "rated_w": 40, "tier": "T1", "on": true, "relay_channel": 1},
         {"id": "fan", "name": "المروحة (بدل المكيّف)", "room": "lab", "kind": "fan", "rated_w": 45, "tier": "T1", "on": true, "relay_channel": 2}
       ],
+      "limits": {"max_current_a": 10, "_note": "PZEM-004T v3.0 10A version and the kit relay (verify the relay label says 10A 250VAC)."},
       "labels": {"mode": "وضع المختبر", "goal": "هدف المختبر", "map": "LAB · غرفة المختبر", "meter": "عدّاد المختبر", "max_w": 200}
     },
     "building": {

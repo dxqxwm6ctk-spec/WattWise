@@ -15,7 +15,7 @@ LLM is missing, late, broken or over budget.
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 
-from backend import actions, billing, config, connectivity, db, ev, forecast, goal, llm, nilm, policy, schedules, weather
+from backend import actions, alerts, billing, config, connectivity, db, ev, forecast, goal, llm, nilm, policy, schedules, weather
 
 # Remembers what the agent is currently looking at, per site: {"device_id", "since"}
 _analyzing: dict[str, dict] = {}
@@ -128,10 +128,13 @@ def tick(conn, site: str, now: float | None = None) -> None:
             db.audit(conn, site, "STOP", "system", "fail_safe",
                      "انقطعت القراءات ← وضع آمن: رجّعنا الأجهزة لوضعها الطبيعي وما في إجراء تلقائي.")
             actions.set_phase(conn, site, "offline")
+            alerts.raise_alert(conn, site, "offline", "offline", alerts.DANGER, "انقطعت القراءات",
+                               "ما وصلنا إشي من العدّاد. رجّعنا الأجهزة لوضعها الطبيعي.", now=now)
         return
     if was_fault:
         db.set_state(conn, f"fault:{site}", False)
         db.audit(conn, site, "T0", "system", "recovered", "رجعت القراءات. الوكيل رجع يراقب.")
+        alerts.resolve(conn, site, "offline", now)
         if actions.get_phase(conn, site) == "offline" and not actions.flag(conn, "safe_mode", site):
             actions.set_phase(conn, site, "normal")
 
@@ -142,6 +145,9 @@ def tick(conn, site: str, now: float | None = None) -> None:
     _verify(conn, site, now)
     forecast.track(conn, site)
     ev.track(conn, site, now)   # EV charging sessions: recognise, measure, notify
+
+    # Warnings for the phone (tier 0: messages only, they also run during an emergency stop).
+    alerts.check(conn, site, now)
 
     if estop or actions.flag(conn, "safe_mode", site):
         _analyzing.pop(site, None)

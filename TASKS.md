@@ -47,6 +47,8 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Offline mode: internet check every 10 s, red banner with what keeps working locally, LLM and weather step aside, rehearsal switch labelled "simulated"; full flow verified with the internet blocked
 - [x] Goal in percent ("وفّر ٢٠٪") becomes a bill target from this month's projection (was misread as 20 JD)
 - [x] Savings counter: today's measured JOD / kWh / kg CO2 + "if 1000 Jordanian homes" projection, clearly labelled (12 new tests)
+- [x] Agent warnings (tier 0): danger near the current limit (10 A PZEM/relay in the lab, simulated 25 A breaker in the house), high power, 80 % / 95 % of the cheaper tariff tier with the expected crossing day, device left on too long, unknown device (from anomaly detection), readings lost. Shown on the dashboard (+ browser notification on localhost) and as local notifications in the Flutter app; "طفّيه؟" only creates an approval request. Tests in `tests/test_alerts.py`
+- [ ] Try the Flutter notifications on a real Android phone and on the sideloaded iPhone build
 - [ ] Voice input inside the Flutter app (needs a speech package; the web pages already have the mic)
 
 ## Bill photo analysis

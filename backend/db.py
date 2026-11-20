@@ -136,6 +136,24 @@ CREATE TABLE IF NOT EXISTS timers (
     minutes     INTEGER NOT NULL,
     created_ts  REAL    NOT NULL
 );
+-- Warnings for the phone and the dashboard (tier 0: messages only). See backend/alerts.py.
+CREATE TABLE IF NOT EXISTS alerts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    site        TEXT    NOT NULL,
+    ts          REAL    NOT NULL,
+    clock       TEXT,
+    key         TEXT    NOT NULL,          -- same key = same warning (raised once while active)
+    kind        TEXT    NOT NULL,          -- overload / current_high / high_power / tier_near / left_on / unknown_device / anomaly / offline
+    level       TEXT    NOT NULL,          -- info / warn / danger
+    title       TEXT    NOT NULL,          -- short Arabic text
+    body        TEXT    NOT NULL,
+    device_id   TEXT,                      -- device the "turn it off?" button would propose
+    active      INTEGER NOT NULL DEFAULT 1, -- 1 while the condition is still true
+    ended_ts    REAL,
+    user_state  TEXT                       -- NULL / dismissed / acted
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_site_key ON alerts(site, key);
+
 CREATE TABLE IF NOT EXISTS system_state (
     key         TEXT PRIMARY KEY,
     value       TEXT NOT NULL

@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'discovery.dart';
+import 'notifications.dart';
 import 'screens/bill_screen.dart';
 import 'screens/devices_screen.dart';
 import 'screens/home_screen.dart';
@@ -77,6 +78,8 @@ class _RootPageState extends State<RootPage> {
     Future.delayed(const Duration(milliseconds: 700), () {
       if (mounted) setState(() => splashMinDone = true);
     });
+    Notifier.instance.onOpened = _onNotificationOpened;
+    Notifier.instance.init();
     _loadServer();
   }
 
@@ -191,6 +194,8 @@ class _RootPageState extends State<RootPage> {
     try {
       final s = await a.getState();
       if (mounted) setState(() { st = s; connectionError = null; failedTries = 0; });
+      await Notifier.instance.handleState(s);
+      _onNotificationOpened();
     } catch (e) {
       if (mounted) setState(() => connectionError = 'ما قدرنا نوصل للسيرفر (${a.baseUrl}).');
       // Still on the splash and the server keeps failing: ask once, quietly retrying meanwhile.
@@ -200,6 +205,17 @@ class _RootPageState extends State<RootPage> {
         _askServer();
       }
     }
+  }
+
+  /// A notification was tapped: go to the home tab. If "طفّيه؟" was pressed,
+  /// ask the backend for an approval request (the human still has to approve it).
+  void _onNotificationOpened() {
+    final a = api;
+    if (a == null || st == null || !mounted) return;
+    final alertId = Notifier.instance.pendingTurnOff;
+    Notifier.instance.pendingTurnOff = null;
+    setState(() => tab = 0);
+    if (alertId != null) run(() => a.alertAct(alertId));
   }
 
   /// Runs an action, shows the server's Arabic message if it is refused, then refreshes.
