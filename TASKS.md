@@ -22,7 +22,7 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Add-device flow: measure a new device's signature on the main meter
 - [x] Dashboard (plain HTML/JS + Chart.js) implementing the "WattWise Home" design
 - [x] Web approval page (PWA, works offline on the local network) as backup for the Flutter app
-- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands (78 passing)
+- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands (88 passing)
 - [x] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API (tested as a web build against the simulator)
 - [ ] Run the Flutter app on a real Android phone on the local Wi-Fi
 - [x] LLM planner + explainer with tool use, spending cap, provider abstraction, rule-based fallback (tested with a fake provider; 38 tests passing)
@@ -37,6 +37,7 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Timers and daily on/off schedules run in the backend, checked when saved and again when they fire; smart water-heater schedule suggestion (max 3 h window)
 - [x] "Why is my bill like this?" analysis and a weekly text report to download
 - [x] Same features in the phone web page and the Flutter app (new Schedules tab); AC set temperature removed from the UI (on/off only)
+- [x] Schedule screen split into Home / Building / Lab, devices grouped by room, per-device control, weekday schedules, review-and-confirm before saving (web dashboard + phone page verified; Flutter checked by the CI build)
 - [x] Interactive 3D house page (`house.html`, three.js bundled offline): realistic rooms, furniture, lighting and day/night, animated devices, energy flow, click-to-zoom, approval card, NILM step recognition, guided "how it works" tour that drives the real system; phone mockup on the dashboard moved behind a "معاينة الموبايل" button
 - [x] Home EV charger (simulated 7.4 kW): session recognised by its meter step, measured kWh, start/end notifications, smart-charging proposal (evening peak, approval, resume timer), excluded from savings
 - [ ] Show the interactive house inside the Flutter app (WebView or native)

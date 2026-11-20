@@ -116,6 +116,8 @@ class NewSchedule(BaseModel):
     device_id: str
     on_time: str | None = None
     off_time: str | None = None
+    days: list[int] | None = None     # 0 = Sunday ... 6 = Saturday; empty/None = every day
+    preview: bool = False             # True = only check and estimate, save nothing (the review step)
 
 
 class NewTimer(BaseModel):
@@ -288,7 +290,9 @@ def get_schedules(site: str):
 
 @app.post("/api/sites/{site}/schedules")
 def post_schedule(site: str, body: NewSchedule):
-    return _run(schedules.add_schedule, site, body.device_id, body.on_time, body.off_time)
+    if body.preview:
+        return _run(schedules.preview_schedule, site, body.device_id, body.on_time, body.off_time, body.days)
+    return _run(schedules.add_schedule, site, body.device_id, body.on_time, body.off_time, days=body.days)
 
 
 @app.post("/api/sites/{site}/schedules/{schedule_id}/enabled")

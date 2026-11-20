@@ -9,6 +9,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/app.css?v=3">
+<link rel="stylesheet" href="css/schedule.css?v=1">
 </head>
 <body>
   <div class="app">
@@ -16,7 +17,8 @@
     <nav class="tabs" id="tabs"></nav>
   </div>
   <script src="js/common.js?v=3"></script>
-  <script src="js/app.js?v=3"></script>
+  <script src="js/schedule.js?v=1"></script>
+  <script src="js/app.js?v=4"></script>
   <script>
     if ('serviceWorker' in navigator && !new URLSearchParams(location.search).get('embed')) {
       navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS schedules (
     device_id   TEXT    NOT NULL,
     on_time     TEXT,                      -- "HH:MM" or NULL
     off_time    TEXT,                      -- "HH:MM" or NULL
+    days        TEXT,                      -- weekdays it runs, "0".."6" (0 = Sunday); NULL = every day
     enabled     INTEGER NOT NULL DEFAULT 1,
     source      TEXT    NOT NULL,          -- user / command / suggested
     created_ts  REAL    NOT NULL
@@ -158,6 +159,10 @@ def init_db() -> None:
     config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as conn:
         conn.executescript(SCHEMA)
+        # Older databases were made before schedules had days: add the column.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(schedules)")}
+        if "days" not in cols:
+            conn.execute("ALTER TABLE schedules ADD COLUMN days TEXT")
         for site_id, site in config.load_sites().items():
             for room in site["rooms"]:
                 conn.execute("INSERT OR IGNORE INTO rooms (site, id, name) VALUES (?,?,?)",
