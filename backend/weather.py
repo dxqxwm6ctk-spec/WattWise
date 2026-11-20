@@ -12,7 +12,7 @@ import time
 import urllib.parse
 import urllib.request
 
-from backend import config
+from backend import config, connectivity
 
 URL = "https://api.open-meteo.com/v1/forecast"
 CACHE_S = 15 * 60
@@ -53,6 +53,8 @@ def get_weather(now: float | None = None) -> dict:
     now = now or time.time()
     if not config.WEATHER_ENABLED:
         return {"available": False, "reason": "disabled"}
+    if not connectivity.is_online():
+        return {"available": False, "reason": "offline: no internet"}
     if _cache["data"] and now - _cache["ts"] < CACHE_S:
         return _cache["data"]
     try:
@@ -77,6 +79,8 @@ def cached() -> dict:
 def refresh_in_background() -> None:
     """Called by the agent loop: refresh the cache in a thread when it is old."""
     if not config.WEATHER_ENABLED or time.time() - _cache["ts"] < CACHE_S:
+        return
+    if not connectivity.is_online():
         return
     if not _refreshing.acquire(blocking=False):
         return

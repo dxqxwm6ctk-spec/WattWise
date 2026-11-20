@@ -30,13 +30,29 @@ def norm(text: str) -> str:
 
 # ---------- goal in plain words ----------
 
+_PERCENT = r"\s*(?:%|٪|بالميه|بالمئه|في الميه|في المئه|بالمائه)"
+
+
 def read_goal(text: str) -> float | None:
-    """The bill target in JD written inside the goal text, if any (5 to 1000)."""
-    m = re.search(r"\d+(?:\.\d+)?", norm(text))
+    """The bill target in JD written inside the goal text, if any (5 to 1000).
+    A percentage ("وفّر ٢٠٪") is not a bill target: see read_goal_percent."""
+    t = norm(text)
+    if read_goal_percent(text) is not None:
+        t = re.sub(r"\d+(?:\.\d+)?" + _PERCENT, " ", t)
+    m = re.search(r"\d+(?:\.\d+)?", t)
     if not m:
         return None
     value = float(m.group(0))
     return value if 5 <= value <= 1000 else None
+
+
+def read_goal_percent(text: str) -> float | None:
+    """'بدي أوفّر ٢٠٪ هالشهر' -> 20 (1 to 90 percent)."""
+    m = re.search(r"(\d+(?:\.\d+)?)" + _PERCENT, norm(text))
+    if not m:
+        return None
+    value = float(m.group(1))
+    return value if 1 <= value <= 90 else None
 
 
 def step_tag(step: str) -> str:

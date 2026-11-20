@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend import actions, agent, assistant, config, db, discovery, report, schedules, state
+from backend import actions, agent, assistant, config, connectivity, db, discovery, report, schedules, state
 
 
 async def _agent_loop():
@@ -124,6 +124,10 @@ class NewTimer(BaseModel):
     run_now: bool = False      # "run it for N minutes": on now, off after N
 
 
+class Offline(BaseModel):
+    offline: bool
+
+
 class Enabled(BaseModel):
     enabled: bool
 
@@ -151,8 +155,29 @@ def connect_info():
 
 
 @app.get("/api/connect/qr.svg")
-def connect_qr():
-    return Response(discovery.qr_svg(discovery.server_url()), media_type="image/svg+xml")
+def connect_qr(path: str = ""):
+    """QR with the server address. With ?path=/app.html?site=home it opens that page directly
+    (the judge scans it and gets the approval page on their own phone)."""
+    if path and (not path.startswith("/") or path.startswith("//") or len(path) > 200):
+        raise HTTPException(status_code=400, detail="bad path")
+    return Response(discovery.qr_svg(discovery.server_url() + path), media_type="image/svg+xml")
+
+
+# ---------- internet (the offline demo) ----------
+
+@app.get("/api/internet")
+def get_internet():
+    s = connectivity.snapshot()
+    return {"online": connectivity.is_online(), "forced": s["forced_offline"], "checked": s["online"] is not None}
+
+
+@app.post("/api/internet/simulate")
+def post_internet_simulate(body: Offline):
+    """Rehearsal switch: pretend the internet is gone. The UI labels it as simulated."""
+    connectivity.set_forced_offline(body.offline)
+    with db.connect() as conn:
+        agent.note_internet_changes(conn)
+    return {"ok": True, "online": connectivity.is_online()}
 
 
 @app.post("/api/readings")

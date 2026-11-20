@@ -4,7 +4,8 @@ import calendar
 import json
 import time
 
-from backend import actions, anomaly, billing, config, db, forecast, llm, mv, schedules, weather
+from backend import (actions, anomaly, billing, config, connectivity, db, forecast, impact, llm, mv,
+                     schedules, weather)
 
 CATEGORY = {"ac": "المكيّفات", "fan": "المكيّفات", "fridge": "الثلاجة", "heater": "سخّان الماء",
             "light": "الإنارة"}
@@ -84,7 +85,6 @@ def build(conn, site: str) -> dict:
     tinfo = billing.tier_info(kwh_now, projected_kwh, tariff, ttype)
     price = billing.marginal_price(kwh_now, tariff, ttype)
     bill_now = billing.bill_for(kwh_now, tariff, ttype)
-    co2 = tariff.get("co2_kg_per_kwh")
 
     # Where does the money go? From NILM-lite attribution of measured energy.
     by_cat: dict[str, float] = {}
@@ -155,12 +155,12 @@ def build(conn, site: str) -> dict:
             "proj_pos": round(min(99, projected_kwh / tinfo["display_max_kwh"] * 100), 1),
             "source": tariff.get("price_source"),
         },
-        "savings": {
-            "kwh": round(saved_wh / 1000, 3),
-            "jod": round(saved_wh / 1000 * price, 3),
-            "co2_kg": None if co2 is None else round(saved_wh / 1000 * co2, 2),
-            "co2_source": tariff.get("co2_source"),
-        },
+        "savings": impact.savings(
+            saved_wh,
+            impact.today_wh(db.get_state(conn, f"saved_day:{site}", None), meter.get("meter_ts") or now),
+            sum(d["signature_w"] for d in devs if d["agent_off"] == actions.AGENT_OFF_VERIFIED),
+            price, tariff),
+        "internet": connectivity.status(conn, site, now),
         "breakdown": breakdown,
         "log": log,
         "learn": db.get_state(conn, f"learn:{site}"),

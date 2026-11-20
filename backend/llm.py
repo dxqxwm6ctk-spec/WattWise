@@ -18,7 +18,7 @@ import json
 import time
 from dataclasses import dataclass, field
 
-from backend import config, db, weather
+from backend import config, connectivity, db, weather
 
 
 class ProviderError(Exception):
@@ -149,6 +149,9 @@ def status(conn) -> dict:
     p = get_provider()
     if p is None:
         return {**base, "mode": "rules", "reason_ar": "بدون نموذج ذكاء اصطناعي (ما في مفتاح). شغّالين بالقواعد."}
+    if not connectivity.is_online():
+        return {**base, "mode": "rules", "model": p.model, "offline": True,
+                "reason_ar": "ما في إنترنت. الوكيل شغّال محليًا بالقواعد، والموافقة والإطفاء ما وقفوا."}
     if spent >= budget:
         return {**base, "mode": "rules", "model": p.model, "reason_ar": "خلصت ميزانية الشهر. رجعنا للقواعد."}
     if time.time() < _down_until:

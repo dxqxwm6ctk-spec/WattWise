@@ -22,7 +22,7 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Add-device flow: measure a new device's signature on the main meter
 - [x] Dashboard (plain HTML/JS + Chart.js) implementing the "WattWise Home" design
 - [x] Web approval page (PWA, works offline on the local network) as backup for the Flutter app
-- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands (78 passing)
+- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands, offline mode and savings counter (90 passing)
 - [x] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API (tested as a web build against the simulator)
 - [ ] Run the Flutter app on a real Android phone on the local Wi-Fi
 - [x] LLM planner + explainer with tool use, spending cap, provider abstraction, rule-based fallback (tested with a fake provider; 38 tests passing)
@@ -37,11 +37,15 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Timers and daily on/off schedules run in the backend, checked when saved and again when they fire; smart water-heater schedule suggestion (max 3 h window)
 - [x] "Why is my bill like this?" analysis and a weekly text report to download
 - [x] Same features in the phone web page and the Flutter app (new Schedules tab); AC set temperature removed from the UI (on/off only)
+- [x] Judge screen `stage.html`: goal by voice/typing, live plan steps, QR that opens the approval page on the judge's phone (phone buzzes and jumps to the card), live savings counter
+- [x] Offline mode: internet check every 10 s, red banner with what keeps working locally, LLM and weather step aside, rehearsal switch labelled "simulated"; full flow verified with the internet blocked
+- [x] Goal in percent ("وفّر ٢٠٪") becomes a bill target from this month's projection (was misread as 20 JD)
+- [x] Savings counter: today's measured JOD / kWh / kg CO2 + "if 1000 Jordanian homes" projection, clearly labelled (12 new tests)
 - [ ] Voice input inside the Flutter app (needs a speech package; the web pages already have the mic)
 
 ## Data to fill (team)
 - [ ] Verify tariff tiers in `config/tariff.json` against a real, anonymized bill
-- [ ] Official CO2 grid emission factor for Jordan, with source
+- [x] Official CO2 grid emission factor for Jordan, with source (IFI v2.0 via UNFCCC, 0.516 kg/kWh)
 - [ ] One week of real measurements for the problem statement
 
 ## Phase B: hardware at low voltage (when the kit arrives)

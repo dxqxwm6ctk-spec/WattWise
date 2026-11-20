@@ -17,6 +17,6 @@
     }
   },
   "price_source": "EMRC household tariff 2025 (as cited in the design). NOT YET VERIFIED against a real bill.",
-  "co2_kg_per_kwh": null,
-  "co2_source": "Fill with an official grid emission factor for Jordan and cite it. Until then CO2 is shown as '—'."
+  "co2_kg_per_kwh": 0.516,
+  "co2_source": "IFI Dataset of Default Grid Factors v2.0 (July 2019), Jordan combined-margin grid emission factor for firm energy / energy efficiency: 516 gCO2/kWh. Published by UNFCCC: https://unfccc.int/sites/default/files/resource/Harmonized_Grid_Emission_factor_data_set.pdf"
 }

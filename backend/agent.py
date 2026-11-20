@@ -15,7 +15,7 @@ LLM is missing, late, broken or over budget.
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 
-from backend import actions, billing, config, db, forecast, llm, policy, schedules, weather
+from backend import actions, billing, config, connectivity, db, forecast, llm, policy, schedules, weather
 
 # Remembers what the agent is currently looking at, per site: {"device_id", "since"}
 _analyzing: dict[str, dict] = {}
@@ -362,8 +362,23 @@ def _room_name(conn, site: str, room_id: str) -> str:
     return r["name"] if r else room_id
 
 
+def note_internet_changes(conn) -> None:
+    """Write 'internet lost / back' into every site's audit log (the judges see it live)."""
+    for ch in connectivity.pop_changes():
+        sim = " (محاكاة للتجربة)" if ch["forced"] else ""
+        for site in config.load_sites():
+            if ch["online"]:
+                db.audit(conn, site, "T0", "system", "internet_back",
+                         f"رجع الإنترنت{sim}. الطقس والنموذج رجعوا متاحين، وما ضاع إشي من القياس.")
+            else:
+                db.audit(conn, site, "T0", "system", "internet_lost",
+                         f"انقطع الإنترنت{sim} ← WattWise مكمّل محليًا: قياس، كشف هدر، موافقة، إطفاء، تحقق.")
+
+
 def tick_all() -> None:
+    connectivity.check_in_background()
     weather.refresh_in_background()
     with db.connect() as conn:
+        note_internet_changes(conn)
         for site in config.load_sites():
             tick(conn, site)

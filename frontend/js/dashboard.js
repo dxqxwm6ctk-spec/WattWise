@@ -44,6 +44,7 @@ function toolbar() {
       <option value="normal">رجّع طبيعي</option>
     </select>` : '';
   return `${other}${scen}
+    <a class="tb ghost" href="stage.html?site=${WW.site}">شاشة العرض للحكّام</a>
     <a class="tb ghost" href="/api/sites/${WW.site}/report" target="_blank" rel="noopener">تقرير التوفير</a>
     <button class="tb ghost" data-act="reset">إعادة الضبط</button>
     <button class="tb stop" data-act="estop">إيقاف طوارئ</button>`;
