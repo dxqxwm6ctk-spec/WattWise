@@ -10,7 +10,7 @@
 //   - No answer from the backend for FAILSAFE_MS: relays go back to NORMAL.
 //   - "NORMAL" = both loads ON (that is how the room works without the agent).
 //
-// Libraries: ArduinoJson (v7), PZEM-004T-v30, DHT sensor library, LiquidCrystal I2C.
+// Libraries: ArduinoJson (v7), PZEM004Tv30, DHT sensor library, LiquidCrystal I2C.
 // Before uploading: copy config.example.h to config.h and fill it in.
 
 #include <WiFi.h>

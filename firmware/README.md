@@ -14,7 +14,7 @@ what to wire and what you should see in the Serial Monitor (115200 baud).
 | `06_buzzer` | buzzer | - |
 | `07_lcd` | LCD 1602 I2C (also prints its address) | LiquidCrystal I2C (Frank de Brabander) |
 | `08_relay_no_mains` | relays clicking, active-LOW or not. **No 220 V attached** | - |
-| `09_pzem` | PZEM-004T communication; real numbers only after the electrician wires 220 V | PZEM-004T-v30 (Jakub Mandula) |
+| `09_pzem` | PZEM-004T communication; real numbers only after the electrician wires 220 V | PZEM004Tv30 (Jakub Mandula; search "PZEM-004T") |
 | `wattwise` | final sketch: sends readings, obeys relay commands, fail-safe | ArduinoJson v7 + all above |
 
 Pins: `pins.md` (check them against your board). Step-by-step wiring in Arabic: `docs/wiring.md`.

@@ -1,5 +1,5 @@
 // Test 9: PZEM-004T v3.0 energy meter, LOW-VOLTAGE side only.
-// Library: "PZEM-004T-v30" by Jakub Mandula.
+// Library: "PZEM004Tv30" by Jakub Mandula (search "PZEM-004T" in the Library Manager).
 //
 // IMPORTANT: the PZEM measures only when its other side is wired to 220 V. That side is wired
 // by the electrician inside the closed box. Without it, this test only checks the
