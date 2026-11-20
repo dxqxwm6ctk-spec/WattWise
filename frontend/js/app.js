@@ -621,8 +621,19 @@ function renderAll() {
     `<button class="tab" data-act="tab" data-k="${k}" style="color:${ui.tab === k ? '#1A1B16' : '#9A988E'}"><i style="background:${ui.tab === k ? '#1A1B16' : 'transparent'}"></i>${label}</button>`).join(''));
 }
 
+let lastPendingId = null;
 async function refresh() {
-  try { st = await WW.getState(); renderAll(); } catch (e) { console.error(e); }
+  try {
+    st = await WW.getState();
+    // A new approval card: bring it to the front and buzz the phone (judge's phone in the demo).
+    const pid = st.pending ? st.pending.id : null;
+    if (pid && pid !== lastPendingId && !ui.wiz) {
+      ui.tab = 'home';
+      if (navigator.vibrate) { try { navigator.vibrate([250, 120, 250]); } catch (e) { /* not allowed yet */ } }
+    }
+    lastPendingId = pid;
+    renderAll();
+  } catch (e) { console.error(e); }
 }
 async function act(fn) {
   try { await fn(); } catch (e) { showError(e.message); }

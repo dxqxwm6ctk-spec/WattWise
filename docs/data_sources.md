@@ -12,7 +12,9 @@
 | Door / window contact | **simulated** (a push button on the device, a flag in the simulator) | in use |
 | Device nameplate watts (`config/sites.json`, `rated_w`) | typical values, used only as a first guess; replaced by the measured step on the meter | in use |
 | Household tariff tiers (`config/tariff.json`) | taken from the design, which cites the EMRC 2025 household tariff | **to verify against a real anonymized bill** |
-| CO2 grid emission factor: 0.516 kg CO2/kWh (`config/tariff.json`) | IFI Dataset of Default Grid Factors v2.0 (Jul 2019), published by UNFCCC, Jordan, combined margin for energy efficiency | in use |
+| CO2 grid emission factor: 0.516 kg CO2/kWh (`config/tariff.json`) | IFI Dataset of Default Grid Factors v2.0 (Jul 2019), Jordan combined margin for firm energy / energy efficiency (516 gCO2/kWh), published by UNFCCC: https://unfccc.int/sites/default/files/resource/Harmonized_Grid_Emission_factor_data_set.pdf | in use (savings counter, report) |
+| "If 1000 Jordanian homes used it" | projection only: today's **measured** saving x 365 x 1000, same tariff tier and CO2 factor (`backend/impact.py`) | in use, labelled as a projection |
+| Internet check | one small request to `https://api.open-meteo.com/` every 10 s (`backend/connectivity.py`), sends no data | in use |
 | Weather and solar radiation | Open-Meteo (free, no key, open data), `backend/weather.py`, default location Irbid | in use, optional: skipped when offline |
 | Electricity bill photo (optional) | the owner's own bill, uploaded by the owner; read once by Claude (vision), **never stored**; only kWh, days and JOD are kept; the model is told not to output names, addresses or account numbers. For the demo, use a bill with the name and numbers covered | in use when a key is set; manual entry otherwise |
 | LLM planner (optional) | Anthropic Claude API; it only receives the synthetic/sensor snapshot (rooms, watts, tariff, weather), never personal data | in use when a key is set |

@@ -22,7 +22,7 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Add-device flow: measure a new device's signature on the main meter
 - [x] Dashboard (plain HTML/JS + Chart.js) implementing the "WattWise Home" design
 - [x] Web approval page (PWA, works offline on the local network) as backup for the Flutter app
-- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands (88 passing)
+- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands, offline mode and savings counter (90 passing)
 - [x] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API (tested as a web build against the simulator)
 - [x] Flutter app: live animated device cards (fan spins, lamp glows, heater waves), "running now" strip, counting watts (tested as a web build against the simulator)
 - [ ] Run the Flutter app on a real Android phone on the local Wi-Fi
@@ -43,6 +43,10 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Interactive 3D house page (`house.html`, three.js bundled offline): realistic rooms, furniture, lighting and day/night, animated devices, energy flow, click-to-zoom, approval card, NILM step recognition, guided "how it works" tour that drives the real system; phone mockup on the dashboard moved behind a "معاينة الموبايل" button
 - [x] Home EV charger (simulated 7.4 kW): session recognised by its meter step, measured kWh, start/end notifications, smart-charging proposal (evening peak, approval, resume timer), excluded from savings
 - [ ] Show the interactive house inside the Flutter app (WebView or native)
+- [x] Judge screen `stage.html`: goal by voice/typing, live plan steps, QR that opens the approval page on the judge's phone (phone buzzes and jumps to the card), live savings counter
+- [x] Offline mode: internet check every 10 s, red banner with what keeps working locally, LLM and weather step aside, rehearsal switch labelled "simulated"; full flow verified with the internet blocked
+- [x] Goal in percent ("وفّر ٢٠٪") becomes a bill target from this month's projection (was misread as 20 JD)
+- [x] Savings counter: today's measured JOD / kWh / kg CO2 + "if 1000 Jordanian homes" projection, clearly labelled (12 new tests)
 - [ ] Voice input inside the Flutter app (needs a speech package; the web pages already have the mic)
 
 ## Bill photo analysis

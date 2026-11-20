@@ -4,10 +4,11 @@ Both the web API (human actions) and the agent loop call these functions, so
 every change goes through the same Policy Guard checks and the same audit log.
 """
 
+import calendar
 import json
 import time
 
-from backend import anomaly, config, db, nilm, policy
+from backend import anomaly, billing, config, db, impact, nilm, policy
 
 # Approval statuses
 PENDING, APPROVED, REJECTED, EXPIRED, BLOCKED, CANCELLED = (
@@ -99,6 +100,8 @@ def ingest(conn, payload: dict) -> None:
     if held_off_w and dt_h:
         saved = db.get_state(conn, f"saved_wh:{site}", 0.0) + held_off_w * dt_h
         db.set_state(conn, f"saved_wh:{site}", saved)
+        db.set_state(conn, f"saved_day:{site}",
+                     impact.add_today(db.get_state(conn, f"saved_day:{site}", None), meter_ts, held_off_w * dt_h))
 
     power = float(meter["power_w"])
     conn.execute(
@@ -155,14 +158,33 @@ def _learning(conn, site: str) -> dict | None:
 
 # ---------- goal ----------
 
+def projected_bill(conn, site: str) -> float | None:
+    """This month's bill if consumption continues at the same pace (JD, energy charge only)."""
+    meter = db.latest_meter(conn, site)
+    if not meter or not meter.get("energy_kwh"):
+        return None
+    tariff = config.load_tariff()
+    ttype = db.get_state(conn, f"tariff_type:{site}", tariff["default_type"])
+    t = time.localtime(meter["meter_ts"])
+    days = calendar.monthrange(t.tm_year, t.tm_mon)[1]
+    elapsed = max(0.5, t.tm_mday - 1 + (t.tm_hour + t.tm_min / 60) / 24)
+    return billing.bill_for(meter["energy_kwh"] / elapsed * days, tariff, ttype)
+
+
 def set_goal(conn, site: str, text: str, bill_target_jd: float | None) -> dict:
     require_site(site)
     text = text.strip()
     if not text:
         raise ActionError("اكتب الهدف.")
+    percent = None
     if bill_target_jd is None:
-        from backend.assistant import read_goal   # "بدي الفاتورة تحت ٢٥ دينار" -> 25
+        from backend.assistant import read_goal, read_goal_percent   # "تحت ٢٥ دينار" -> 25, "وفّر ٢٠٪" -> 20
         bill_target_jd = read_goal(text)
+        percent = read_goal_percent(text)
+        projected = projected_bill(conn, site)
+        if bill_target_jd is None and percent and projected:
+            # "save 20%" becomes a bill target: this month's projected bill minus 20%.
+            bill_target_jd = max(1.0, round(projected * (1 - percent / 100), 1))
     conn.execute("UPDATE goals SET active=0 WHERE site=?", (site,))
     conn.execute("INSERT INTO goals (site, created_ts, text, bill_target_jd, active) VALUES (?,?,?,?,1)",
                  (site, time.time(), text, bill_target_jd))
@@ -170,8 +192,13 @@ def set_goal(conn, site: str, text: str, bill_target_jd: float | None) -> dict:
     from backend import goal as goal_reader   # rule-based reading of the goal (no LLM needed)
     intent = goal_reader.understand(conn, site, text, bill_target_jd)
     steps = goal_reader.plan_steps(intent)
+    summary = goal_reader.summary(intent)
+    if percent and bill_target_jd:
+        summary = (f"فهمت إنك بدك توفّر {percent:g}٪: الفاتورة المتوقعة هالشهر بتصير هدفها "
+                   f"{bill_target_jd:g} دينار بدل {projected_bill(conn, site):.1f}. "
+                   "هذا هدف، والتوفير الحقيقي بنحسبه بس من العدّاد.")
     db.set_state(conn, f"plan:{site}", {
-        "goal_id": goal["id"], "by": "rules", "steps": steps, "summary": goal_reader.summary(intent),
+        "goal_id": goal["id"], "by": "rules", "steps": steps, "summary": summary,
         "intent": intent,
         "focus": {"rooms": [r["id"] for r in intent["rooms"]], "kinds": intent["kinds"]},
     })
@@ -328,6 +355,7 @@ def reset_demo(conn, site: str) -> None:
     db.set_state(conn, f"safe_mode:{site}", False)
     db.set_state(conn, f"scenario:{site}", "normal")
     db.set_state(conn, f"saved_wh:{site}", 0.0)
+    db.set_state(conn, f"saved_day:{site}", None)
     db.set_state(conn, f"learn:{site}", None)
     conn.execute("DELETE FROM schedules WHERE site=?", (site,))
     conn.execute("DELETE FROM timers WHERE site=?", (site,))
