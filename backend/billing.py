@@ -54,11 +54,11 @@ def tier_info(kwh: float, projected_kwh: float, tariff: dict, ttype: str) -> dic
     nxt = tiers[idx + 1] if idx + 1 < len(tiers) else None
     fils = round(price * 1000)
     if nxt and cap - kwh < 60:
-        msg = f"باقي {round(cap - kwh)} ك.و.س وبتدخلي شريحة {round(nxt[1] * 1000)} فلس، كل ك.و.س بعدها أغلى."
+        msg = f"بقي {round(cap - kwh)} ك.و.س على دخول شريحة {round(nxt[1] * 1000)} فلس، وكل ك.و.س بعدها أغلى."
     elif nxt and projected_kwh > cap:
-        msg = f"إنتِ بشريحة {fils} فلس، وإذا ضلّينا هيك رح تدخلي شريحة {round(nxt[1] * 1000)} فلس قبل آخر الشهر."
+        msg = f"أنت في شريحة {fils} فلس، وبهذا المعدّل ستدخل شريحة {round(nxt[1] * 1000)} فلس قبل آخر الشهر."
     else:
-        msg = f"إنتِ بشريحة {fils} فلس، كل ك.و.س بتوفّريه بيوفّرلك {fils} فلس."
+        msg = f"أنت في شريحة {fils} فلس، وكل ك.و.س توفّره يوفّر لك {fils} فلس."
     return {"segments": segs, "message": msg, "display_max_kwh": display_max}
 
 

@@ -47,9 +47,9 @@ NOISY_UNKNOWN_MIN_W = 100  # on the noisy main meter only big unknown devices ar
 # appliance nameplates and common measurements; a guess only, the user confirms.
 # (kind, Arabic label, watts min, watts max, pf min, pf max)
 GUESSES = [
-    ("light", "ضو LED صغير", 2, 15, 0.45, 0.95),
-    ("other", "شاحن تلفون أو راوتر", 2, 15, 0.3, 0.6),
-    ("light", "ضو LED كبير", 15, 60, 0.9, 0.97),
+    ("light", "مصباح LED صغير", 2, 15, 0.45, 0.95),
+    ("other", "شاحن هاتف أو راوتر", 2, 15, 0.3, 0.6),
+    ("light", "مصباح LED كبير", 15, 60, 0.9, 0.97),
     ("light", "لمبة عادية (توهّج أو هالوجين)", 25, 150, 0.97, 1.0),
     ("pc", "لابتوب (الشاحن)", 30, 100, 0.45, 0.75),
     ("fan", "مروحة", 25, 90, 0.75, 0.9),
@@ -58,7 +58,7 @@ GUESSES = [
     ("fridge", "ثلاجة", 80, 250, 0.6, 0.85),
     ("washer", "غسالة", 300, 900, 0.6, 0.9),
     ("ac", "مكيّف", 700, 2500, 0.8, 0.96),
-    ("heater", "سخّان أو غلّاية أو مكوى", 600, 3000, 0.97, 1.0),
+    ("heater", "سخّان أو غلّاية أو مكواة", 600, 3000, 0.97, 1.0),
 ]
 
 # In-memory buffers per (site, stream): list of (ts, watts, var). Lost on restart, that is fine.
@@ -215,7 +215,7 @@ def delete_fingerprint(conn, site: str, fp_id: int) -> None:
 
 def room_name(conn, site: str, room_id: str | None) -> str:
     if not room_id:
-        return "غرفة مش معروفة"
+        return "غرفة غير معروفة"
     r = db.one(conn.execute("SELECT name FROM rooms WHERE site=? AND id=?", (site, room_id)))
     return r["name"] if r else room_id
 
@@ -315,13 +315,13 @@ def _handle(conn, site: str, ev: dict, changes: list[dict], now: float) -> None:
         if ev["dp"] > 0 and str(best["id"]) not in on:
             on[str(best["id"])] = {"since": now, "tipped": False}
             db.audit(conn, site, "T0", "agent", "recognised",
-                     f"تعرّفت عالبصمة: انشغل {best['name']} ({room_name(conn, site, best['room'])}) ≈ {round(abs(ev['dp']))} واط.",
+                     f"تعرّفت على البصمة: اشتغل {best['name']} ({room_name(conn, site, best['room'])}) ≈ {round(abs(ev['dp']))} واط.",
                      {"step_w": ev["dp"], "pf": ev["pf"], "fingerprint_id": best["id"]})
             teach.note_recognised(conn, site, best, ev)
         elif ev["dp"] < 0 and str(best["id"]) in on:
             on.pop(str(best["id"]))
             db.audit(conn, site, "T0", "agent", "recognised_off",
-                     f"تعرّفت عالبصمة: انطفى {best['name']} ({room_name(conn, site, best['room'])}).",
+                     f"تعرّفت على البصمة: انطفأ {best['name']} ({room_name(conn, site, best['room'])}).",
                      {"step_w": ev["dp"], "fingerprint_id": best["id"]})
         db.set_state(conn, f"nilm_on:{site}", on)
         return
@@ -388,10 +388,10 @@ def _unknown_on(conn, site: str, ev: dict, now: float) -> None:
          "stream": ev["stream"], "guess": g, "status": "open"}
     items = [x for x in items if x["status"] == "open" or now - x["ts"] < 3600][-20:] + [u]
     db.set_state(conn, f"nilm_unknown:{site}", items)
-    where = f"ب{room_name(conn, site, ev['room'])}" if ev["room"] else "(العدّاد الرئيسي، الغرفة مش معروفة)"
+    where = f"في {room_name(conn, site, ev['room'])}" if ev["room"] else "(العدّاد الرئيسي، والغرفة غير معروفة)"
     pf_txt = f"، معامل القدرة ≈ {pf}" if pf is not None else ""
     db.audit(conn, site, "T0", "agent", "unknown_device",
-             f"في جهاز مجهول بيسحب ≈ {round(ev['dp'])} واط {where}{pf_txt}. ما إله بصمة محفوظة. غالبًا: {g[0]['label']}.",
+             f"جهاز مجهول يستهلك ≈ {round(ev['dp'])} واط {where}{pf_txt}، وليست له بصمة محفوظة. غالبًا: {g[0]['label']}.",
              {"step_w": ev["dp"], "pf": ev["pf"], "room": ev["room"], "guess": g})
     teach.ask_about_unknown(conn, site, u)
 
@@ -403,7 +403,7 @@ def _unknown_off(conn, site: str, ev: dict, now: float) -> None:
             u["status"] = "gone"
             db.set_state(conn, f"nilm_unknown:{site}", items)
             db.audit(conn, site, "T0", "agent", "unknown_gone",
-                     f"الجهاز المجهول (≈ {u['watts']} واط) انطفى.", {"step_w": ev["dp"]})
+                     f"انطفأ الجهاز المجهول (≈ {u['watts']} واط).", {"step_w": ev["dp"]})
             return
 
 
@@ -433,8 +433,8 @@ def _recognised_waste(conn, site: str, now: float) -> None:
         if empty_s is None or empty_s < max(config.WASTE_EMPTY_S, 30):
             continue
         info["tipped"] = changed = True
-        msg = (f"{f['name']} شغّال ب{room_name(conn, site, f['room'])} والغرفة فاضية. "
-               f"ما عليه ريليه، فما بقدر أطفيه أنا. إذا بدك طفّيه بإيدك (≈ {round(f['watts'])} واط).")
+        msg = (f"{f['name']} يعمل في {room_name(conn, site, f['room'])} والغرفة فارغة. "
+               f"لا يتصل بريليه، فلا يمكنني إطفاؤه. أطفئه يدويًا إن أردت (≈ {round(f['watts'])} واط).")
         db.audit(conn, site, "T0", "agent", "recognised_waste", msg, {"fingerprint_id": f["id"]})
         teach.say_ai(conn, site, msg)
     if changed:
@@ -468,7 +468,7 @@ PF_TOLERANCE = 0.15
 
 def load_type_ar(pf: float | None) -> str:
     if pf is None:
-        return "نوع الحمل مش معروف (بدنا قياس PF)"
+        return "نوع الحمل غير معروف (يلزم قياس PF)"
     if pf >= RESISTIVE_PF:
         return "حمل مقاومي (لمبة عادية، سخّان، غلّاية)"
     return "حمل فيه محرّك أو إلكترونيات (مروحة، مكيّف، شاحن)"

@@ -53,11 +53,11 @@ READ_SYSTEM = (
     "Never guess or invent a number. Never write the customer's name, address, account number, subscription number "
     "or meter serial number anywhere in your answer, even in the explanation. "
     "If the photo is not an electricity bill or is unreadable, say so with is_electricity_bill/readable = false. "
-    "Write explanation_ar as 3 to 5 short sentences in simple Jordanian Arabic for someone who never read a bill: "
+    "Write explanation_ar as 3 to 5 short sentences in simple, friendly Modern Standard Arabic (not dialect) for someone who never read a bill: "
     "what they consumed, which tier they reached and why the amount is what it is. Use only numbers from the bill."
 )
 
-READ_PROMPT = "اقرأ هالفاتورة وطلّع الأرقام زي ما هي مكتوبة، واشرحها بالعربي البسيط."
+READ_PROMPT = "اقرأ هذه الفاتورة واستخرج الأرقام كما هي مكتوبة، واشرحها بعربية بسيطة."
 
 _NUM = {"type": ["number", "null"]}
 _STR = {"type": ["string", "null"]}
@@ -93,8 +93,8 @@ READ_SCHEMA = {
     "additionalProperties": False,
 }
 
-NO_KEY_MSG = ("قراءة الصورة بالذكاء الاصطناعي مش مفعّلة لسا (لازم مفتاح ANTHROPIC_API_KEY بملف .env). "
-              "بتقدر هلأ تكتب ٣ أرقام من الفاتورة بإيدك وبنحلّلها: الكيلوواط ساعة، عدد الأيام، والمبلغ.")
+NO_KEY_MSG = ("قراءة الصورة بالذكاء الاصطناعي غير مفعّلة بعد (تحتاج مفتاح ANTHROPIC_API_KEY في ملف .env). "
+              "يمكنك الآن إدخال ٣ أرقام من الفاتورة يدويًا لنحلّلها: الكيلوواط ساعة، وعدد الأيام، والمبلغ.")
 
 
 # ---------------- small helpers ----------------
@@ -137,13 +137,13 @@ def _analyze(conn, site: str, bill: dict, by: str, explanation: list[str]) -> di
             diff = round(paid - expected, 2)
             if abs(diff) <= max(0.5, expected * 0.05):
                 checks.append(f"حسبناها على تعرفة «{label}»: {kwh:g} ك.و.س = {expected:g} دينار طاقة. "
-                              f"قريبة من اللي بالفاتورة ({paid:g}).")
+                              f"قريبة مما في الفاتورة ({paid:g}).")
             elif diff > 0:
-                checks.append(f"على تعرفة «{label}» الطاقة لحالها = {expected:g} دينار، والفاتورة {paid:g}. "
-                              f"الفرق {diff:g} دينار غالباً رسوم ثانية (تلفزيون، نفايات، فلس الريف) أو تعرفة غير اللي اخترتها.")
+                checks.append(f"على تعرفة «{label}» قيمة الطاقة وحدها = {expected:g} دينار، والفاتورة {paid:g}. "
+                              f"الفرق {diff:g} دينار غالبًا رسوم أخرى (تلفزيون، نفايات، فلس الريف) أو تعرفة غير التي اخترتها.")
             else:
-                checks.append(f"على تعرفة «{label}» المفروض {expected:g} دينار، والفاتورة أقل ({paid:g}). "
-                              "يمكن في دعم أو خصم، أو التعرفة اللي بإعداداتنا مش نفس تعرفتك.")
+                checks.append(f"على تعرفة «{label}» يُفترض أن تكون {expected:g} دينار، والفاتورة أقل ({paid:g}). "
+                              "ربما هناك دعم أو خصم، أو أن التعرفة في إعداداتنا تختلف عن تعرفتك.")
 
         # Which tier, and how far above the cheaper one?
         tiers = billing._tiers(tariff, ttype)
@@ -154,12 +154,12 @@ def _analyze(conn, site: str, bill: dict, by: str, explanation: list[str]) -> di
                 if i > 0:
                     over = round(kwh - prev_cap)
                     cheaper = round(tiers[i - 1][1] * 1000)
-                    per_day = f" (≈ {over / days:.1f} باليوم)" if days else ""
-                    checks.append(f"وصلت شريحة {fils} فلس. آخر {over} ك.و.س انحسبت بالسعر الأغلى.")
-                    ideas.append(f"لو نزّلت {over} ك.و.س بالشهر{per_day} بترجع لشريحة {cheaper} فلس، "
-                                 f"وبتوفّر تقريباً {over * price:.2f} دينار (تقدير من التعرفة).")
+                    per_day = f" (≈ {over / days:.1f} يوميًا)" if days else ""
+                    checks.append(f"وصلت إلى شريحة {fils} فلس، وحُسبت آخر {over} ك.و.س بالسعر الأغلى.")
+                    ideas.append(f"لو خفّضت {over} ك.و.س شهريًا{per_day} تعود إلى شريحة {cheaper} فلس، "
+                                 f"وتوفّر نحو {over * price:.2f} دينار (تقدير من التعرفة).")
                 else:
-                    checks.append(f"إنت بأرخص شريحة ({fils} فلس). كل ك.و.س بتوفّره بيوفّر {fils} فلس.")
+                    checks.append(f"أنت في أرخص شريحة ({fils} فلس). كل ك.و.س توفّره يوفّر {fils} فلس.")
                 break
             prev_cap = cap
 
@@ -174,15 +174,15 @@ def _analyze(conn, site: str, bill: dict, by: str, explanation: list[str]) -> di
             pct = round((measured_per_day - bill_per_day) / bill_per_day * 100)
             compare["diff_pct"] = pct
             trend = ("أعلى" if pct > 0 else "أقل") + f" بـ {abs(pct)}%"
-            checks.append(f"بالفاتورة صرفت {bill_per_day:g} ك.و.س باليوم. هلأ {src} بيقيس {measured_per_day:g} باليوم، "
-                          f"يعني {trend} من الفاتورة." if pct else
-                          f"بالفاتورة {bill_per_day:g} ك.و.س باليوم، وهلأ {src} بيقيس نفس الرقم تقريباً.")
+            checks.append(f"في الفاتورة استهلكت {bill_per_day:g} ك.و.س يوميًا، والآن يقيس {src} {measured_per_day:g} يوميًا، "
+                          f"أي {trend} من الفاتورة." if pct else
+                          f"في الفاتورة {bill_per_day:g} ك.و.س يوميًا، والآن يقيس {src} الرقم نفسه تقريبًا.")
 
     if s["breakdown"]:
         top = s["breakdown"][0]
-        ideas.append(f"أكبر بند عندنا هلأ: {top['name']} (≈ {top['jod']:g} دينار لحد اليوم، تقدير من بصمات الأحمال). "
-                     "ابدأ فيه.")
-    ideas.append("أعطِ الوكيل هدف (مثلاً «بدي الفاتورة الجاية أقل من هيك»)، وبيسألك قبل أي إطفاء.")
+        ideas.append(f"أكبر بند الآن: {top['name']} (≈ {top['jod']:g} دينار حتى اليوم، تقدير من بصمات الأحمال). "
+                     "ابدأ به.")
+    ideas.append("أعطِ الوكيل هدفًا (مثلًا «أريد الفاتورة القادمة أقل من هذه»)، وسيسألك قبل أي إطفاء.")
 
     return {
         "by": by,
@@ -192,8 +192,8 @@ def _analyze(conn, site: str, bill: dict, by: str, explanation: list[str]) -> di
         "checks": checks,
         "ideas": ideas[:3],
         "compare": compare,
-        "note": ("الأرقام قرأها الذكاء الاصطناعي من الصورة، والمقارنات محسوبة بالكود. راجع الأرقام مع الفاتورة."
-                 if by == "llm" else "الأرقام إنت كتبتها، والمقارنات محسوبة بالكود من التعرفة والعدّاد."),
+        "note": ("الأرقام قرأها الذكاء الاصطناعي من الصورة، والمقارنات محسوبة برمجيًا. راجع الأرقام مع الفاتورة."
+                 if by == "llm" else "الأرقام أدخلتها أنت، والمقارنات محسوبة برمجيًا من التعرفة والعدّاد."),
     }
 
 
@@ -210,7 +210,7 @@ def _remember(conn, site: str, result: dict) -> None:
     db.audit(conn, site, "T0", "agent", "bill_read",
              f"تحليل فاتورة ({'من صورة' if result['by'] == 'llm' else 'أرقام يدوية'}): "
              f"{b['kwh'] if b['kwh'] is not None else '—'} ك.و.س، {b['amount_jod'] if b['amount_jod'] is not None else '—'} دينار. "
-             "الصورة ما انحفظت.")
+             "لم تُحفظ الصورة.")
 
 
 def last_bill(conn, site: str) -> dict | None:
@@ -229,7 +229,7 @@ def from_manual(conn, site: str, kwh, days, amount_jod) -> dict:
     require_site(site)
     kwh = _num(kwh, 0, 100_000)
     if kwh is None:
-        raise ActionError("اكتب الكيلوواط ساعة (ك.و.س) زي ما هي بالفاتورة.")
+        raise ActionError("أدخل الكيلوواط ساعة (ك.و.س) كما هي في الفاتورة.")
     days_n = _num(days, 0, 121)
     bill = {"kwh": kwh, "days": round(days_n) if days_n else None, "amount_jod": _num(amount_jod, 0, 100_000),
             "energy_jod": None, "period_from": None, "period_to": None, "tiers": [], "other_charges": [],
@@ -246,30 +246,30 @@ def from_photo(conn, site: str, image_b64: str) -> dict:
     try:
         raw = base64.b64decode(image_b64, validate=True)
     except (binascii.Error, ValueError):
-        raise ActionError("الصورة ما وصلت صح. جرّب مرة ثانية.")
+        raise ActionError("لم تصل الصورة بشكل صحيح. حاول مجددًا.")
     if len(raw) > config.BILL_PHOTO_MAX_BYTES:
-        raise ActionError("الصورة كبيرة كثير. صوّرها أقرب أو اختار صورة أصغر.")
+        raise ActionError("الصورة كبيرة جدًا. صوّرها من مسافة أقرب أو اختر صورة أصغر.")
     media_type = _media_type(raw)
     if not media_type:
-        raise ActionError("لازم تكون صورة (JPG أو PNG أو WEBP).")
+        raise ActionError("يجب أن يكون الملف صورة (JPG أو PNG أو WEBP).")
 
     provider = llm.get_provider()
     if provider is None or not llm.available(conn):
         return {"needs_manual": True, "message": NO_KEY_MSG if provider is None else
-                llm.status(conn)["reason_ar"] + " اكتب أرقام الفاتورة بإيدك."}
+                llm.status(conn)["reason_ar"] + " أدخل أرقام الفاتورة يدويًا."}
     try:
         data, run = provider.read_image(READ_SYSTEM, READ_PROMPT, base64.b64encode(raw).decode(), media_type,
                                         READ_SCHEMA)
     except llm.ProviderError:
         llm.mark_down()
-        return {"needs_manual": True, "message": "ما قدرنا نقرأ الصورة هلأ (نت أو خطأ). اكتب أرقام الفاتورة بإيدك."}
+        return {"needs_manual": True, "message": "تعذّرت قراءة الصورة الآن (مشكلة اتصال أو خطأ). أدخل أرقام الفاتورة يدويًا."}
     finally:
         raw = image_b64 = None   # drop the photo from memory as soon as possible
     llm.add_spend(conn, run)
 
     if not data.get("is_electricity_bill") or not data.get("readable"):
         return {"needs_manual": True,
-                "message": "الصورة مش واضحة أو مش فاتورة كهربا. صوّرها بضو منيح وكاملة، أو اكتب الأرقام بإيدك."}
+                "message": "الصورة غير واضحة أو ليست فاتورة كهرباء. صوّرها كاملة وبإضاءة جيدة، أو أدخل الأرقام يدويًا."}
     bill = {
         "kwh": _num(data.get("kwh"), 0, 100_000),
         "days": data.get("days") or _days_between(data.get("period_from"), data.get("period_to")),

@@ -21,13 +21,13 @@ def _lib():
         import tinytuya
         return tinytuya
     except ImportError:
-        raise PlugError("مكتبة tinytuya مش منزّلة. نفّذ: pip install tinytuya")
+        raise PlugError("مكتبة tinytuya غير مثبّتة. نفّذ: pip install tinytuya")
 
 
 def _device(host: str, options: dict):
     tinytuya = _lib()
     if not options.get("device_id") or not options.get("local_key"):
-        raise PlugError("مقبس Tuya بدّه Device ID و Local Key (بناخدهم مرة وحدة).")
+        raise PlugError("مقبس Tuya يحتاج Device ID و Local Key (مرة واحدة فقط).")
     d = tinytuya.OutletDevice(options["device_id"], host, options["local_key"],
                               version=float(options.get("version") or 3.3))
     d.set_socketTimeout(2)
@@ -38,7 +38,7 @@ def _device(host: str, options: dict):
 def status(host: str, options: dict) -> PlugStatus:
     s = _device(host, options).status()
     if not isinstance(s, dict) or "dps" not in s:
-        raise PlugError("مقبس Tuya ما رد صح. تأكد من الـ Local Key والنسخة (3.3 / 3.4).")
+        raise PlugError("لم يردّ مقبس Tuya بشكل صحيح. تأكد من الـ Local Key والنسخة (3.3 / 3.4).")
     dps = s["dps"]
     sw = str(options.get("dps_switch") or "1")
     pw = str(options.get("dps_power") or "19")

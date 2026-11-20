@@ -51,14 +51,14 @@ def http_json(method: str, url: str, body: dict | None = None, timeout: float = 
             text = resp.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as exc:
         if exc.code == 401:
-            raise PlugError("المقبس طلب كلمة سر. ضيفها بالإعدادات أو شيل الحماية من تطبيق الشركة.")
-        raise PlugError(f"المقبس رد بخطأ ({exc.code}).")
+            raise PlugError("طلب المقبس كلمة سر. أضفها في الإعدادات أو ألغِ الحماية من تطبيق الشركة.")
+        raise PlugError(f"ردّ المقبس بخطأ ({exc.code}).")
     except (urllib.error.URLError, OSError, TimeoutError):
-        raise PlugError("المقبس ما رد. تأكد إنه شغّال وعلى نفس الـ Wi-Fi.")
+        raise PlugError("لم يردّ المقبس. تأكد أنه يعمل وعلى شبكة الـ Wi-Fi نفسها.")
     try:
         return json.loads(text) if text.strip() else {}
     except json.JSONDecodeError:
-        raise PlugError("رد المقبس مش مفهوم (ممكن مش هاي الماركة).")
+        raise PlugError("ردّ المقبس غير مفهوم (ربما الماركة مختلفة).")
 
 
 def num(value) -> float | None:

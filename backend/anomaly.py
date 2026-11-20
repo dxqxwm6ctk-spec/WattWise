@@ -98,11 +98,11 @@ def observe(conn, site: str, power_w: float, meter_ts: float, occupied: bool, le
                       residual_w=round(extra), power_w=round(power_w), expected_w=round(exp + b["mean"]),
                       hour=hour, occupied=occupied)
             if extra > 0:
-                msg = (f"شذوذ: العدّاد بيقرأ ≈ {round(power_w)} واط، والمتوقع ≈ {round(exp + b['mean'])} واط "
-                       f"(زيادة ≈ {round(extra)} واط). ممكن جهاز مش مسجّل أو جهاز عم يسحب أكثر من عادته.")
+                msg = (f"شذوذ: يقرأ العدّاد ≈ {round(power_w)} واط، والمتوقع ≈ {round(exp + b['mean'])} واط "
+                       f"(زيادة ≈ {round(extra)} واط). ربما يوجد جهاز غير مسجّل أو جهاز يستهلك أكثر من المعتاد.")
             else:
-                msg = (f"شذوذ: العدّاد أقل من المتوقع بـ≈ {round(-extra)} واط. "
-                       "ممكن جهاز فاصل أو معطّل وهو مفروض شغّال.")
+                msg = (f"شذوذ: العدّاد أقل من المتوقع بنحو {round(-extra)} واط. "
+                       "ربما يوجد جهاز مفصول أو معطّل يُفترض أنه يعمل.")
             db.audit(conn, site, "T0", "agent", "anomaly", msg,
                      {"power_w": round(power_w), "expected_w": round(exp + b["mean"]),
                       "deviation_w": round(extra), "limit_w": round(b["limit"]),

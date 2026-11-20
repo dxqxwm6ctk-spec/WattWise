@@ -24,7 +24,7 @@ def _cmd(host: str, options: dict, command: str, timeout: float | None = None) -
 def _is_on(answer: dict) -> bool:
     value = answer.get("POWER", answer.get("POWER1"))
     if value is None:
-        raise PlugError("الجهاز ما رد بحالة التشغيل (POWER).")
+        raise PlugError("لم يردّ الجهاز بحالة التشغيل (POWER).")
     return str(value).upper() == "ON"
 
 

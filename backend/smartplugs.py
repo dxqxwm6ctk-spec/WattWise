@@ -37,16 +37,16 @@ def safety(kind: str, est_w: float, max_w: float) -> dict:
     if est_w > max_w:
         return {"level": "block", "needs_confirm": False,
                 "message": f"الجهاز ≈ {est_w:.0f} واط، أكبر من حد المقبس ({max_w:.0f} واط). "
-                           "ما بنضيفه على هالمقبس: خطر سخونة وحريق."}
+                           "لن نضيفه على هذا المقبس: خطر سخونة وحريق."}
     if kind == "heater":
         return {"level": "heater", "needs_confirm": True,
-                "message": "السخّان حمل كبير (≈ ٢٠٠٠ واط) وبيشتغل ساعات. في مقابس بتتحمّل 16A، "
-                           "بس الأسلم للسخّان يضل كونتاكتور بيركّبه كهربائي. إذا بدك تكمل: "
-                           "تأكد إنه المقبس 16A، وموصول بالحيط مباشرة (مش على مشترك)."}
+                "message": "السخّان حمل كبير (≈ ٢٠٠٠ واط) ويعمل لساعات. توجد مقابس تتحمّل 16A، "
+                           "لكن الأسلم للسخّان كونتاكتور يركّبه كهربائي. إن أردت المتابعة: "
+                           "تأكد أن المقبس 16A وموصول بالحائط مباشرة (لا بمشترك)."}
     if est_w >= WARN_ABOVE * max_w or est_w >= BIG_LOAD_W:
         return {"level": "warn", "needs_confirm": True,
-                "message": f"حمل عالي (≈ {est_w:.0f} واط) قريب من حد المقبس ({max_w:.0f} واط). "
-                           "وصّله على الحيط مباشرة مش على مشترك، وتأكد إنه المقبس ما بيسخن."}
+                "message": f"حمل مرتفع (≈ {est_w:.0f} واط) قريب من حد المقبس ({max_w:.0f} واط). "
+                           "صِله بالحائط مباشرة لا بمشترك، وتأكد أن المقبس لا يسخن."}
     return {"level": "ok", "needs_confirm": False, "message": ""}
 
 
@@ -110,9 +110,9 @@ def add(conn, site: str, brand: str, host: str, options: dict | None, name: str,
     host = (host or "").strip()
     options = _clean_options(brand, options)
     if not db.one(conn.execute("SELECT 1 AS x FROM rooms WHERE site=? AND id=?", (site, room))):
-        raise ActionError("الغرفة مش معروفة.")
+        raise ActionError("الغرفة غير معروفة.")
     if db.one(conn.execute("SELECT 1 AS x FROM smart_plugs WHERE site=? AND host=?", (site, host))):
-        raise ActionError("هذا المقبس مضاف من قبل.")
+        raise ActionError("هذا المقبس مضاف مسبقًا.")
     info = check(site, brand, host, options, kind)
     sf = safety(kind, info["est_w"], info["max_w"])
     if sf["level"] == "block":
@@ -141,20 +141,20 @@ def add(conn, site: str, brand: str, host: str, options: dict | None, name: str,
         "voltage_v, reported_on, confirmed_on, last_seen_ts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (site, device_id, brand, host, model, json.dumps(options), int(info["meters"]), info["max_w"], 1,
          info["power_w"], info["voltage_v"], on, on, time.time()))
-    access = "T2 محمي (مراقبة بس)" if tier == "T2" else ("T1 بالقائمة المسموحة" if allow else "تحكم يدوي فقط")
-    measured = "مقاسة من المقبس" if info["measured"] else "تقديرية لحد ما يشتغل"
+    access = "T2 محمي (مراقبة فقط)" if tier == "T2" else ("T1 بالقائمة المسموحة" if allow else "تحكم يدوي فقط")
+    measured = "مقاسة من المقبس" if info["measured"] else "تقديرية حتى تشغيله"
     db.audit(conn, site, "T0", "human", "plug_added",
              f"مقبس ذكي جديد ({plugs.brand_name(brand)}): {name} · بصمة ≈ {info['est_w']} واط ({measured}) · {access}",
              {"brand": brand, "host": host, "safety": sf["level"]})
     if sf["needs_confirm"]:
-        db.audit(conn, site, "T0", "policy", "plug_high_power", "تحذير حمل عالي، والمستخدم أكّد إنه فهمه: " + sf["message"])
+        db.audit(conn, site, "T0", "policy", "plug_high_power", "تحذير حمل مرتفع، وأكّد المستخدم أنه فهمه: " + sf["message"])
     return db.device(conn, site, device_id)
 
 
 def remove(conn, site: str, device_id: str) -> None:
     p = db.plug(conn, site, device_id)
     if not p:
-        raise ActionError("هذا الجهاز مش على مقبس ذكي.")
+        raise ActionError("هذا الجهاز ليس على مقبس ذكي.")
     d = db.device(conn, site, device_id)
     conn.execute("DELETE FROM smart_plugs WHERE site=? AND device_id=?", (site, device_id))
     conn.execute("DELETE FROM devices WHERE site=? AND id=?", (site, device_id))
@@ -162,7 +162,7 @@ def remove(conn, site: str, device_id: str) -> None:
     conn.execute("DELETE FROM timers WHERE site=? AND device_id=?", (site, device_id))
     if p["brand"] == "simulated":
         simulated.detach(p["host"])
-    db.audit(conn, site, "T0", "human", "plug_removed", f"شلنا {d['name'] if d else 'الجهاز'} من المقابس الذكية.")
+    db.audit(conn, site, "T0", "human", "plug_removed", f"أُزيل {d['name'] if d else 'الجهاز'} من المقابس الذكية.")
 
 
 # ---------------- for the UI and the simulator ----------------
@@ -251,12 +251,12 @@ def _store(conn, job: dict, res: dict) -> None:
                      (fails, online, res["error"], site, dev_id))
         if p["online"] and not online:
             db.audit(conn, site, "T0", "system", "plug_offline",
-                     f"المقبس الذكي تبع {d['name']} انقطع: {res['error']} ما رح نتحكّم فيه لحد ما يرجع.")
+                     f"انقطع المقبس الذكي الخاص بـ{d['name']}: {res['error']} لن نتحكّم به حتى يعود.")
         return
 
     s: PlugStatus = res["status"]
     if not p["online"]:
-        db.audit(conn, site, "T0", "system", "plug_online", f"المقبس الذكي تبع {d['name']} رجع اتصل.")
+        db.audit(conn, site, "T0", "system", "plug_online", f"عاد اتصال المقبس الذكي الخاص بـ{d['name']}.")
     still_same_wish = bool(d["is_on"]) == want
     confirmed = p["confirmed_on"]
     if s.on == bool(d["is_on"]):
@@ -273,8 +273,8 @@ def _store(conn, job: dict, res: dict) -> None:
         if s.power_w > OVERLOAD_ALERT * p["max_w"] and not overload:
             overload = 1
             db.audit(conn, site, "T0", "policy", "plug_overload",
-                     f"تنبيه: {d['name']} بيسحب {s.power_w:.0f} واط، قريب من حد المقبس ({p['max_w']:.0f} واط). "
-                     "افحص إنه المقبس ما بيسخن.")
+                     f"تنبيه: {d['name']} يستهلك {s.power_w:.0f} واط، قريبًا من حد المقبس ({p['max_w']:.0f} واط). "
+                     "تأكد أن المقبس لا يسخن.")
         elif s.power_w < 0.8 * p["max_w"]:
             overload = 0
 

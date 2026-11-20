@@ -30,7 +30,7 @@ def _known(host: str) -> dict:
     for c in CATALOG:
         if c["host"] == host:
             return c
-    raise PlugError("المقبس المحاكى مش موجود.")
+    raise PlugError("المقبس المحاكى غير موجود.")
 
 
 def attach(host: str, kind: str, on: bool = True) -> None:

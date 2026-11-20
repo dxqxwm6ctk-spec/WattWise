@@ -74,7 +74,7 @@ def _minutes_from(t: str) -> int | None:
     m = re.search(r"(?:بعد|لمده|لمدة)\s+(\d+)\s*(دقيقه|دقايق|دقائق|د|ساعه|ساعات|س)\b", t)
     if m:
         return int(m.group(1)) * (60 if m.group(2).startswith("س") else 1)
-    for words, n in ((r"نص\s+ساعه", 30), (r"ربع\s+ساعه", 15), (r"ساعتين", 120), (r"ساعه", 60)):
+    for words, n in ((r"نصف?\s+ساعه", 30), (r"ربع\s+ساعه", 15), (r"ساعتين", 120), (r"ساعه", 60)):
         if re.search(r"(?:بعد|لمده)\s+" + words, t):
             return n
     return None
@@ -120,13 +120,13 @@ def parse_command(conn, site: str, text: str) -> dict:
     off, on = bool(re.search(OFF_WORDS, t)), bool(re.search(ON_WORDS, t))
     sched = _schedule_from(t)
     if not (off or on or sched):
-        return {"reply": "", "clarify": "ما فهمت إذا بدك أطفي ولا أشغّل. جرّب: «طفّي مكيّف النوم».",
+        return {"reply": "", "clarify": "لم أفهم هل تريد الإطفاء أم التشغيل. جرّب: «أطفئ مكيّف غرفة النوم».",
                 "items": [], "by": "rules"}
     devices = db.devices(conn, site)
     rooms = {r["id"]: r["name"] for r in db.rooms(conn, site)}
     targets = _match_devices(t, devices, rooms)
     if not targets:
-        return {"reply": "", "clarify": "ما عرفت أي جهاز بتقصد. اذكر اسمه زي ما هو بصفحة الأجهزة.",
+        return {"reply": "", "clarify": "لم أعرف أي جهاز تقصد. اذكر اسمه كما يظهر في صفحة الأجهزة.",
                 "items": [], "by": "rules"}
     minutes = _minutes_from(t)
     run_for = minutes is not None and bool(re.search(r"لمده|لمدة", t))
@@ -152,13 +152,13 @@ def parse_command(conn, site: str, text: str) -> dict:
             decision = policy.check_switch(d, turn_on, policy.HUMAN, None, plug=db.plug(conn, site, d["id"]))
             if decision.allowed and d["sensitive"] and not turn_on:
                 decision = policy.Decision(False, "sensitive_device",
-                                           f"{d['name']} بيقطع تطبيق الموافقة. طفّيه من صفحة الأجهزة بتأكيد إضافي.")
+                                           f"إطفاء {d['name']} يقطع تطبيق الموافقة. أطفئه من صفحة الأجهزة بتأكيد إضافي.")
             elif decision.allowed and bool(d["is_on"]) == turn_on:
-                decision = policy.Decision(False, "no_change", "هو أصلاً شغّال." if turn_on else "هو أصلاً مطفي.")
+                decision = policy.Decision(False, "no_change", "يعمل بالفعل." if turn_on else "مطفأ بالفعل.")
         if not decision.allowed:
             item["ok"], item["why"] = False, decision.reason_ar
         items.append(item)
-    reply = "فهمت أمرك. أكّد قبل ما أنفّذ:" if any(i["ok"] for i in items) else "ما في إشي بقدر أنفّذه من هالأمر:"
+    reply = "فهمت أمرك. أكّد قبل التنفيذ:" if any(i["ok"] for i in items) else "لا يمكنني تنفيذ شيء من هذا الأمر:"
     return {"reply": reply, "clarify": None, "items": items, "by": "rules"}
 
 
@@ -183,7 +183,7 @@ def run_command(conn, site: str, text: str) -> dict:
             i["ok"], i["why"] = False, str(e)
     if done:
         db.audit(conn, site, "MANUAL", "human", "voice_command",
-                 f"أمر بالكلام: «{text.strip()[:70]}» ← {'، '.join(done)}. أكّدته إنت، وحارس السياسات وافق.")
+                 f"أمر نصّي: «{text.strip()[:70]}» ← {'، '.join(done)}. أكّده المستخدم، ووافق حارس السياسات.")
     return {"done": done, "items": parsed["items"]}
 
 
@@ -195,23 +195,23 @@ def why_bill(conn, site: str) -> dict:
     b, goal = s["bill"], (s.get("goal") or {}).get("bill_target_jd")
     proj = b["bill_projected"]
     if goal:
-        head = (f"متوقّع آخر الشهر {proj:g} دينار، وهدفك {goal:g}. " +
-                ("لازم ننزل شوي." if proj > goal else "ماشيين صح."))
+        head = (f"المتوقّع آخر الشهر {proj:g} دينار، وهدفك {goal:g}. " +
+                ("نحتاج إلى خفض الاستهلاك قليلًا." if proj > goal else "نحن على المسار الصحيح."))
     else:
-        head = f"متوقّع آخر الشهر {proj:g} دينار. أعطِ الوكيل هدف عشان نقارن فيه."
+        head = f"المتوقّع آخر الشهر {proj:g} دينار. أعطِ الوكيل هدفًا لنقارن به."
     causes = []
     if s["breakdown"]:
         top = s["breakdown"][0]
-        causes.append({"what": f"{top['name']} أكبر بند بالفاتورة",
-                       "evidence": f"تقريباً {top['jod']:g} دينار لحد اليوم (تقدير من بصمات الأحمال على العدّاد)."})
+        causes.append({"what": f"{top['name']} أكبر بند في الفاتورة",
+                       "evidence": f"نحو {top['jod']:g} دينار حتى اليوم (تقدير من بصمات الأحمال على العدّاد)."})
     fils = round(b["price_jod_per_kwh"] * 1000)
-    causes.append({"what": f"إنت بشريحة {fils} فلس للكيلوواط ساعة",
-                   "evidence": f"استهلاكك لحد اليوم {b['kwh_now']:g} ك.و.س. {b['message']}"})
+    causes.append({"what": f"أنت في شريحة {fils} فلس للكيلوواط ساعة",
+                   "evidence": f"استهلاكك حتى اليوم {b['kwh_now']:g} ك.و.س. {b['message']}"})
     on_now = sorted((d for d in s["devices"] if d["is_on"] and d["tier"] == "T1"), key=lambda d: -d["est_w"])
     if on_now:
         d = on_now[0]
-        causes.append({"what": f"أكبر جهاز شغّال هلأ: {d['name']}",
-                       "evidence": f"بصمته ≈ {d['est_w']} واط = {d['est_w'] / 1000 * b['price_jod_per_kwh']:.3f} دينار بالساعة."})
+        causes.append({"what": f"أكبر جهاز يعمل الآن: {d['name']}",
+                       "evidence": f"بصمته ≈ {d['est_w']} واط = {d['est_w'] / 1000 * b['price_jod_per_kwh']:.3f} دينار في الساعة."})
     last = bill_reader.last_bill(conn, site)
     if last and last.get("kwh") and last.get("days"):
         bill_day = last["kwh"] / last["days"]
@@ -219,14 +219,14 @@ def why_bill(conn, site: str) -> dict:
         if now_day > 0:
             pct = round((now_day - bill_day) / bill_day * 100)
             causes.insert(1, {"what": "مقارنة مع فاتورتك الأخيرة",
-                              "evidence": f"الفاتورة: {bill_day:.1f} ك.و.س باليوم. هلأ: {now_day:.1f} باليوم "
+                              "evidence": f"الفاتورة: {bill_day:.1f} ك.و.س يوميًا. الآن: {now_day:.1f} يوميًا "
                                           f"({'أعلى' if pct > 0 else 'أقل'} بـ {abs(pct)}%)."})
     heater = next((d for d in s["devices"] if d["kind"] == "heater"), None)
     has_heater_plan = heater and any(r["device_id"] == heater["id"] for r in schedules.listing(conn, site)["schedules"])
     if heater and not has_heater_plan:
-        action = "جرّب «اقترحلي جدول للسخّان»: بيسخّن قبل الحمّام بس بدل ما يضل شغّال."
+        action = "جرّب «اقترح جدولًا للسخّان»: يعمل السخّان قبل الاستحمام فقط بدل تشغيله طوال اليوم."
     else:
-        action = "خلّي الوكيل يراقب، وبنسألك قبل أي إطفاء."
+        action = "دع الوكيل يراقب، وسنسألك قبل أي إطفاء."
     return {"headline": head, "causes": causes[:4], "action": action, "by": "rules",
             "note": "تحليل بالقواعد من القياسات. النسب تقديرية من بصمات الأحمال."}
 
@@ -242,24 +242,24 @@ def weekly_report(conn, site: str) -> str:
         f"التاريخ: {time.strftime('%Y-%m-%d')}",
         "(بيانات المحاكي)" if s["source"] == "simulator" else "(قياسات العدّاد الحقيقي)",
         "",
-        f"الاستهلاك لحد اليوم: {b['kwh_now']:g} ك.و.س",
-        f"الفاتورة لحد اليوم: {b['bill_now']:g} دينار (شريحة {round(b['price_jod_per_kwh'] * 1000)} فلس)",
+        f"الاستهلاك حتى اليوم: {b['kwh_now']:g} ك.و.س",
+        f"الفاتورة حتى اليوم: {b['bill_now']:g} دينار (شريحة {round(b['price_jod_per_kwh'] * 1000)} فلس)",
         f"المتوقّع آخر الشهر: {b['bill_projected']:g} دينار" + (f" · الهدف: {goal:g} دينار" if goal else ""),
     ]
     if sv["kwh"] > 0:
         co2 = f" = {sv['co2_kg']:g} كغ CO2" if sv.get("co2_kg") is not None else ""
         lines.append(f"التوفير المُقاس: {sv['kwh']:g} ك.و.س = {sv['jod']:g} دينار{co2}")
     else:
-        lines.append("التوفير المُقاس: لسا ما في توفير مُقاس هالفترة.")
-    lines += ["(كل الأرقام محسوبة بالكود من القياسات والتعرفة.)", "", "وين بتروح الفلوس (تقدير):"]
-    lines += [f"- {x['name']}: {x['jod']:g} دينار" for x in s["breakdown"]] or ["- لسا ما في بيانات كفاية."]
+        lines.append("التوفير المُقاس: لا يوجد توفير مُقاس في هذه الفترة بعد.")
+    lines += ["(كل الأرقام محسوبة برمجيًا من القياسات والتعرفة.)", "", "توزيع التكلفة (تقدير):"]
+    lines += [f"- {x['name']}: {x['jod']:g} دينار" for x in s["breakdown"]] or ["- لا توجد بيانات كافية بعد."]
     sch = schedules.listing(conn, site)["schedules"]
     if sch:
-        lines += ["", "الجداول الشغّالة:"]
+        lines += ["", "الجداول المفعّلة:"]
         lines += [f"- {r['device_name']}: {r['on_time'] or '—'} ← {r['off_time'] or '—'}"
-                  + ("" if r["enabled"] else " (موقوف)") for r in sch]
+                  + ("" if r["enabled"] else " (متوقف)") for r in sch]
     log = db.rows(conn.execute("SELECT clock, tier, message FROM audit_log WHERE site=? ORDER BY id DESC LIMIT 10",
                                (site,)))
     lines += ["", "آخر القرارات:"] + [f"- {e['clock']} [{e['tier']}] {e['message']}" for e in log]
-    lines += ["", "اقتراح للأسبوع الجاي (بيحتاج موافقتك): " + why_bill(conn, site)["action"]]
+    lines += ["", "اقتراح للأسبوع القادم (يحتاج موافقتك): " + why_bill(conn, site)["action"]]
     return "\n".join(lines) + "\n"

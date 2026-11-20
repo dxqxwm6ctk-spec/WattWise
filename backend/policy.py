@@ -46,7 +46,7 @@ def check_switch(device: dict, turn_on: bool, actor: str, room: dict | None,
 
     # Tier 2: nobody touches critical loads. Not the agent, not the app.
     if is_critical(device):
-        return Decision(False, "critical_load", f"{name} حمل حرج (T2) وممنوع التحكم فيه بالكود.")
+        return Decision(False, "critical_load", f"{name} حمل حرج (T2) والتحكم فيه ممنوع برمجيًا.")
 
     # Smart plug rules apply to everyone, the human too (they protect the wiring, not comfort).
     if plug is not None:
@@ -62,21 +62,21 @@ def check_switch(device: dict, turn_on: bool, actor: str, room: dict | None,
     # Allowlist: the agent only touches devices explicitly allowed.
     # (A schedule was chosen by the human for this device, so it skips this one check.)
     if actor == AGENT and not device.get("allow"):
-        return Decision(False, "not_in_allowlist", f"{name} مش ضمن القائمة المسموحة للوكيل.")
+        return Decision(False, "not_in_allowlist", f"{name} ليس ضمن القائمة المسموحة للوكيل.")
 
     # Sensitive devices (like the router that carries the approval app) stay manual.
     if device.get("sensitive"):
-        return Decision(False, "sensitive_device", f"{name} جهاز حساس، التحكم فيه يدوي بس.")
+        return Decision(False, "sensitive_device", f"{name} جهاز حساس، والتحكم فيه يدوي فقط.")
 
     if estop:
-        return Decision(False, "estop_active", "إيقاف الطوارئ مفعّل، الوكيل موقوف.")
+        return Decision(False, "estop_active", "إيقاف الطوارئ مفعّل، والوكيل متوقف.")
 
     if safe_mode:
-        return Decision(False, "safe_mode", "الوكيل بالوضع الآمن (ما في اتصال)، ما بينفّذ إشي.")
+        return Decision(False, "safe_mode", "الوكيل في الوضع الآمن (لا اتصال)، ولن ينفّذ شيئًا.")
 
     # Without fresh room data we cannot know if comfort is safe: refuse.
     if room is None:
-        return Decision(False, "no_sensor_data", "ما في قراءات حساسات للغرفة، ما بنقدر نتأكد إنه آمن.")
+        return Decision(False, "no_sensor_data", "لا توجد قراءات حسّاسات للغرفة، فلا يمكن التأكد من أن الإجراء آمن.")
 
     # Turning a load ON never breaks comfort limits in this system.
     if turn_on:
@@ -88,16 +88,16 @@ def check_switch(device: dict, turn_on: bool, actor: str, room: dict | None,
     # Comfort: never switch cooling off on people in a room that is too hot.
     if device.get("kind") in config.COOLING_KINDS and occupied:
         if temp is None:
-            return Decision(False, "no_temperature", "ما في قراءة حرارة والغرفة فيها ناس.")
+            return Decision(False, "no_temperature", "لا توجد قراءة حرارة والغرفة مشغولة.")
         if temp >= config.COMFORT_MAX_TEMP_C:
             return Decision(False, "comfort_max_temp",
-                            f"الحرارة {temp:.1f}° فوق حد الراحة ({config.COMFORT_MAX_TEMP_C:.0f}°) والغرفة فيها ناس.")
+                            f"الحرارة {temp:.1f}° فوق حد الراحة ({config.COMFORT_MAX_TEMP_C:.0f}°) والغرفة مشغولة.")
 
     # Comfort: never switch the light off on people sitting in the dark.
     if device.get("kind") == "light" and occupied:
         light = room.get("light")
         if light is None or light < config.DARK_LIGHT_LEVEL:
-            return Decision(False, "comfort_dark", "الغرفة فيها ناس والإضاءة الطبيعية قليلة.")
+            return Decision(False, "comfort_dark", "الغرفة مشغولة والإضاءة الطبيعية قليلة.")
 
     return ok()
 
@@ -106,12 +106,12 @@ def check_plug(device: dict, turn_on: bool, plug: dict) -> Decision:
     """A smart plug must be reachable, and never switch ON a load bigger than its rating."""
     name = device.get("name", device.get("id", "?"))
     if not plug.get("online"):
-        return Decision(False, "plug_offline", f"المقبس الذكي تبع {name} مش متصل، فما بنقدر ننفّذ.")
+        return Decision(False, "plug_offline", f"المقبس الذكي الخاص بـ{name} غير متصل، فلا يمكن التنفيذ.")
     max_w = plug.get("max_w") or 0
     if turn_on and max_w and (device.get("signature_w") or 0) > max_w:
         return Decision(False, "plug_overload",
-                        f"{name} بيسحب ≈ {device['signature_w']:.0f} واط، أكثر من حد المقبس ({max_w:.0f} واط). "
-                        "ممنوع تشغيله على هالمقبس.")
+                        f"{name} يستهلك ≈ {device['signature_w']:.0f} واط، أكثر من حد المقبس ({max_w:.0f} واط). "
+                        "تشغيله على هذا المقبس ممنوع.")
     return ok()
 
 
@@ -120,11 +120,11 @@ def check_setpoint(device: dict, value: float) -> Decision:
     if is_critical(device):
         return Decision(False, "critical_load", "حمل حرج، ممنوع التحكم فيه.")
     if device.get("kind") != "ac":
-        return Decision(False, "no_setpoint", "هذا الجهاز ما إله حرارة.")
+        return Decision(False, "no_setpoint", "هذا الجهاز لا يدعم ضبط الحرارة.")
     lo, hi = config.COMFORT_MIN_TEMP_C, config.COMFORT_MAX_TEMP_C
     if value < lo or value > hi:
         return Decision(False, "comfort_band",
-                        f"ما بنقدر نضبط المكيّف على {value:g}°، برّا حدود الراحة {lo:g}–{hi:g}°.")
+                        f"لا يمكن ضبط المكيّف على {value:g}°، فهي خارج حدود الراحة {lo:g}–{hi:g}°.")
     return ok()
 
 
@@ -153,9 +153,9 @@ def window_minutes(on_time: str, off_time: str) -> int:
 def _can_automate(device: dict) -> Decision:
     name = device.get("name", device.get("id", "?"))
     if is_critical(device):
-        return Decision(False, "critical_load", f"{name} حمل حرج (T2)، ممنوع بالكود حتى لو طلبت.")
+        return Decision(False, "critical_load", f"{name} حمل حرج (T2)، ممنوع برمجيًا حتى لو طلبت.")
     if device.get("sensitive"):
-        return Decision(False, "sensitive_device", f"{name} جهاز حساس، ما بيندار بمؤقّت أو جدول.")
+        return Decision(False, "sensitive_device", f"{name} جهاز حساس، ولا يُدار بمؤقّت أو جدول.")
     return ok()
 
 
@@ -165,16 +165,16 @@ def check_schedule(device: dict, on_time: str | None, off_time: str | None) -> D
     if not d.allowed:
         return d
     if not on_time and not off_time:
-        return Decision(False, "no_time", "لازم وقت تشغيل أو وقت إطفاء.")
+        return Decision(False, "no_time", "يجب تحديد وقت تشغيل أو إطفاء.")
     if (on_time and _minutes(on_time) is None) or (off_time and _minutes(off_time) is None):
-        return Decision(False, "bad_time", "الوقت مش مفهوم. اكتبه مثل 06:30.")
+        return Decision(False, "bad_time", "الوقت غير مفهوم. اكتبه بصيغة 06:30.")
     if on_time and off_time:
         w = window_minutes(on_time, off_time)
         if w < MIN_WINDOW_MIN:
-            return Decision(False, "window_too_short", f"المدة أقل من {MIN_WINDOW_MIN} دقايق.")
+            return Decision(False, "window_too_short", f"المدة أقل من {MIN_WINDOW_MIN} دقائق.")
         if device.get("kind") == "heater" and w > HEATER_MAX_WINDOW_MIN:
             return Decision(False, "heater_too_long",
-                            "حارس السياسات: السخّان ما بيشتغل أكثر من ٣ ساعات متواصلة.")
+                            "حارس السياسات: لا يعمل السخّان أكثر من ٣ ساعات متواصلة.")
     return ok()
 
 
@@ -184,5 +184,5 @@ def check_timer(device: dict, minutes: int) -> Decision:
     if not d.allowed:
         return d
     if not isinstance(minutes, int) or minutes < 1 or minutes > MAX_TIMER_MIN:
-        return Decision(False, "bad_minutes", "المدة مش مفهومة (من دقيقة لـ ١٢ ساعة).")
+        return Decision(False, "bad_minutes", "المدة غير مفهومة (من دقيقة إلى ١٢ ساعة).")
     return ok()

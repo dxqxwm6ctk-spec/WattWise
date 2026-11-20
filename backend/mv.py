@@ -132,8 +132,8 @@ def compute(conn, site: str) -> dict:
 
     if len(base) < MIN_BASELINE_INTERVALS:
         out["status"] = "not_enough_baseline"
-        out["message_ar"] = (f"لسا ما في بيانات كفاية لخط الأساس ({len(base)} من {MIN_BASELINE_INTERVALS} فترة "
-                             f"كل وحدة {INTERVAL_S // 60} دقيقة). ما بنعرض رقم توفير.")
+        out["message_ar"] = (f"لا توجد بيانات كافية لخط الأساس بعد ({len(base)} من {MIN_BASELINE_INTERVALS} فترة، "
+                             f"مدة كل منها {INTERVAL_S // 60} دقيقة)، لذا لا نعرض رقم توفير.")
         out["series"] = [{"label": r["label"], "actual_w": round(r["power_w"]), "baseline_w": None,
                           "period": _period(r, end)} for r in rows]
         return out
@@ -148,12 +148,12 @@ def compute(conn, site: str) -> dict:
 
     if not quality["passes"]:
         out["status"] = "model_not_good_enough"
-        out["message_ar"] = (f"نموذج خط الأساس مش دقيق كفاية (CV(RMSE) = {quality['cv_rmse_pct']}٪، "
-                             f"NMBE = {quality['nmbe_pct']}٪). ما بنعرض رقم توفير لحد ما يتحسّن.")
+        out["message_ar"] = (f"نموذج خط الأساس غير دقيق بما يكفي (CV(RMSE) = {quality['cv_rmse_pct']}٪، "
+                             f"NMBE = {quality['nmbe_pct']}٪)، لذا لا نعرض رقم توفير حتى يتحسّن.")
         return out
     if not report:
         out["status"] = "no_reporting_data"
-        out["message_ar"] = "النموذج جاهز. لسا ما في فترة بعد أول إجراء وافقت عليه، فما في توفير نقيسه."
+        out["message_ar"] = "النموذج جاهز، لكن لا توجد بعد فترة تلي أول إجراء وافقت عليه، فلا يوجد توفير لقياسه."
         return out
 
     h = INTERVAL_S / 3600
@@ -176,7 +176,7 @@ def compute(conn, site: str) -> dict:
         "saved_jod": round(saved * price, 3), "price_jod_per_kwh": price,
         "saved_co2_kg": None if co2 is None else round(saved * co2, 2),
     })
-    sign = "وفّرنا" if saved >= 0 else "استهلكنا زيادة"
+    sign = "وفّرنا" if saved >= 0 else "زاد الاستهلاك"
     out["message_ar"] = (f"{sign} {abs(round(saved, 2))} ± {round(band, 2)} ك.و.س "
                          f"({abs(out['saved_pct'] or 0)}٪) مقارنة بخط الأساس المعدّل.")
     return out

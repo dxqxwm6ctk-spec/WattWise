@@ -28,7 +28,7 @@ def status(host: str, options: dict) -> PlugStatus:
     if _gen(host, options) >= 2:
         s = http_json("GET", f"http://{host}/rpc/Switch.GetStatus?id=0", auth=auth)
         if "output" not in s:
-            raise PlugError("هذا الـ Shelly ما فيه مفتاح (Switch).")
+            raise PlugError("جهاز Shelly هذا لا يحتوي مفتاحًا (Switch).")
         total_wh = num((s.get("aenergy") or {}).get("total"))
         return PlugStatus(on=bool(s["output"]), power_w=num(s.get("apower")),
                           energy_kwh=None if total_wh is None else total_wh / 1000,
@@ -36,7 +36,7 @@ def status(host: str, options: dict) -> PlugStatus:
     s = http_json("GET", f"http://{host}/status", auth=auth)
     relays = s.get("relays") or []
     if not relays:
-        raise PlugError("هذا الـ Shelly ما فيه ريليه.")
+        raise PlugError("جهاز Shelly هذا لا يحتوي ريليه.")
     meter = (s.get("meters") or [{}])[0]
     total_wmin = num(meter.get("total"))   # Gen 1 counts in watt-minutes
     return PlugStatus(on=bool(relays[0].get("ison")), power_w=num(meter.get("power")),

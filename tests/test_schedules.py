@@ -9,7 +9,7 @@ import time
 
 import pytest
 
-from backend import actions, agent, assistant, config, db, policy, schedules
+from backend import actions, agent, assistant, config, db, policy, schedules, teach
 from backend.actions import ActionError
 
 
@@ -243,6 +243,15 @@ def test_command_timer_and_schedule(conn):
     assert (p["items"][0]["on_time"], p["items"][0]["off_time"]) == ("06:00", "07:00")
 
 
+def test_msa_command_phrasing_from_the_placeholders(conn):
+    # The UI examples are written in Modern Standard Arabic; the parser must still read them.
+    reading(conn, at("10:00"))
+    p = assistant.parse_command(conn, "home", "أطفئ مكيّف غرفة النوم بعد نصف ساعة")
+    assert p["items"][0]["device_id"] == "bedAc" and p["items"][0]["minutes"] == 30
+    assert schedules.shower_times("الصباح ٦:٣٠ والمساء ٩") == [390, 1260]
+    assert teach.kind_from_name("مصباح المكتب") == "light"
+
+
 def test_unclear_command_asks_instead_of_guessing(conn):
     assert assistant.parse_command(conn, "home", "شو الأخبار")["items"] == []
     assert assistant.parse_command(conn, "home", "طفّي الإشي")["items"] == []
@@ -253,4 +262,4 @@ def test_why_and_weekly_report_use_measured_numbers(conn):
     w = assistant.why_bill(conn, "home")
     assert w["headline"] and w["causes"]
     text = assistant.weekly_report(conn, "home")
-    assert "التقرير الأسبوعي" in text and "لسا ما في توفير مُقاس" in text
+    assert "التقرير الأسبوعي" in text and "لا يوجد توفير مُقاس" in text

@@ -26,24 +26,24 @@ DRIVERS = {
 # fields: extra things the user must type (besides the IP address).
 BRANDS = [
     {"key": "shelly", "name": "Shelly", "meters": True,
-     "how": "الأسهل: إله API محلي على الـ Wi-Fi وبيقيس الواط. بس اكتب الـ IP.",
-     "fields": [{"key": "password", "label": "كلمة السر (إذا حطّيت حماية)", "optional": True}]},
+     "how": "الأسهل: لديه API محلي على الـ Wi-Fi ويقيس الواط. يكفي إدخال الـ IP.",
+     "fields": [{"key": "password", "label": "كلمة السر (إن فعّلت الحماية)", "optional": True}]},
     {"key": "tplink", "name": "TP-Link Tapo / Kasa", "meters": True,
-     "how": "Kasa بيشتغل مباشرة. Tapo بدّه إيميل وكلمة سر حساب TP-Link بملف .env مرة وحدة. الموديلات P110 / KP115 بتقيس.",
+     "how": "Kasa يعمل مباشرة. Tapo يحتاج بريد وكلمة سر حساب TP-Link في ملف .env مرة واحدة. الطرازان P110 / KP115 يقيسان الاستهلاك.",
      "fields": []},
     {"key": "tuya", "name": "Tuya / Smart Life", "meters": True,
-     "how": "أغلب الماركات الرخيصة. بيشتغل محليًا بعد ما ناخد Device ID و Local Key مرة وحدة (tinytuya wizard).",
+     "how": "أغلب الماركات الرخيصة. يعمل محليًا بعد الحصول على Device ID و Local Key مرة واحدة (tinytuya wizard).",
      "fields": [{"key": "device_id", "label": "Device ID"},
                 {"key": "local_key", "label": "Local Key", "secret": True},
                 {"key": "version", "label": "النسخة (3.3 أو 3.4)", "optional": True}]},
     {"key": "tasmota", "name": "Sonoff + Tasmota", "meters": True,
-     "how": "Sonoff (أو أي مقبس) عليه برنامج Tasmota: محلي بالكامل، وبيقيس إذا المقبس فيه حسّاس.",
-     "fields": [{"key": "password", "label": "كلمة السر (إذا في)", "optional": True}]},
+     "how": "Sonoff (أو أي مقبس) يعمل ببرنامج Tasmota: محلي بالكامل، ويقيس إن كان في المقبس حسّاس.",
+     "fields": [{"key": "password", "label": "كلمة السر (إن وُجدت)", "optional": True}]},
     {"key": "sonoff", "name": "Sonoff DIY (LAN)", "meters": False,
-     "how": "وضع DIY من Sonoff: تشغيل وإطفاء محلي بس، بدون قياس واط. (eWeLink بدّه إنترنت، فما بنعتمد عليه.)",
+     "how": "وضع DIY من Sonoff: تشغيل وإطفاء محلي فقط، دون قياس الواط. (eWeLink يحتاج إنترنت، فلا نعتمد عليه.)",
      "fields": []},
     {"key": "simulated", "name": "مقبس محاكى (للعرض)", "meters": True,
-     "how": "مقبس وهمي ببيانات تركيبية، عشان نجرّب بدون أجهزة.", "fields": []},
+     "how": "مقبس وهمي ببيانات تركيبية، للتجربة دون أجهزة.", "fields": []},
 ]
 
 # Rated current most plugs carry if the user does not say otherwise. 230 V in Jordan.
@@ -54,7 +54,7 @@ VOLTS = 230
 def driver(brand: str):
     d = DRIVERS.get(brand)
     if d is None:
-        raise PlugError("ماركة المقبس مش معروفة.")
+        raise PlugError("ماركة المقبس غير معروفة.")
     return d
 
 
