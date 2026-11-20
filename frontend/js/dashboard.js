@@ -8,7 +8,6 @@ const scale = SITE_SCALE[WW.site] || SITE_SCALE.home;
 const ui = {
   confirmId: null, goalText: 'خلّي فاتورة هالشهر تحت 30 دينار بدون ما تزعّج حدا بالبيت',
   cmd: { text: '', res: null, busy: false, msg: '' }, listening: false,
-  sched: { dev: null, on: '', off: '', msg: '' },
   heater: { hint: '', res: null, busy: false, msg: '' },
   why: { res: null, busy: false }, rep: { text: '', busy: false },
   bill: { status: null, busy: false, res: null, msg: '', manual: false, kwh: '', days: '', amount: '' },
@@ -355,7 +354,6 @@ async function parseCommand() {
 
 // Timers and daily schedules (on/off only), and the smart water-heater schedule.
 const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (متوقّع مش مقاس)` : '';
-const minLabel = n => n === 30 ? '30 دقيقة' : n === 60 ? 'ساعة' : 'ساعتين';
 
 function heaterPanel() {
   const h = ui.heater, hr = h.res;
@@ -380,57 +378,16 @@ function heaterPanel() {
     </div>`;
 }
 
-function schedForm(a) {
-  const chips = a.devices.map(d => `<button class="chip${ui.sched.dev === d.id ? ' sel' : ''}" data-act="sched-dev" data-id="${esc(d.id)}">${esc(d.name)}</button>`).join('');
-  const btns = isFor => [30, 60, 120].map(n => `<button class="btn-ghost btn-sm" data-act="timer" data-min="${n}"${isFor ? ' data-for="1"' : ''}>${minLabel(n)}</button>`).join('');
-  return `<div class="panel">
-      <span class="panel-title">جدول أو مؤقّت لأي جهاز</span>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#8E8C82">يشتغل الساعة
-          <input class="field" type="time" id="sched-on" value="${esc(ui.sched.on)}"></label>
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#8E8C82">يطفي الساعة
-          <input class="field" type="time" id="sched-off" value="${esc(ui.sched.off)}"></label>
-        <button class="btn-lime" style="height:40px;font-size:13px" data-act="sched-add">ضيف الجدول</button>
-      </div>
-      ${ui.sched.msg ? `<span style="font-size:12px;color:#F2B544">${esc(ui.sched.msg)}</span>` : ''}
-      <div style="display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px solid #23251F">
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12px;color:#8E8C82;min-width:84px">طفّيه بعد</span>${btns(false)}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12px;color:#8E8C82;min-width:84px">شغّله لمدة</span>${btns(true)}</div>
-      </div>
-    </div>`;
-}
-
+// Rooms and devices of Home / Building / Lab, with detailed schedules (js/schedule.js).
 function schedSection() {
-  const a = st.automation || { schedules: [], timers: [], devices: [] };
-  if (!a.devices.some(d => d.id === ui.sched.dev) && a.devices.length) {
-    ui.sched.dev = (a.devices.find(d => d.id === 'heater') || a.devices[0]).id;
-  }
-  const rows = a.schedules.map(r => `
-    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:#181A15;border:1px solid #23251F">
-      <div style="flex:1 1 240px;display:flex;flex-direction:column;gap:2px;min-width:0">
-        <span style="font-size:14px;font-weight:600">${esc(r.device_name)}${r.source === 'suggested' ? ' <span style="font-size:11px;color:#B8F04A">· مقترح ومعتمد</span>' : ''}</span>
-        <span class="mono" style="font-size:12.5px;color:#D9D7CF">${[r.on_time && 'تشغيل ' + r.on_time, r.off_time && 'إطفاء ' + r.off_time].filter(Boolean).join(' ← ')}</span>
-        <span style="font-size:11.5px;color:#8E8C82">${estText(r.estimate)}</span>
-      </div>
-      <span style="font-size:12px;color:#8E8C82">${r.enabled ? 'شغّال' : 'موقوف'}</span>
-      <button class="switch" style="background:${r.enabled ? '#3D5418' : '#2A2C25'}" data-act="sched-toggle" data-id="${r.id}" data-on="${r.enabled ? 1 : 0}" aria-label="${esc(r.device_name)}"><i style="${r.enabled ? 'left' : 'right'}:4px;background:${r.enabled ? '#B8F04A' : '#6F6D64'}"></i></button>
-      <button class="btn-ghost btn-sm" style="border-color:#4A2620;color:#E8553F" data-act="sched-del" data-id="${r.id}">حذف</button>
-    </div>`).join('');
-  const timers = a.timers.map(x => `
-    <div style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:#1E1A10;border:1px solid #5A4518">
-      <span class="mono" style="font-size:11px;color:#F2B544">TIMER</span>
-      <span style="flex:1;font-size:13.5px;color:#ECEBE4">${esc(x.text)}</span>
-      <button class="btn-ghost btn-sm" style="border-color:#5A4518;color:#F2B544" data-act="timer-del" data-id="${x.id}">إلغاء</button>
-    </div>`).join('');
-  const empty = !rows && !timers ? '<span style="font-size:12.5px;color:#6F6D64">ما في جداول لسا. جرّب «اقترحلي جدول للسخّان» أو قول للوكيل: سخّان الماء يشتغل من 6 لل 7.</span>' : '';
+  const heater = WWSched.state.site === WW.site ? heaterPanel() : '';
   return `
     <div class="head">
-      <div class="label">SCHEDULES · الجدولة والمؤقّتات</div>
-      <div style="font-size:11px;color:#6F6D64">تشغيل وإطفاء بس · بتشتغل بالسيرفر · الحارس بيفحص كل مرة${st.source === 'simulator' ? ' · ساعة المحاكي ×60' : ''}</div>
+      <div class="label">SCHEDULES · جدولة الأجهزة</div>
+      <div style="font-size:11px;color:#6F6D64">تشغيل وإطفاء بس · بتشتغل بالسيرفر · بتراجعها وبتأكّدها قبل الحفظ · الحارس بيفحص كل مرة${st.source === 'simulator' ? ' · ساعة المحاكي ×60' : ''}</div>
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">${heaterPanel()}${schedForm(a)}</div>
-    <div style="display:flex;flex-direction:column;gap:8px">${empty}${rows}${timers}</div>`;
+    ${WWSched.render({ theme: 'dark', layout: 'side' })}
+    ${heater ? `<div style="display:flex;flex-wrap:wrap;gap:12px">${heater}</div>` : ''}`;
 }
 
 // Teach mode: the AI learns the room's appliances from the meter and asks the user.
@@ -778,6 +735,7 @@ function renderAll() {
 async function refresh() {
   try {
     st = await WW.getState();
+    WWSched.sync(st);
     renderAll();
   } catch (e) {
     console.error(e);
@@ -791,6 +749,7 @@ async function act(fn) {
 
 WW.onAction({
   onError: e => toast(e.message),
+  ...WWSched.actions,
   scenario: d => act(() => WW.post('/scenario', { name: d.name })),
   reset: () => act(() => WW.post('/reset')),
   estop: () => act(() => WW.post('/estop')),
@@ -813,17 +772,6 @@ WW.onAction({
     const r = await WW.post('/command/run', { text: ui.cmd.text });
     ui.cmd = { text: '', res: null, busy: false, msg: r.done.length ? 'تم: ' + r.done.join('، ') : 'ما تنفّذ إشي.' };
   }),
-  'sched-dev': d => { ui.sched.dev = d.id; ui.sched.msg = ''; renderAll(); },
-  'sched-add': () => act(async () => {
-    try {
-      await WW.post('/schedules', { device_id: ui.sched.dev, on_time: ui.sched.on || null, off_time: ui.sched.off || null });
-      ui.sched.on = ''; ui.sched.off = ''; ui.sched.msg = 'انضاف الجدول ✓';
-    } catch (e) { ui.sched.msg = e.message; }
-  }),
-  'sched-toggle': d => act(() => WW.post(`/schedules/${d.id}/enabled`, { enabled: d.on !== '1' })),
-  'sched-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/schedules/${d.id}`)),
-  timer: d => act(() => WW.post('/timers', { device_id: ui.sched.dev, minutes: Number(d.min), turn_on: false, run_now: d.for === '1' })),
-  'timer-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/timers/${d.id}`)),
   'heater-suggest': async () => {
     ui.heater.busy = true; ui.heater.msg = ''; renderAll();
     try { ui.heater.res = await WW.post('/heater/suggest', { hint: ui.heater.hint }); } catch (e) { toast(e.message); }
@@ -899,8 +847,6 @@ document.addEventListener('input', ev => {
   if (id === 'cmd-text') ui.cmd.text = v;
   if (id === 'teach-text') ui.teach.text = v;
   if (id === 'heater-hint') ui.heater.hint = v;
-  if (id === 'sched-on') ui.sched.on = v;
-  if (id === 'sched-off') ui.sched.off = v;
   if (id === 'bill-kwh') ui.bill.kwh = v;
   if (id === 'bill-days') ui.bill.days = v;
   if (id === 'bill-amount') ui.bill.amount = v;
@@ -928,5 +874,6 @@ $('house-link').href = 'house.html?site=' + encodeURIComponent(WW.site);
 // Show the address that is inside the QR code (for typing it by hand if needed).
 fetch('/api/connect').then(r => r.json()).then(d => { $('connect-url').textContent = d.url; }).catch(() => {});
 WW.billStatus().then(x => { ui.bill.status = x; }).catch(() => {});
+WWSched.init({ rerender: () => st && renderAll(), refresh, toast });
 refresh();
 setInterval(refresh, 1000);

@@ -106,6 +106,50 @@ def test_daily_schedule_fires_when_the_clock_passes(conn):
     assert not is_on(conn, "heater")
 
 
+def test_schedule_runs_only_on_its_days(conn):
+    today = schedules.weekday(at("05:00"))
+    other = (today + 1) % 7
+    reading(conn, at("05:00"))
+    agent.tick(conn, "home")
+    schedules.add_schedule(conn, "home", "heater", "05:30", "06:30", days=[other])
+    reading(conn, at("05:31"))
+    agent.tick(conn, "home")
+    assert not is_on(conn, "heater")               # not one of its days
+    schedules.clear_all(conn, "home")
+    schedules.add_schedule(conn, "home", "heater", "05:40", "06:30", days=[today])
+    reading(conn, at("05:41"))
+    agent.tick(conn, "home")
+    assert is_on(conn, "heater")
+
+
+def test_days_are_checked():
+    assert schedules.normalize_days(None) is None
+    assert schedules.normalize_days([4, 0, 4]) == "04"
+    assert schedules.normalize_days(range(7)) is None            # all week = every day
+    with pytest.raises(ActionError):
+        schedules.normalize_days([])
+    with pytest.raises(ActionError):
+        schedules.normalize_days([7])
+
+
+def test_preview_checks_the_guard_and_saves_nothing(conn):
+    p = schedules.preview_schedule(conn, "home", "heater", "05:30", "06:30", [0, 1, 2, 3, 4])
+    assert p["room_name"] == "الحمّام" and p["days_text"] == "الأحد للخميس"
+    assert schedules.listing(conn, "home")["schedules"] == []
+    with pytest.raises(ActionError):
+        schedules.preview_schedule(conn, "home", "fridge", "05:30", "06:30")
+
+
+def test_listing_groups_devices_by_room_for_each_site(conn):
+    for site in ("home", "building", "lab"):
+        a = schedules.listing(conn, site)
+        room_ids = {r["id"] for r in a["rooms"]}
+        assert a["devices"] and all(d["room"] in room_ids and d["room_name"] for d in a["devices"])
+    home = schedules.listing(conn, "home")
+    assert {d["id"] for d in home["locked"]} >= {"fridge", "fireAlarm", "router"}
+    assert "fridge" not in {d["id"] for d in home["devices"]}
+
+
 def test_disabled_schedule_does_nothing(conn):
     reading(conn, at("05:00"))
     agent.tick(conn, "home")

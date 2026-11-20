@@ -60,6 +60,46 @@ def normalize_time(value: str | None) -> str | None:
     return value if m is None else f"{m // 60:02d}:{m % 60:02d}"
 
 
+# ---------- days of the week ----------
+
+# 0 = Sunday ... 6 = Saturday (the same numbers as JavaScript's getDay()).
+DAY_NAMES = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
+
+
+def normalize_days(days) -> str | None:
+    """[0, 4, 4] -> "04". None, or all seven days -> None (means every day)."""
+    if days is None:
+        return None
+    try:
+        picked = sorted({int(x) for x in days})
+    except (TypeError, ValueError):
+        raise ActionError("الأيام مش مفهومة.")
+    if not picked:
+        raise ActionError("اختار يوم واحد على الأقل.")
+    if any(x < 0 or x > 6 for x in picked):
+        raise ActionError("الأيام مش مفهومة.")
+    return None if len(picked) == 7 else "".join(str(x) for x in picked)
+
+
+def days_text(days: str | None) -> str:
+    if not days:
+        return "كل يوم"
+    if days == "01234":
+        return "الأحد للخميس"
+    if days == "56":
+        return "الجمعة والسبت"
+    return "، ".join(DAY_NAMES[int(x)] for x in days)
+
+
+def weekday(ts: float) -> int:
+    """0 = Sunday ... 6 = Saturday, on the site clock."""
+    return (time.localtime(ts).tm_wday + 1) % 7
+
+
+def runs_on(days: str | None, ts: float) -> bool:
+    return not days or str(weekday(ts)) in days
+
+
 # ---------- estimates (expected, never shown as a measured saving) ----------
 
 def estimate_day(conn, site: str, device: dict, on_time: str | None, off_time: str | None) -> dict | None:
@@ -77,21 +117,45 @@ def estimate_day(conn, site: str, device: dict, on_time: str | None, off_time: s
 
 # ---------- create / list / change ----------
 
-def add_schedule(conn, site: str, device_id: str, on_time: str | None, off_time: str | None,
-                 source: str = "user") -> dict:
+def _room_name(conn, site: str, room_id: str) -> str:
+    r = db.one(conn.execute("SELECT name FROM rooms WHERE site=? AND id=?", (site, room_id)))
+    return r["name"] if r else room_id
+
+
+def preview_schedule(conn, site: str, device_id: str, on_time: str | None, off_time: str | None,
+                     days=None) -> dict:
+    """The review step before saving: the guard checks it and we show what will happen. Saves nothing."""
     require_site(site)
     d = require_device(conn, site, device_id)
     on_time, off_time = normalize_time(on_time), normalize_time(off_time)
+    days = normalize_days(days)
+    decision = policy.check_schedule(d, on_time, off_time)
+    if not decision.allowed:
+        raise ActionError(decision.reason_ar)
+    when = " ← ".join(x for x in (on_time and f"يشتغل {on_time}", off_time and f"يطفي {off_time}") if x)
+    return {"device_id": d["id"], "device_name": d["name"], "room_name": _room_name(conn, site, d["room"]),
+            "on_time": on_time, "off_time": off_time, "days": days, "days_text": days_text(days),
+            "text": f"{d['name']} ({_room_name(conn, site, d['room'])}): {when} · {days_text(days)}",
+            "estimate": estimate_day(conn, site, d, on_time, off_time)}
+
+
+def add_schedule(conn, site: str, device_id: str, on_time: str | None, off_time: str | None,
+                 source: str = "user", days=None) -> dict:
+    require_site(site)
+    d = require_device(conn, site, device_id)
+    on_time, off_time = normalize_time(on_time), normalize_time(off_time)
+    days = normalize_days(days)
     decision = policy.check_schedule(d, on_time, off_time)
     if not decision.allowed:
         if decision.code in ("heater_too_long", "critical_load", "sensitive_device"):
             db.audit(conn, site, "T0", "policy", "blocked", f"{decision.reason_ar} ← الجدول ما انحفظ.")
         raise ActionError(decision.reason_ar)
     cur = conn.execute(
-        "INSERT INTO schedules (site, device_id, on_time, off_time, enabled, source, created_ts) "
-        "VALUES (?,?,?,?,1,?,?)", (site, device_id, on_time, off_time, source, time.time()))
+        "INSERT INTO schedules (site, device_id, on_time, off_time, days, enabled, source, created_ts) "
+        "VALUES (?,?,?,?,?,1,?,?)", (site, device_id, on_time, off_time, days, source, time.time()))
     when = " · ".join(x for x in (on_time and f"تشغيل {on_time}", off_time and f"إطفاء {off_time}") if x)
-    db.audit(conn, site, TIER, "human", "schedule_added", f"جدول جديد: {d['name']} · {when}.")
+    db.audit(conn, site, TIER, "human", "schedule_added",
+             f"جدول جديد: {d['name']} ({_room_name(conn, site, d['room'])}) · {when} · {days_text(days)}.")
     return {"id": cur.lastrowid}
 
 
@@ -134,8 +198,15 @@ def clear_all(conn, site: str) -> None:
 
 
 def listing(conn, site: str) -> dict:
-    """What the dashboard and the phone show."""
+    """What the dashboard and the phone show.
+
+    devices = the ones a schedule may switch; locked = the ones the guard never
+    lets a schedule touch (critical or sensitive), shown with the reason.
+    Every device carries its room, so the screens can group them by room.
+    """
+    require_site(site)
     names = {d["id"]: d for d in db.devices(conn, site)}
+    room_names = {r["id"]: r["name"] for r in db.rooms(conn, site)}
     now = site_now(conn, site)
     out_s, out_t = [], []
     for r in db.rows(conn.execute("SELECT * FROM schedules WHERE site=? ORDER BY id", (site,))):
@@ -143,7 +214,9 @@ def listing(conn, site: str) -> dict:
         if not d:
             continue
         out_s.append({"id": r["id"], "device_id": r["device_id"], "device_name": d["name"],
+                      "room": d["room"], "room_name": room_names.get(d["room"], d["room"]),
                       "on_time": r["on_time"], "off_time": r["off_time"], "enabled": bool(r["enabled"]),
+                      "days": r["days"], "days_text": days_text(r["days"]),
                       "source": r["source"], "estimate": estimate_day(conn, site, d, r["on_time"], r["off_time"])})
     for t in db.rows(conn.execute("SELECT * FROM timers WHERE site=? ORDER BY due_ts", (site,))):
         d = names.get(t["device_id"])
@@ -153,9 +226,20 @@ def listing(conn, site: str) -> dict:
         out_t.append({"id": t["id"], "device_id": t["device_id"], "device_name": d["name"],
                       "turn_on": bool(t["turn_on"]), "minutes_left": left,
                       "text": f"{'تشغيل' if t['turn_on'] else 'إطفاء'} {d['name']} بعد {fmt_minutes(left)}"})
-    devices = [{"id": d["id"], "name": d["name"]} for d in names.values()
-               if policy.check_timer(d, 1).allowed]
-    return {"schedules": out_s, "timers": out_t, "devices": devices}
+    def card(d):
+        return {"id": d["id"], "name": d["name"], "kind": d["kind"], "room": d["room"],
+                "room_name": room_names.get(d["room"], d["room"]), "is_on": bool(d["is_on"]),
+                "watts": round(d["signature_w"])}
+    devices, locked = [], []
+    for d in names.values():
+        decision = policy.check_timer(d, 1)
+        if decision.allowed:
+            devices.append(card(d))
+        else:
+            locked.append({**card(d), "why": decision.reason_ar})
+    rooms = [{"id": rid, "name": name} for rid, name in room_names.items()]
+    return {"site": site, "schedules": out_s, "timers": out_t, "devices": devices, "locked": locked,
+            "rooms": rooms}
 
 
 # ---------- running them (called by the agent loop every second) ----------
@@ -200,7 +284,16 @@ def run_due(conn, site: str) -> None:
         if not d:
             continue
         for hhmm, turn_on in ((r["on_time"], True), (r["off_time"], False)):
-            if hhmm and policy._minutes(hhmm) is not None and last < last_occurrence(now, hhmm) <= now:
+            if not (hhmm and policy._minutes(hhmm) is not None):
+                continue
+            when = last_occurrence(now, hhmm)
+            if not last < when <= now:
+                continue
+            # Days: an off time after midnight belongs to the day the window started.
+            day_ts = when
+            if not turn_on and r["on_time"] and policy._minutes(hhmm) < (policy._minutes(r["on_time"]) or 0):
+                day_ts = when - 86400
+            if runs_on(r["days"], day_ts):
                 verb = "تشغيل" if turn_on else "إطفاء"
                 _switch(conn, site, d, turn_on, f"جدول: {verb} {d['name']} ({hhmm}).")
                 d = db.device(conn, site, r["device_id"])

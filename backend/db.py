@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS schedules (
     device_id   TEXT    NOT NULL,
     on_time     TEXT,                      -- "HH:MM" or NULL
     off_time    TEXT,                      -- "HH:MM" or NULL
+    days        TEXT,                      -- weekdays it runs, "0".."6" (0 = Sunday); NULL = every day
     enabled     INTEGER NOT NULL DEFAULT 1,
     source      TEXT    NOT NULL,          -- user / command / suggested
     created_ts  REAL    NOT NULL
@@ -220,6 +221,7 @@ def connect(path: Path | None = None):
 MIGRATIONS = [
     ("devices", "signature_pf", "REAL"),
     ("meter_readings", "pf", "REAL"),
+    ("schedules", "days", "TEXT"),
 ]
 
 

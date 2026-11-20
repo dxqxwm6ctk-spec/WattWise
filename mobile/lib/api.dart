@@ -22,6 +22,14 @@ class WattWiseApi {
 
   Uri _uri(String path) => Uri.parse('$baseUrl/api/sites/$site$path');
 
+  /// The same server, another site (home / building / lab). Used by the schedule tab.
+  WattWiseApi forSite(String other) => other == site ? this : WattWiseApi(baseUrl: baseUrl, site: other);
+
+  Future<Map<String, dynamic>> schedules() async {
+    final res = await http.get(_uri('/schedules')).timeout(const Duration(seconds: 4));
+    return _decode(res);
+  }
+
   Future<Map<String, dynamic>> getState() async {
     final res = await http.get(_uri('/state')).timeout(const Duration(seconds: 4));
     return _decode(res);
@@ -87,8 +95,11 @@ class WattWiseApi {
   Future<void> setGoal(String text) => post('/goal', {'text': text});
   Future<Map<String, dynamic>> parseCommand(String text) => post('/command/parse', {'text': text});
   Future<Map<String, dynamic>> runCommand(String text) => post('/command/run', {'text': text});
-  Future<void> addSchedule(String deviceId, String? on, String? off) =>
-      post('/schedules', {'device_id': deviceId, 'on_time': on, 'off_time': off});
+  Future<void> addSchedule(String deviceId, String? on, String? off, {List<int>? days}) =>
+      post('/schedules', {'device_id': deviceId, 'on_time': on, 'off_time': off, 'days': days});
+  /// The review step: the Policy Guard checks the schedule and we get an estimate. Nothing is saved.
+  Future<Map<String, dynamic>> previewSchedule(String deviceId, String? on, String? off, List<int> days) =>
+      post('/schedules', {'device_id': deviceId, 'on_time': on, 'off_time': off, 'days': days, 'preview': true});
   Future<void> setScheduleEnabled(int id, bool enabled) => post('/schedules/$id/enabled', {'enabled': enabled});
   Future<void> deleteSchedule(int id) => delete('/schedules/$id');
   Future<void> addTimer(String deviceId, int minutes, {bool runNow = false}) =>
