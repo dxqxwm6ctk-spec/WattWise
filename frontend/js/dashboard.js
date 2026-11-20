@@ -11,6 +11,7 @@ const ui = {
   sched: { dev: null, on: '', off: '', msg: '' },
   heater: { hint: '', res: null, busy: false, msg: '' },
   why: { res: null, busy: false }, rep: { text: '', busy: false },
+  bill: { status: null, busy: false, res: null, msg: '', manual: false, kwh: '', days: '', amount: '' },
 };
 let st = null;
 const lbl = (key, fallback) => (st && st.labels && st.labels[key]) || fallback;
@@ -451,6 +452,7 @@ function analystSection() {
           <button class="btn-lime" style="height:36px;font-size:13px" data-act="why">${ui.why.busy ? 'عم نحلّل…' : w ? 'حلّل من جديد' : 'ليش الفاتورة هيك؟'}</button>
         </div>${why}
       </div>
+      <div class="panel">${billPanel()}</div>
       <div class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <span class="panel-title">التقرير الأسبوعي</span>
@@ -458,6 +460,52 @@ function analystSection() {
         </div>${report}
       </div>
     </div>`;
+}
+
+// Bill photo: Claude reads it (when there is a key), the code checks it. Or type 3 numbers by hand.
+function billPanel() {
+  const b = ui.bill, r = b.res, noPhoto = b.status && !b.status.photo;
+  const inp = 'height:38px;border-radius:10px;border:1px solid #3A3C33;background:#0F100D;color:#ECEBE4;padding:0 10px;font-family:inherit;font-size:14px;min-width:0;flex:1 1 90px';
+  const bn = r && r.bill;
+  const nums = !bn ? '' : [
+    bn.kwh != null && `${fmt(bn.kwh, 0)} ك.و.س`, bn.days && `${bn.days} يوم`,
+    bn.amount_jod != null && `${fmt(bn.amount_jod, 2)} دينار`,
+    bn.period_from && bn.period_to && `${bn.period_from} ← ${bn.period_to}`,
+  ].filter(Boolean).map(x => `<span class="mono" style="padding:4px 10px;border-radius:999px;background:#1E201B;font-size:12px;color:#D9D7CF">${esc(x)}</span>`).join('');
+  const result = !r ? '' : `<div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${nums}</div>
+      ${r.explanation.map(x => `<div style="font-size:13.5px;line-height:1.65;color:#ECEBE4">${esc(x)}</div>`).join('')}
+      ${r.checks.map(x => `<div class="sub-box"><span style="font-size:12.5px;line-height:1.55;color:#D9D7CF">${esc(x)}</span></div>`).join('')}
+      ${r.ideas.map(x => `<div style="font-size:13px;line-height:1.6;color:#C8E68A">• ${esc(x)}</div>`).join('')}
+      <div style="font-size:11.5px;color:#A9A79D">${esc(r.note)}</div></div>`;
+  const manual = !(b.manual || noPhoto) ? '' : `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <input id="bill-kwh" inputmode="decimal" value="${esc(b.kwh)}" placeholder="ك.و.س" aria-label="الاستهلاك بالكيلوواط ساعة" style="${inp}">
+      <input id="bill-days" inputmode="numeric" value="${esc(b.days)}" placeholder="عدد الأيام" aria-label="عدد أيام الفاتورة" style="${inp}">
+      <input id="bill-amount" inputmode="decimal" value="${esc(b.amount)}" placeholder="المبلغ (دينار)" aria-label="مبلغ الفاتورة بالدينار" style="${inp}">
+      <button class="btn-lime" style="height:38px;font-size:13px" data-act="bill-manual">حلّل الأرقام</button></div>`;
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="panel-title">حلّل صورة الفاتورة</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <label class="btn-lime" style="height:36px;font-size:13px;display:inline-flex;align-items:center;cursor:pointer;${noPhoto ? 'opacity:.5;pointer-events:none' : ''}">
+          ${b.busy ? 'عم نقرأ…' : '📷 ارفع صورة'}<input id="bill-file" type="file" accept="image/*" hidden></label>
+        <button class="btn-ghost" style="height:36px" data-act="bill-toggle-manual">اكتب الأرقام بإيدك</button>
+      </div>
+    </div>
+    ${noPhoto ? `<div style="font-size:12px;line-height:1.55;color:#F2B544">${esc(b.status.reason_ar)}</div>` : ''}
+    ${b.msg ? `<div style="font-size:12.5px;line-height:1.55;color:#F2B544">${esc(b.msg)}</div>` : ''}
+    ${manual}${result}
+    <div style="font-size:11px;color:#6F6D64">الصورة بتنقرأ مرة وحدة وما بتنحفظ. بنحتفظ بس بالأرقام (ك.و.س، الأيام، المبلغ).</div>`;
+}
+
+async function billSend(promise) {
+  ui.bill.busy = true; ui.bill.msg = ''; renderAll();
+  try {
+    const r = await promise;
+    if (r.needs_manual) { ui.bill.manual = true; ui.bill.msg = r.message; }
+    else ui.bill.res = r;
+  } catch (e) { ui.bill.msg = e.message; }
+  ui.bill.busy = false; renderAll();
 }
 
 // AI layer 2: expected load for this hour and the next 5, plus our measured accuracy.
@@ -663,6 +711,11 @@ WW.onAction({
     try { ui.why.res = await WW.api('GET', `/api/sites/${WW.site}/why`); } catch (e) { toast(e.message); }
     ui.why.busy = false; renderAll();
   },
+  'bill-toggle-manual': () => { ui.bill.manual = !ui.bill.manual; renderAll(); },
+  'bill-manual': () => {
+    if (!(Number(ui.bill.kwh) > 0)) { ui.bill.msg = 'اكتب الكيلوواط ساعة (ك.و.س) من الفاتورة.'; renderAll(); return; }
+    return billSend(WW.billManual(ui.bill));
+  },
   report: async () => {
     ui.rep.busy = true; renderAll();
     try {
@@ -691,6 +744,11 @@ WW.onAction({
 });
 
 document.addEventListener('change', ev => {
+  if (ev.target.id === 'bill-file' && ev.target.files[0]) {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    billSend(WW.billPhoto(file));
+  }
   if (ev.target.id === 'scenario-pick' && ev.target.value) {
     const name = ev.target.value;
     ev.target.value = '';
@@ -705,6 +763,9 @@ document.addEventListener('input', ev => {
   if (id === 'heater-hint') ui.heater.hint = v;
   if (id === 'sched-on') ui.sched.on = v;
   if (id === 'sched-off') ui.sched.off = v;
+  if (id === 'bill-kwh') ui.bill.kwh = v;
+  if (id === 'bill-days') ui.bill.days = v;
+  if (id === 'bill-amount') ui.bill.amount = v;
 });
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target.id === 'cmd-text') parseCommand();
@@ -727,5 +788,6 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape') $('phone-d
 $('house-link').href = 'house.html?site=' + encodeURIComponent(WW.site);
 // Show the address that is inside the QR code (for typing it by hand if needed).
 fetch('/api/connect').then(r => r.json()).then(d => { $('connect-url').textContent = d.url; }).catch(() => {});
+WW.billStatus().then(x => { ui.bill.status = x; }).catch(() => {});
 refresh();
 setInterval(refresh, 1000);

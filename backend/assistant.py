@@ -11,10 +11,11 @@ Nothing here switches a device without the human's confirmation, and every
 number comes from the code (meter, tariff, load signatures), never invented.
 """
 
+import calendar
 import re
 import time
 
-from backend import db, policy, schedules, state
+from backend import bill_reader, db, policy, schedules, state
 from backend.actions import ActionError, human_toggle, require_site
 
 _AR_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
@@ -198,13 +199,22 @@ def why_bill(conn, site: str) -> dict:
         d = on_now[0]
         causes.append({"what": f"أكبر جهاز شغّال هلأ: {d['name']}",
                        "evidence": f"بصمته ≈ {d['est_w']} واط = {d['est_w'] / 1000 * b['price_jod_per_kwh']:.3f} دينار بالساعة."})
+    last = bill_reader.last_bill(conn, site)
+    if last and last.get("kwh") and last.get("days"):
+        bill_day = last["kwh"] / last["days"]
+        now_day = b["projected_kwh"] / max(1, calendar.monthrange(*time.localtime()[:2])[1])
+        if now_day > 0:
+            pct = round((now_day - bill_day) / bill_day * 100)
+            causes.insert(1, {"what": "مقارنة مع فاتورتك الأخيرة",
+                              "evidence": f"الفاتورة: {bill_day:.1f} ك.و.س باليوم. هلأ: {now_day:.1f} باليوم "
+                                          f"({'أعلى' if pct > 0 else 'أقل'} بـ {abs(pct)}%)."})
     heater = next((d for d in s["devices"] if d["kind"] == "heater"), None)
     has_heater_plan = heater and any(r["device_id"] == heater["id"] for r in schedules.listing(conn, site)["schedules"])
     if heater and not has_heater_plan:
         action = "جرّب «اقترحلي جدول للسخّان»: بيسخّن قبل الحمّام بس بدل ما يضل شغّال."
     else:
         action = "خلّي الوكيل يراقب، وبنسألك قبل أي إطفاء."
-    return {"headline": head, "causes": causes[:3], "action": action, "by": "rules",
+    return {"headline": head, "causes": causes[:4], "action": action, "by": "rules",
             "note": "تحليل بالقواعد من القياسات. النسب تقديرية من بصمات الأحمال."}
 
 

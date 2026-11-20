@@ -74,6 +74,23 @@ class WattWiseApi {
     return _decode(res);
   }
 
+  // --- bill photo (Claude reads it on the server) or bill numbers typed by hand ---
+  Future<Map<String, dynamic>> billStatus() async {
+    final res = await http.get(Uri.parse('$baseUrl/api/bill/status')).timeout(const Duration(seconds: 4));
+    return _decode(res);
+  }
+
+  Future<Map<String, dynamic>> billPhoto(String imageB64) async {
+    // Reading a photo can take up to a minute, so this one waits longer.
+    final res = await http
+        .post(_uri('/bill/photo'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'image_b64': imageB64}))
+        .timeout(const Duration(seconds: 75));
+    return _decode(res);
+  }
+
+  Future<Map<String, dynamic>> billManual(double kwh, double? days, double? amountJod) =>
+      post('/bill/manual', {'kwh': kwh, 'days': days, 'amount_jod': amountJod});
+
   Future<String> weeklyReport() async {
     final res = await http.get(_uri('/weekly.txt')).timeout(const Duration(seconds: 6));
     if (res.statusCode >= 400) throw ApiException('ما قدرنا نجهّز التقرير.');

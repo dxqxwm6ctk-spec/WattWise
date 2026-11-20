@@ -92,6 +92,10 @@ LLM_PRICE_OUT_PER_MTOK = _env_float("LLM_PRICE_OUT_PER_MTOK", 20)
 # If the LLM does not answer within this time, the rule-based explanation is used.
 LLM_TIMEOUT_S = _env_float("LLM_TIMEOUT_S", 30)
 LLM_MAX_TOOL_ROUNDS = 6
+# Reading a photo of a bill takes longer than a small decision.
+LLM_VISION_TIMEOUT_S = _env_float("LLM_VISION_TIMEOUT_S", 60)
+# Largest photo we accept (bytes, after decoding). The apps shrink photos before sending.
+BILL_PHOTO_MAX_BYTES = int(_env_float("BILL_PHOTO_MAX_BYTES", 3_500_000))
 
 
 def load_sites() -> dict:
