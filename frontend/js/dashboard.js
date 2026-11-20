@@ -70,11 +70,12 @@ function hero() {
         ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<span style="height:48px;display:grid;place-items:center;font-family:var(--mono);font-size:26px;font-weight:500;color:${i === 5 ? '#FF8A70' : '#ECEBE4'}">${n}</span>`).join('')}
       </div>
     </div>`).join('');
-  const v = st.meter.voltage_v, a = st.meter.current_a, f = st.meter.freq_hz;
+  const v = st.meter.voltage_v, a = st.meter.current_a, pf = st.meter.pf;
   const mini = [
     { label: 'الجهد', v: fmt(v, 1) + ' V', pct: v ? (v - 200) / 50 * 100 : 0 },
     { label: 'التيار', v: fmt(a, 2) + ' A', pct: a ? Math.min(100, a / 20 * 100) : 0 },
-    { label: 'التردد', v: fmt(f, 2) + ' Hz', pct: f ? 50 : 0 },
+    // Power factor of the whole circuit: the jump in it tells a lamp from a fan (NILM).
+    { label: 'معامل القدرة PF', v: fmt(pf, 2), pct: pf ? pf * 100 : 0 },
   ].map(m => `
     <div style="padding:10px;border-radius:12px;background:#181A15;display:flex;flex-direction:column;gap:6px">
       <span style="font-size:11px;color:#8E8C82">${m.label}</span>
@@ -274,7 +275,7 @@ function devicesGrid() {
           </button>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <span style="font-family:var(--mono);font-size:13px;color:${on ? '#ECEBE4' : '#5E5C55'}" dir="ltr">${d.est_w} W${d.signature_measured ? '' : ' *'}</span>
+          <span style="font-family:var(--mono);font-size:13px;color:${on ? '#ECEBE4' : '#5E5C55'}" dir="ltr">${d.est_w} W${d.signature_measured ? '' : ' *'}${d.signature_pf != null ? ` · PF ${Number(d.signature_pf).toFixed(2)}` : ''}</span>
           ${ac}
         </div>
         <span style="font-size:11px;color:#6F6D64">${note}</span>

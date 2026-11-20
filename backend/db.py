@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS devices (
     setpoint    REAL,                      -- AC only
     signature_w REAL    NOT NULL,          -- load signature (step in watts)
     signature_measured INTEGER NOT NULL DEFAULT 0,
+    signature_pf REAL,                     -- power factor of the step (NILM: tells a lamp from a fan)
     agent_off   INTEGER NOT NULL DEFAULT 0, -- 1 while the agent holds it off after an approval
     energy_wh   REAL    NOT NULL DEFAULT 0, -- attributed energy (NILM-lite)
     added       INTEGER NOT NULL DEFAULT 0, -- added by the user from the app
@@ -49,7 +50,8 @@ CREATE TABLE IF NOT EXISTS meter_readings (
     energy_kwh  REAL,
     voltage_v   REAL,
     current_a   REAL,
-    freq_hz     REAL
+    freq_hz     REAL,
+    pf          REAL                       -- power factor from the PZEM (0..1)
 );
 CREATE INDEX IF NOT EXISTS idx_meter_site_ts ON meter_readings(site, ts);
 
@@ -152,12 +154,27 @@ def connect(path: Path | None = None):
         conn.close()
 
 
+# Columns added after the first release. Old database files get them with ALTER TABLE.
+MIGRATIONS = [
+    ("devices", "signature_pf", "REAL"),
+    ("meter_readings", "pf", "REAL"),
+]
+
+
+def _migrate(conn) -> None:
+    for table, column, kind in MIGRATIONS:
+        cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+
+
 def init_db() -> None:
     """Create tables and seed rooms/devices from config/sites.json (first run only)."""
     # On a cloud host the database may live on a mounted volume (for example /data).
     config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as conn:
         conn.executescript(SCHEMA)
+        _migrate(conn)
         for site_id, site in config.load_sites().items():
             for room in site["rooms"]:
                 conn.execute("INSERT OR IGNORE INTO rooms (site, id, name) VALUES (?,?,?)",
@@ -245,6 +262,21 @@ def avg_power(conn, site: str, seconds: float) -> float | None:
     row = conn.execute("SELECT AVG(power_w) AS p FROM meter_readings WHERE site=? AND ts>=?",
                        (site, time.time() - seconds)).fetchone()
     return row["p"]
+
+
+def avg_pq(conn, site: str, t_from: float, t_to: float) -> tuple[float | None, float | None]:
+    """Average real power (W) and reactive power (VAR) between two server times.
+
+    Q is None when the meter did not send a power factor (older firmware)."""
+    from backend import nilm
+    rows_ = conn.execute("SELECT power_w, pf FROM meter_readings WHERE site=? AND ts>=? AND ts<=?",
+                         (site, t_from, t_to)).fetchall()
+    if not rows_:
+        return None, None
+    p = sum(r["power_w"] for r in rows_) / len(rows_)
+    qs = [nilm.reactive(r["power_w"], r["pf"]) for r in rows_]
+    q = None if any(x is None for x in qs) else sum(qs) / len(qs)
+    return p, q
 
 
 def set_device(conn, site: str, device_id: str, **fields) -> None:

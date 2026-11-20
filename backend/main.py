@@ -54,6 +54,7 @@ class Meter(BaseModel):
     voltage_v: float | None = None
     current_a: float | None = None
     freq_hz: float | None = None
+    pf: float | None = Field(default=None, ge=0, le=1)   # power factor (PZEM-004T)
 
 
 class RoomReading(BaseModel):

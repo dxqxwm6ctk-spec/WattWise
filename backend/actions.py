@@ -7,7 +7,7 @@ every change goes through the same Policy Guard checks and the same audit log.
 import json
 import time
 
-from backend import anomaly, config, db, policy
+from backend import anomaly, config, db, nilm, policy
 
 # Approval statuses
 PENDING, APPROVED, REJECTED, EXPIRED, BLOCKED, CANCELLED = (
@@ -16,20 +16,6 @@ SKIPPED = "skipped"   # the LLM planner decided not to ask about this device
 
 # devices.agent_off values
 AGENT_OFF_NONE, AGENT_OFF_UNVERIFIED, AGENT_OFF_VERIFIED = 0, 1, 2
-
-def rule_plan(text: str, bill_target_jd: float | None) -> list[str]:
-    """The plan the rule-based agent follows (used when there is no LLM)."""
-    steps = [
-        "أراقب العدّاد وكل غرفة كل ثانية.",
-        "أدوّر على أجهزة شغّالة بغرف فاضية.",
-        "أتأكد إنه الإطفاء ما بيكسر حدود الراحة ولا بيلمس جهاز ممنوع.",
-        "أسألك قبل أي إطفاء، وإذا ما رديت ما بعمل إشي.",
-        "أتأكد من التوفير بالعدّاد وأحسبه بالدينار.",
-    ]
-    if bill_target_jd:
-        steps.append(f"أقارن الفاتورة المتوقعة بهدفك ({bill_target_jd:g} دينار).")
-    return steps
-
 
 GOAL_STEPS = [
     "قراءة العدّاد والحسّاسات والطقس",
@@ -117,9 +103,10 @@ def ingest(conn, payload: dict) -> None:
     power = float(meter["power_w"])
     conn.execute(
         "INSERT INTO meter_readings (site, ts, meter_ts, source, power_w, baseline_w, energy_kwh, "
-        "voltage_v, current_a, freq_hz) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "voltage_v, current_a, freq_hz, pf) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (site, now, meter_ts, payload.get("source", "device"), power, power + held_off_w,
-         meter.get("energy_kwh"), meter.get("voltage_v"), meter.get("current_a"), meter.get("freq_hz")),
+         meter.get("energy_kwh"), meter.get("voltage_v"), meter.get("current_a"), meter.get("freq_hz"),
+         meter.get("pf")),
     )
     for r in payload.get("rooms", []):
         conn.execute(
@@ -180,13 +167,17 @@ def set_goal(conn, site: str, text: str, bill_target_jd: float | None) -> dict:
     conn.execute("INSERT INTO goals (site, created_ts, text, bill_target_jd, active) VALUES (?,?,?,?,1)",
                  (site, time.time(), text, bill_target_jd))
     goal = active_goal(conn, site)
-    summary = (f"فهمت إنك بدك الفاتورة تحت {bill_target_jd:g} دينار." if bill_target_jd
-               else "ما لقيت رقم بالدينار بكلامك، فبراقب وبوفّر بدون هدف رقمي.")
-    db.set_state(conn, f"plan:{site}", {"goal_id": goal["id"], "by": "rules",
-                                         "steps": rule_plan(text, bill_target_jd), "summary": summary})
+    from backend import goal as goal_reader   # rule-based reading of the goal (no LLM needed)
+    intent = goal_reader.understand(conn, site, text, bill_target_jd)
+    steps = goal_reader.plan_steps(intent)
+    db.set_state(conn, f"plan:{site}", {
+        "goal_id": goal["id"], "by": "rules", "steps": steps, "summary": goal_reader.summary(intent),
+        "intent": intent,
+        "focus": {"rooms": [r["id"] for r in intent["rooms"]], "kinds": intent["kinds"]},
+    })
     db.audit(conn, site, "T0", "agent", "goal_received",
-             f"استلمت الهدف وقسّمته لـ{len(GOAL_STEPS)} خطوات. الوضع: مراقبة.",
-             {"goal": text, "steps": GOAL_STEPS})
+             f"استلمت الهدف وقسّمته لـ{len(steps)} خطوات: " + " · ".join(steps),
+             {"goal": text, "steps": steps, "intent": intent})
     if get_phase(conn, site) not in ("stopped",):
         set_phase(conn, site, "normal")
     return active_goal(conn, site)
@@ -403,7 +394,9 @@ def start_learning(conn, site: str, kind: str) -> dict:
         "status": "measuring",
         "started_ts": time.time(),
         "before_w": db.avg_power(conn, site, 3) or 0.0,
+        "before_q": db.avg_pq(conn, site, time.time() - 3, time.time())[1],
         "learned_w": None,
+        "learned_pf": None,
     }
     db.set_state(conn, f"learn:{site}", session)
     return session
@@ -414,8 +407,13 @@ def finish_learning_if_ready(conn, site: str) -> None:
     s = db.get_state(conn, f"learn:{site}")
     if not s or s["status"] != "measuring" or time.time() - s["started_ts"] < 3:
         return
+    now = time.time()
     after = db.avg_power(conn, site, 1.5) or 0.0
     s["learned_w"] = round(max(0.0, after - s["before_w"]))
+    # Power factor of the step: tells a resistive load from a motor (backend/nilm.py).
+    after_q = db.avg_pq(conn, site, now - 1.5, now)[1]
+    if s.get("before_q") is not None and after_q is not None:
+        s["learned_pf"] = nilm.step_pf(s["learned_w"], after_q - s["before_q"])
     s["status"] = "done"
     db.set_state(conn, f"learn:{site}", s)
 
@@ -431,15 +429,16 @@ def add_device(conn, site: str, room: str, name: str, kind: str, allow: bool) ->
     allow = bool(allow) and tier == "T1" and not sensitive
     conn.execute(
         "INSERT INTO devices (site, id, name, room, kind, rated_w, tier, sensitive, allow, is_on, normal_on, "
-        "setpoint, signature_w, signature_measured, added) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "setpoint, signature_w, signature_measured, signature_pf, added) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (site, s["device_id"], name.strip() or kind, room, kind, s["learned_w"], tier, int(sensitive),
-         int(allow), 1, 1, 24 if kind == "ac" else None, s["learned_w"], 1, 1),
+         int(allow), 1, 1, 24 if kind == "ac" else None, s["learned_w"], 1, s.get("learned_pf"), 1),
     )
     db.set_state(conn, f"learn:{site}", None)
     access = "T2 محمي" if tier == "T2" else ("T1 بالقائمة المسموحة" if allow else "تحكم يدوي فقط")
     room_name = db.one(conn.execute("SELECT name FROM rooms WHERE site=? AND id=?", (site, room)))["name"]
     db.audit(conn, site, "T0", "human", "device_added",
-             f"جهاز جديد: {name} ({room_name}) · بصمة ≈ {s['learned_w']} واط · {access}")
+             f"جهاز جديد: {name} ({room_name}) · بصمة ≈ {s['learned_w']} واط"
+             + (f" · PF {s['learned_pf']:.2f}" if s.get("learned_pf") is not None else "") + f" · {access}")
     return db.device(conn, site, s["device_id"])
 
 

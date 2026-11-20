@@ -4,7 +4,7 @@ import calendar
 import json
 import time
 
-from backend import actions, anomaly, billing, config, db, ev, forecast, llm, mv, schedules, weather
+from backend import actions, anomaly, billing, config, db, ev, forecast, llm, mv, nilm, schedules, weather
 
 CATEGORY = {"ac": "المكيّفات", "fan": "المكيّفات", "fridge": "الثلاجة", "heater": "سخّان الماء", "ev": "شحن السيارة",
             "light": "الإنارة"}
@@ -49,6 +49,7 @@ def build(conn, site: str) -> dict:
             "sensitive": bool(d["sensitive"]), "allow": bool(d["allow"]), "is_on": bool(d["is_on"]),
             "setpoint": d["setpoint"], "est_w": round(d["signature_w"]) if d["is_on"] else 0,
             "signature_w": round(d["signature_w"]), "signature_measured": bool(d["signature_measured"]),
+            "signature_pf": d["signature_pf"], "load_type": nilm.load_type_ar(d["signature_pf"]),
             "added": bool(d["added"]), "agent_off": d["agent_off"],
         })
 
@@ -123,7 +124,7 @@ def build(conn, site: str) -> dict:
         "demo_label": (site_cfg.get("demo_waste") or {}).get("label"),
         "clock": time.strftime("%H:%M", t),
         "online": bool(meter) and now - meter.get("ts", 0) <= config.STALE_READING_S,
-        "meter": {k: meter.get(k) for k in ("power_w", "voltage_v", "current_a", "freq_hz", "energy_kwh")},
+        "meter": {k: meter.get(k) for k in ("power_w", "voltage_v", "current_a", "freq_hz", "energy_kwh", "pf")},
         "history": _history(conn, site),
         "rooms": rooms,
         "devices": devices,

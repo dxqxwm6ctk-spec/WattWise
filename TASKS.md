@@ -6,7 +6,7 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Read CLAUDE.md, create this file
 - [x] Repo skeleton (backend, simulator, firmware, frontend, docs, tests)
 - [x] Backend runs (`uvicorn backend.main:app`), `/api/health` answers
-- [ ] Ask the organizers (ieeerasjadara@gmail.com) to confirm AI coding assistants are allowed
+- [ ] Ask the organizers (ieeerasjadara@gmail.com) to confirm AI coding assistants are allowed (draft ready: `docs/outreach/organizers_email_ai_tools.md`, team sends it)
 
 ## Phase A: software, no hardware
 - [x] SQLite schema (rooms, devices, meter/room readings, approvals, audit log, goals)
@@ -22,7 +22,7 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Add-device flow: measure a new device's signature on the main meter
 - [x] Dashboard (plain HTML/JS + Chart.js) implementing the "WattWise Home" design
 - [x] Web approval page (PWA, works offline on the local network) as backup for the Flutter app
-- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands (78 passing)
+- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands (88 passing)
 - [x] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API (tested as a web build against the simulator)
 - [ ] Run the Flutter app on a real Android phone on the local Wi-Fi
 - [x] LLM planner + explainer with tool use, spending cap, provider abstraction, rule-based fallback (tested with a fake provider; 38 tests passing)
@@ -33,6 +33,8 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [ ] Lab-mode page polish (the design's "WattWise.dc.html")
 - [x] Simulator: 10-room office building as a third site (`--site building`), config only, same agent code
 - [x] New design: goal in plain words -> plan with T0/T1 tags, approval card shows the gentler alternative
+- [x] Rule-based goal reading (`backend/goal.py`): percent, bill, rooms, device kinds, period, comfort; the plan differs per goal and the named rooms/kinds are handled first; "15%" no longer read as 15 JD
+- [x] Power factor in the load signature (`backend/nilm.py`): meter `pf`, step PF learned at verification and in add-device, (P, Q) matching; simulator sends a synthetic PF; dashboard shows PF
 - [x] Typed/spoken commands (rule-based Arabic parsing), each action checked by the Policy Guard, runs only after confirm (mic via the browser in the web pages)
 - [x] Timers and daily on/off schedules run in the backend, checked when saved and again when they fire; smart water-heater schedule suggestion (max 3 h window)
 - [x] "Why is my bill like this?" analysis and a weekly text report to download
@@ -44,14 +46,14 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 
 ## Data to fill (team)
 - [ ] Verify tariff tiers in `config/tariff.json` against a real, anonymized bill
-- [ ] Official CO2 grid emission factor for Jordan, with source
+- [x] CO2 grid emission factor for Jordan: 0.516 kg/kWh, IFI dataset v2.0 (UNFCCC), in `config/tariff.json`
 - [ ] One week of real measurements for the problem statement
 
 ## Phase B: hardware at low voltage (when the kit arrives)
 - [ ] Blink LED, then PIR, DHT11, LDR, buttons, buzzer, LCD
 - [ ] Relay test with NO mains attached (check active-LOW)
 - [ ] PZEM-004T at low voltage in the lab only if safe
-- [ ] Final firmware: POST readings, poll commands
+- [ ] Final firmware: POST readings, poll commands (written in `firmware/wattwise`, plus test sketches 01-09 and `docs/wiring.md`; compiled by CI only, not yet on a board)
 
 ## Phase C: mains (electrician only)
 - [ ] Electrician wires the 220 V side in a closed box with the RCBO

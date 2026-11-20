@@ -15,7 +15,7 @@ LLM is missing, late, broken or over budget.
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 
-from backend import actions, billing, config, db, ev, forecast, llm, policy, schedules, weather
+from backend import actions, billing, config, db, ev, forecast, goal, llm, nilm, policy, schedules, weather
 
 # Remembers what the agent is currently looking at, per site: {"device_id", "since"}
 _analyzing: dict[str, dict] = {}
@@ -67,8 +67,9 @@ def detect_waste(conn, site: str, now: float) -> list[dict]:
         room = db.latest_room(conn, site, d["room"])
         found.append({"device": d, "room": room, "empty_s": empty_s,
                       "window_open": bool(room and room["window_open"])})
-    # Biggest waste first.
-    return sorted(found, key=lambda w: -w["device"]["signature_w"])
+    # Devices the goal named come first (backend/goal.py), then the biggest waste.
+    plan = db.get_state(conn, f"plan:{site}", None)
+    return sorted(found, key=lambda w: (goal.focus_rank(plan, w["device"]), -w["device"]["signature_w"]))
 
 
 def recently_asked(conn, site: str, device_id: str, now: float) -> bool:
@@ -332,7 +333,10 @@ def _llm_plan(conn, site: str, now: float) -> None:
     _plan_jobs.pop(site, None)
     answer = _finish(conn, site, job, "خطة")
     if answer and job["goal_id"] == goal["id"]:
-        db.set_state(conn, f"plan:{site}", {"goal_id": goal["id"], "by": "llm", **answer})
+        # Keep the rule-based reading of the goal (focus rooms/kinds) next to the LLM's own plan.
+        current = db.get_state(conn, f"plan:{site}", None) or {}
+        db.set_state(conn, f"plan:{site}", {"goal_id": goal["id"], "by": "llm", **answer,
+                                             "intent": current.get("intent"), "focus": current.get("focus")})
         db.audit(conn, site, "T0", "llm", "plan", "النموذج قسّم الهدف لخطة: " + " · ".join(answer["steps"]),
                  {"steps": answer["steps"], "summary": answer["summary"]})
 
@@ -344,19 +348,29 @@ def _verify(conn, site: str, now: float) -> None:
         if now - a["decided_ts"] < config.VERIFY_AFTER_S:
             continue
         d = db.device(conn, site, a["device_id"])
-        after = db.avg_power(conn, site, 1.5) or 0.0
+        after = db.avg_power(conn, site, 1.5)
+        if after is None:
+            continue   # no fresh reading yet: an empty window would look like a huge drop
         drop = (a["power_before"] or 0.0) - after
         conn.execute("UPDATE approvals SET power_after=?, verified_ts=? WHERE id=?", (after, now, a["id"]))
         if d and not a["turn_on"] and d["agent_off"] == actions.AGENT_OFF_UNVERIFIED:
             if drop > 0.5 * d["signature_w"] or (drop > 5 and not d["signature_measured"]):
-                # NILM-lite: the measured step becomes the device's signature.
+                # NILM-lite: the measured step (watts + power factor) becomes the device's signature.
+                pf = _step_pf(conn, site, a, now, drop)
+                same_type = nilm.pf_matches(d["signature_pf"], pf)
                 db.set_device(conn, site, d["id"], signature_w=round(drop), signature_measured=1,
+                              signature_pf=pf if pf is not None else d["signature_pf"],
                               agent_off=actions.AGENT_OFF_VERIFIED)
+                pf_text = ""
+                if pf is not None:
+                    pf_text = f" · PF {pf:.2f}، {nilm.load_type_ar(pf)}"
+                    if same_type is False:
+                        pf_text += f" (كان {d['signature_pf']:.2f}، يمكن الجهاز تغيّر)"
                 db.audit(conn, site, "OK", "agent", "verified",
-                         f"العدّاد أكّد انخفاض ≈ {round(drop)} واط يطابق بصمة {d['name']}. "
+                         f"العدّاد أكّد انخفاض ≈ {round(drop)} واط يطابق بصمة {d['name']}{pf_text}. "
                          + ("هاد تأجيل للشحن مش توفير، فما بنحسبه بالتوفير." if d["kind"] == "ev"
                             else "بدأ حساب التوفير المُقاس."),
-                         {"before_w": round(a["power_before"] or 0), "after_w": round(after)})
+                         {"before_w": round(a["power_before"] or 0), "after_w": round(after), "step_pf": pf})
                 actions.set_phase(conn, site, "verified")
             else:
                 db.audit(conn, site, "T1", "agent", "verify_failed",
@@ -364,6 +378,16 @@ def _verify(conn, site: str, now: float) -> None:
                          {"before_w": round(a["power_before"] or 0), "after_w": round(after)})
                 db.set_device(conn, site, d["id"], agent_off=actions.AGENT_OFF_NONE)
                 actions.set_phase(conn, site, "normal")
+
+
+def _step_pf(conn, site: str, approval: dict, now: float, drop_w: float) -> float | None:
+    """Power factor of the switched device: reactive power before the switch minus after it."""
+    t = approval["decided_ts"]
+    _, q_before = db.avg_pq(conn, site, t - 3, t)
+    _, q_after = db.avg_pq(conn, site, now - 1.5, now)
+    if q_before is None or q_after is None:
+        return None
+    return nilm.step_pf(drop_w, q_before - q_after)
 
 
 def _room_name(conn, site: str, room_id: str) -> str:
