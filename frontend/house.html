@@ -6,7 +6,7 @@
 <title>WattWise · البيت التفاعلي</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/fonts.css">
-<link rel="stylesheet" href="css/house.css?v=1">
+<link rel="stylesheet" href="css/house.css?v=2">
 </head>
 <body>
 <div class="hp">
@@ -23,7 +23,7 @@
       <div class="seg" id="site-seg"></div>
       <div class="seg">
         <button class="seg-b" data-act="view" data-v="iso" id="v-iso">3D</button>
-        <button class="seg-b" data-act="view" data-v="flat" id="v-flat">مخطط</button>
+        <button class="seg-b" data-act="view" data-v="top" id="v-flat">من فوق</button>
       </div>
       <button class="tb tour-b" data-act="tour-open">▶ كيف بيشتغل؟</button>
       <a class="tb ghost" href="index.html" id="dash-link">لوحة التحكم</a>
@@ -45,6 +45,7 @@
         <span><i class="lg lg-waste"></i>هدر</span>
         <span><i class="lg lg-pend"></i>بانتظار موافقتك</span>
         <span>🔒 جهاز ممنوع (حماية بالكود)</span>
+        <span>اسحب لتلف · عجلة الماوس للزوم · كبسة على غرفة</span>
         <span id="data-note"></span>
       </div>
     </section>
@@ -62,6 +63,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="js/common.js?v=3"></script>
-<script src="js/house.js?v=1"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
+<script type="module" src="js/house.js?v=2"></script>
 </body>
 </html>

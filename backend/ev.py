@@ -238,8 +238,11 @@ def maybe_propose(conn, site: str, now: float) -> bool:
     title = f"نأجّل شحن السيارة لـ {plan['resume_at']}؟"
     near = "فوق" if house_w >= limit_w else "قريب من"
     reason = (f"البيت عم يسحب {house_w / 1000:.1f} kW هلأ، {near} حد القاطع الرئيسي ({limit_w / 1000:.1f} kW)، والسيارة لحالها {d['signature_w'] / 1000:.1f} kW. "
-              f"إذا وقّفنا الشحن وكمّلنا الساعة {plan['resume_at']}، بتحتاج {_fmt_h(plan['need_min'])} "
-              f"وبتكون جاهزة {cfg.get('target_soc', 80)}٪ قبل الساعة {plan['ready_by']}. {money}")
+              + (f"البطارية وصلت الهدف ({cfg.get('target_soc', 80)}٪) أصلًا، فمنقدر نوقّف هلأ ونكمّل الساعة {plan['resume_at']} بدون أي مشكلة. "
+                 if plan["need_min"] <= 0 else
+                 f"إذا وقّفنا الشحن وكمّلنا الساعة {plan['resume_at']}، بتحتاج {_fmt_h(plan['need_min'])} "
+                 f"وبتكون جاهزة {cfg.get('target_soc', 80)}٪ قبل الساعة {plan['ready_by']}. ")
+              + money)
     details = {"ev": True, "device": d["name"], "signature_w": round(d["signature_w"]),
                "resume_in_min": plan["resume_in_min"], "resume_at": plan["resume_at"],
                "ready_by": plan["ready_by"], "need_min": plan["need_min"],

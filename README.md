@@ -32,7 +32,7 @@ python -m simulator.sim --site building
 
 Open:
 - Dashboard: http://localhost:8000/index.html (building: `index.html?site=building`)
-- Interactive 3D house + guided "how it works" tour: http://localhost:8000/house.html (`?site=building`, `?site=lab`)
+- Interactive 3D house (three.js, works offline) + guided "how it works" tour: http://localhost:8000/house.html (`?site=building`, `?site=lab`)
 - Phone app: Flutter, in `mobile/` (see `mobile/README.md`)
 - Savings report (print to PDF): http://localhost:8000/api/sites/home/report
 - Web backup of the phone page: http://localhost:8000/app.html

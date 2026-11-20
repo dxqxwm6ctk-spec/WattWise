@@ -1,6 +1,8 @@
 /* WattWise interactive house.
  *
- * A 3D-looking (isometric) house drawn with plain HTML + CSS 3D transforms.
+ * A real 3D house (three.js, in frontend/vendor/three, so it works offline); the drawing
+ * itself is in js/house3d.js. This file reads the state, fills the side panels, places
+ * the HTML labels over the 3D scene and runs the guided tour.
  * It reads the SAME state as the dashboard (GET /api/sites/<site>/state, once a second)
  * and sends the SAME commands (toggle, approve, reject, goal, scenario).
  * Nothing here decides anything: the backend agent and the Policy Guard decide.
@@ -9,21 +11,18 @@
  * Works offline: no internet, no external library. Served by our own backend.
  */
 
+import { createHouse } from './house3d.js';
+
 const { esc, fmt } = WW;
 const $ = id => document.getElementById(id);
 
-// ---------- sizes of the drawing (in CSS pixels before scaling) ----------
-const CELL_W = 240;                  // one room on the floor plan
-let CELL_H = 180;                    // taller on phones (set in layout)
-const WALL = 38;                     // wall height
-const TILT = 56, TURN = -36;         // isometric camera angles (degrees)
-const MARGIN_Y = 90;                 // space under the house for the meter
-
 let st = null;                       // latest state from the backend
 let built = '';                      // signature of the drawn layout (rebuild when it changes)
-const els = { rooms: {}, devs: {}, wires: {} };
+let scene3d = null;                  // the three.js scene (house3d.js)
+let pinEls = [];                     // [key, element] HTML labels glued to 3D points
 const ui = {
-  view: localGet('ww-house-view') || (window.innerWidth < 760 ? 'flat' : 'iso'),
+  view: localGet('ww-house-view3') || 'iso',
+  tourFocus: null,                   // the tour step the camera last flew to
   room: null, device: null,
   tour: null,                        // index of the tour step, or null
   busy: false,
@@ -68,158 +67,49 @@ const icon = kind => `<svg viewBox="0 0 48 48" class="ico k-${esc(kind)}" aria-h
 const KIND_AR = { ac: 'مكيّف', fan: 'مروحة', light: 'إنارة', heater: 'سخّان', tv: 'تلفزيون', washer: 'غسالة', fridge: 'ثلاجة',
   fire_alarm: 'إنذار حريق', emergency_light: 'إنارة طوارئ', router: 'راوتر', pc: 'كمبيوتر', other: 'جهاز' };
 
-// ---------- layout: put the rooms on a grid ----------
-function layout(rooms) {
-  const n = rooms.length;
-  // On a narrow phone screen use 2 columns so the rooms stay big enough to tap.
-  const narrow = $('scene').clientWidth < 600;
-  CELL_H = narrow ? 235 : 180;
-  const cols = narrow ? Math.min(n, 2) : n <= 3 ? n : n <= 6 ? 3 : 4;
-  const rows = Math.ceil(n / cols);
-  const pos = {};
-  rooms.forEach((r, i) => {
-    const c = i % cols, row = Math.floor(i / cols);
-    // Arabic reads right to left, so the first room is at the top right.
-    pos[r.id] = { x: (cols - 1 - c) * CELL_W, y: row * CELL_H, w: CELL_W, h: CELL_H };
-  });
-  return { pos, W: cols * CELL_W, H: rows * CELL_H };
-}
-
-// Device spots inside a room (relative to the room's top-left corner).
-function devSpots(count) {
-  const perRow = count <= 3 ? count : Math.ceil(count / 2);
-  const rows = Math.ceil(count / perRow);
-  const out = [];
-  for (let i = 0; i < count; i++) {
-    const r = Math.floor(i / perRow), c = i % perRow;
-    const inRow = Math.min(perRow, count - r * perRow);
-    out.push({ x: 18 + (CELL_W - 36) * (c + 1) / (inRow + 1), y: rows === 1 ? CELL_H * 0.48 : CELL_H * (0.34 + r * 0.28) });
+// ---------- labels over the 3D scene ----------
+function buildPins() {
+  const pins = [];
+  for (const r of st.rooms) {
+    pins.push(['room:' + r.id, `<div class="rl" data-act="room" data-id="${esc(r.id)}" data-rl="${esc(r.id)}">
+      <div class="rl-name">${esc(r.name)}</div>
+      <div class="rl-row"><span class="rl-occ"></span><span class="rl-temp mono" dir="ltr"></span><span class="rl-w mono" dir="ltr"></span></div></div>`, 'room']);
+    pins.push(['tag:' + r.id, `<div class="rl-tag" data-rt="${esc(r.id)}"></div>`, 'rtag']);
   }
-  return out;
-}
-
-// ---------- build the scene once (and again only when rooms/devices change) ----------
-function build() {
-  const L = layout(st.rooms);
-  const plan = $('plan');
-  plan.style.width = L.W + 'px';
-  plan.style.height = L.H + 'px';
-  els.rooms = {}; els.devs = {}; els.wires = {};
-  els.L = L;
-
-  // Where the main meter stands, outside the house (bottom middle).
-  const meter = { x: L.W / 2, y: L.H + MARGIN_Y - 20 };
-  const bus = L.H + 34;
-
-  let floors = '', wires = '', glows = '', pins = '', anchors = '';
-  // A pin is drawn flat on top of the scene, at the screen position of an invisible anchor on the floor.
-  // (So labels and devices stay crisp and are never cut by walls.)
-  const pin = (key, x, y, html, cls) => {
-    anchors += `<i class="anc" data-anc="${key}" style="left:${x}px;top:${y}px"></i>`;
-    pins += `<div class="pin ${cls}" data-pin="${key}">${html}</div>`;
-  };
-  st.rooms.forEach(r => {
-    const p = L.pos[r.id];
-    const devs = st.devices.filter(d => d.room === r.id);
-    const spots = devSpots(devs.length);
-    floors += `
-      <div class="room" data-room="${esc(r.id)}" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px">
-        <div class="floor" data-act="room" data-id="${esc(r.id)}"></div>
-        <div class="wall wn" style="height:${WALL}px"></div><div class="wall ws" style="height:${WALL}px"></div>
-        <div class="wall ww" style="width:${WALL}px"></div><div class="wall we" style="width:${WALL}px"></div>
-        <div class="window-mark" title="الشباك"></div>
-        <!-- Room name and conditions, printed on the floor like an architect's plan. -->
-        <div class="decal" data-rl="${esc(r.id)}" data-act="room" data-id="${esc(r.id)}">
-          <div class="rl-name">${esc(r.name)}</div>
-          <div class="rl-row"><span class="rl-occ"></span><span class="rl-temp mono" dir="ltr"></span><span class="rl-w mono" dir="ltr"></span></div>
-        </div>
-      </div>`;
-    // Alerts (waste, waiting for approval) float above the room.
-    pin('t:' + r.id, p.x + p.w / 2, p.y + p.h * 0.3, '<div class="rl-tag"></div>', 'rtag" data-rt="' + esc(r.id));
-    const entryX = p.x + p.w / 2, entryY = p.y + p.h;
-    devs.forEach((d, i) => {
-      const s = spots[i];
-      const x = p.x + s.x, y = p.y + s.y;
-      glows += `<div class="glow" data-glow="${esc(d.id)}" style="left:${x}px;top:${y}px"></div>`;
-      pin('d:' + d.id, x, y, `
-          <button class="dev-in" data-act="device" data-id="${esc(d.id)}" aria-label="${esc(d.name)}">
-            <span class="dev-badge"></span>
-            ${icon(d.kind)}
-            <span class="dev-w mono" dir="ltr"></span>
-          </button>`, 'dev" data-dev="' + esc(d.id));
-      // Wire: meter -> bus under the house -> into the room -> to the device.
-      wires += `<path class="wire" data-wire="${esc(d.id)}" d="M${meter.x} ${meter.y} V${bus} H${entryX} V${y + 4} H${x}"/>`;
-    });
-  });
-
-  pin('m', meter.x, meter.y, `
-      <div class="meter-in" data-act="meter">
-        <div class="m-lab">العدّاد الرئيسي${st.source === 'device' ? ' · PZEM' : ''}</div>
-        <div class="m-w mono" dir="ltr" id="m-w">—</div>
-      </div>`, 'meter');
-  const svgH = L.H + MARGIN_Y;
-  plan.innerHTML = `
-    ${floors}
-    <svg class="wires" width="${L.W}" height="${svgH}" viewBox="0 0 ${L.W} ${svgH}">
-      <path class="wire-base" d="M${meter.x} ${meter.y} V${bus} H0 M${meter.x} ${bus} H${L.W}"/>
-      ${wires}
-    </svg>
-    <div class="meter-pad" style="left:${meter.x}px;top:${meter.y}px"></div>
-    ${glows}${anchors}`;
-  $('pins').innerHTML = pins;
-  els.anchors = [...plan.querySelectorAll('[data-anc]')].map(a => [a, $('pins').querySelector(`[data-pin="${a.dataset.anc}"]`)]);
-
-  for (const el of plan.querySelectorAll('[data-room]')) els.rooms[el.dataset.room] = { box: el };
-  for (const el of plan.querySelectorAll('[data-rl]')) els.rooms[el.dataset.rl].label = el;
-  for (const el of $('pins').querySelectorAll('[data-rt]')) els.rooms[el.dataset.rt].tag = el;
-  for (const el of $('pins').querySelectorAll('[data-dev]')) els.devs[el.dataset.dev] = { box: el };
-  for (const el of plan.querySelectorAll('[data-glow]')) els.devs[el.dataset.glow].glow = el;
-  for (const el of plan.querySelectorAll('[data-wire]')) els.wires[el.dataset.wire] = el;
-  fit();
-}
-
-// Scale the drawing so the whole house fits the stage (computed, not measured, so it animates).
-function fit() {
-  if (!els.L) return;
-  const stage = $('scene');
-  const W = els.L.W, H = els.L.H + MARGIN_Y;
-  let bw = W, bh = H + 60;
-  if (ui.view === 'iso') {
-    const a = Math.abs(TURN) * Math.PI / 180, t = TILT * Math.PI / 180;
-    bw = W * Math.cos(a) + H * Math.sin(a);
-    bh = (W * Math.sin(a) + H * Math.cos(a)) * Math.cos(t) + WALL + 40;
-    bw /= 0.9; bh /= 0.9;   // room for perspective
+  for (const d of st.devices) {
+    pins.push(['dev:' + d.id, `<button class="chip" data-act="device" data-id="${esc(d.id)}" data-dev="${esc(d.id)}" aria-label="${esc(d.name)}">
+      <span class="chip-badge"></span><span class="chip-w mono" dir="ltr"></span></button>`, 'dev']);
   }
-  let s;
-  if (stage.clientWidth < 600) {
-    // Phone: fill the width and let the stage grow as tall as the house needs.
-    s = (stage.clientWidth - 16) / bw;
-    stage.style.minHeight = Math.ceil(bh * s + 24) + 'px';
-  } else {
-    stage.style.minHeight = '';
-    s = Math.min(1.4, (stage.clientWidth - 16) / bw, (stage.clientHeight - 16) / bh);
-  }
-  $('plan').style.setProperty('--s', s.toFixed(3));
-  $('pins').style.setProperty('--ps', Math.max(0.55, Math.min(1, s * 1.15)).toFixed(3));
-  followPins(1300);
+  pins.push(['meter', `<div class="meter-in" data-act="meter"><div class="m-lab">العدّاد الرئيسي${st.source === 'device' ? ' · PZEM' : ''}</div><div class="m-w mono" dir="ltr" id="m-w">—</div></div>`, 'meter']);
+  if (st.ev) pins.push(['car', '<div class="car-card" id="car-card"></div>', 'car']);
+  $('pins').innerHTML = pins.map(([k, html, cls]) => `<div class="pin ${cls}" data-pin="${k}">${html}</div>`).join('');
+  pinEls = pins.map(([k]) => [k, $('pins').querySelector(`[data-pin="${k}"]`)]);
 }
 
-// Move every pin to where its floor anchor is on screen right now.
+// Put every label where its 3D point is on screen (called every animation frame).
 function placePins() {
-  if (!els.anchors) return;
-  const box = $('scene').getBoundingClientRect();
-  for (const [a, el] of els.anchors) {
-    if (!el) continue;
-    const r = a.getBoundingClientRect();
-    el.style.transform = `translate(${(r.left + r.width / 2 - box.left).toFixed(1)}px, ${(r.top + r.height / 2 - box.top).toFixed(1)}px)`;
+  if (!scene3d) return;
+  for (const [k, el] of pinEls) {
+    const p = scene3d.project(k);
+    if (!p || p.behind) { el.style.display = 'none'; continue; }
+    el.style.display = '';
+    const sc = Math.max(0.55, Math.min(1, 24 / p.dist));
+    el.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px) scale(${sc.toFixed(3)})`;
+    el.style.zIndex = String(1000 - Math.round(p.dist * 10));
   }
 }
-// While the camera moves (3D <-> plan), keep the pins glued to the floor.
-function followPins(ms) {
-  const until = performance.now() + ms;
-  cancelAnimationFrame(followPins.raf);
-  const step = () => { placePins(); if (performance.now() < until) followPins.raf = requestAnimationFrame(step); };
-  step();
+
+function build() {
+  if (!scene3d) {
+    scene3d = createHouse($('scene'), {
+      onRoom: id => { ui.room = id; ui.device = null; scene3d.focusRoom(id); update(); },
+      onDevice: id => { const d = st.devices.find(x => x.id === id); ui.device = id; ui.room = d && d.room; update(); },
+      onFrame: placePins,
+    });
+  }
+  scene3d.build(st, { narrow: $('scene').clientWidth < 600 });
+  scene3d.setView(ui.view, true);
+  buildPins();
 }
 
 // ---------- update every second (no rebuild: CSS transitions stay smooth) ----------
@@ -230,31 +120,20 @@ function pendingDeviceId() {
 }
 
 function update() {
-  const plan = $('plan');
-  plan.classList.toggle('iso', ui.view === 'iso');
-  plan.classList.toggle('flat', ui.view !== 'iso');
   $('v-iso').classList.toggle('sel', ui.view === 'iso');
   $('v-flat').classList.toggle('sel', ui.view !== 'iso');
-
   const pend = pendingDeviceId();
   const pendRoom = pend && (st.devices.find(d => d.id === pend) || {}).room;
+  scene3d.update(st, { pendingDevice: pend, room: ui.room });
 
   for (const r of st.rooms) {
-    const e = els.rooms[r.id];
-    if (!e) continue;
+    const L = $('pins').querySelector(`[data-rl="${r.id}"]`);
+    if (!L) continue;
     const hot = r.temp_c != null && r.temp_c > st.comfort.max_c, cold = r.temp_c != null && r.temp_c < st.comfort.min_c;
-    e.box.classList.toggle('occupied', r.occupied === true);
-    e.box.classList.toggle('empty', r.occupied === false);
-    e.box.classList.toggle('waste', !!r.waste);
-    e.box.classList.toggle('pend', pendRoom === r.id);
-    e.box.classList.toggle('win', r.window_open === true);
-    e.box.classList.toggle('sel', ui.room === r.id);
-    const lit = st.devices.some(d => d.room === r.id && d.kind === 'light' && d.is_on);
-    e.box.classList.toggle('lit', lit);
-    const L = e.label;
     L.classList.toggle('sel', ui.room === r.id);
-    L.querySelector('.rl-occ').textContent = r.occupied == null ? '' : r.occupied ? '● فيها حدا' : '○ فاضية';
-    L.querySelector('.rl-occ').className = 'rl-occ ' + (r.occupied ? 'on' : 'off');
+    const occ = L.querySelector('.rl-occ');
+    occ.textContent = r.occupied == null ? '' : r.occupied ? '● فيها حدا' : '○ فاضية';
+    occ.className = 'rl-occ ' + (r.occupied ? 'on' : 'off');
     const tEl = L.querySelector('.rl-temp');
     tEl.textContent = r.temp_c == null ? '' : fmt(r.temp_c, 1) + '°';
     tEl.className = 'rl-temp mono' + (hot ? ' hot' : cold ? ' cold' : '');
@@ -262,36 +141,20 @@ function update() {
     const tag = pendRoom === r.id ? '<b class="t-pend">بانتظار موافقتك</b>'
       : r.waste ? '<b class="t-waste">هدر!</b>'
       : r.window_open ? '<b class="t-win">الشباك مفتوح</b>' : '';
-    const tagEl = e.tag.querySelector('.rl-tag');
+    const tagEl = $('pins').querySelector(`[data-rt="${r.id}"]`);
     if (tagEl.innerHTML !== tag) tagEl.innerHTML = tag;
   }
-
-  const maxW = Math.max(60, ...st.devices.map(d => d.est_w));
   for (const d of st.devices) {
-    const e = els.devs[d.id];
-    if (!e) continue;
+    const c = $('pins').querySelector(`[data-dev="${d.id}"]`);
+    if (!c) continue;
     const locked = d.tier === 'T2';
-    e.box.classList.toggle('on', d.is_on);
-    e.box.classList.toggle('off', !d.is_on);
-    e.box.classList.toggle('locked', locked);
-    e.box.classList.toggle('pend', pend === d.id);
-    e.box.classList.toggle('sel', ui.device === d.id);
-    e.box.classList.toggle('agent-off', d.agent_off > 0);
-    e.glow.classList.toggle('on', d.is_on && d.kind === 'light');
-    e.box.querySelector('.dev-w').textContent = d.is_on ? `${d.est_w} W` : 'مطفي';
-    const badge = locked ? '🔒' : !d.allow ? '⚠' : d.agent_off === 2 ? '✓' : d.agent_off === 1 ? '…' : '';
-    e.box.querySelector('.dev-badge').textContent = badge;
-    // Fan speed / airflow speed follow the power.
-    e.box.style.setProperty('--spd', d.is_on ? (1.6 - Math.min(1, d.est_w / 1200)).toFixed(2) + 's' : '0s');
-    const w = els.wires[d.id];
-    if (w) {
-      const frac = d.is_on ? Math.min(1, d.est_w / maxW) : 0;
-      w.classList.toggle('live', d.is_on && d.est_w > 0);
-      w.style.strokeWidth = (1.5 + frac * 4).toFixed(1);
-      w.style.animationDuration = (2.6 - frac * 2.1).toFixed(2) + 's';
-    }
+    c.classList.toggle('on', d.is_on); c.classList.toggle('off', !d.is_on && !locked); c.classList.toggle('pend', pend === d.id); c.classList.toggle('sel', ui.device === d.id);
+    c.classList.toggle('agent-off', d.agent_off > 0); c.classList.toggle('locked', locked);
+    c.querySelector('.chip-w').textContent = d.kind === 'ev' && st.ev && st.ev.charging ? `${fmt(st.ev.power_w / 1000, 1)} kW`
+      : d.is_on ? (d.est_w >= 1000 ? `${fmt(d.est_w / 1000, 1)} kW` : `${d.est_w} W`) : (locked ? '' : 'مطفي');
+    c.querySelector('.chip-badge').textContent = locked ? '🔒' : !d.allow ? '⚠' : d.agent_off === 2 ? '✓' : d.agent_off === 1 ? '…' : '';
   }
-
+  renderCar();
   const mw = st.meter.power_w;
   $('m-w').textContent = mw == null ? '—' : mw >= 1000 ? fmt(mw / 1000, 2) + ' kW' : fmt(mw, 0) + ' W';
   renderHud();
@@ -300,7 +163,22 @@ function update() {
   renderRoom();
   renderPrint();
   if (ui.tour !== null) renderTour();
-  placePins();
+}
+
+// The car in the driveway: battery, power, time to the target.
+function renderCar() {
+  const el = $('car-card');
+  if (!el || !st.ev) return;
+  const e = st.ev, soc = e.soc_pct == null ? null : Math.round(e.soc_pct);
+  const state = e.charging ? `⚡ عم تشحن · <b class="mono" dir="ltr">${fmt(e.power_w / 1000, 1)} kW</b>`
+    : e.resume_at ? `⏸ موقوف · بيكمّل <b class="mono" dir="ltr">${esc(e.resume_at)}</b>` : soc != null && soc >= 99 ? '✓ مشحونة' : 'مش عم تشحن';
+  const eta = !e.charging ? '' : e.minutes_to_target > 0 ? `${Math.floor(e.minutes_to_target / 60)}س ${e.minutes_to_target % 60}د لـ ${e.target_soc}٪` : `وصلت ${e.target_soc}٪`;
+  WW.render(el, `
+    <div class="car-top"><span>🚗 السيارة</span><span class="mono" dir="ltr">${soc == null ? '—' : soc + '%'}</span></div>
+    <div class="car-bar"><i style="width:${soc || 0}%"></i><u style="left:${e.target_soc}%"></u></div>
+    <div class="car-sub">${state}</div>
+    ${eta ? `<div class="car-sub dim">${eta}${e.session_kwh != null ? ` · ${fmt(e.session_kwh, 1)} kWh` : ''}</div>` : ''}`);
+  el.classList.toggle('charging', !!e.charging);
 }
 
 // ---------- top: meter + agent ----------
@@ -446,49 +324,59 @@ function renderPrint() {
 // ---------- guided tour: explains the whole process using the REAL system ----------
 const GOAL_TEXT = 'خفّض استهلاك البيت ١٥٪ هالأسبوع بدون ما نكسر حدود الراحة';
 const TOUR = [
-  { t: 'هاد بيت رقمي (Digital Twin)', spot: ['#stage'],
+  { t: 'هاد بيت رقمي (Digital Twin)', spot: ['#stage'], cam: () => scene3d.home(),
     body: () => `كل غرفة فيها حسّاسات (حركة، حرارة، إضاءة) وأجهزة. الخطوط المضيئة هي الكهربا طالعة من <b>عدّاد واحد</b> لكل جهاز شغّال، وكل ما زاد الاستهلاك بتسرع. ${st.source === 'simulator' ? 'هون البيانات اصطناعية من المحاكي، وبنفس الـ API تبع الجهاز الحقيقي.' : 'هون القراءات حقيقية من ESP32 والعدّاد PZEM.'}` },
-  { t: '١ · بنعطي الوكيل هدف، مش سؤال', spot: ['#hud-agent', '.pipe'],
+  { t: '١ · بنعطي الوكيل هدف، مش سؤال', spot: ['#hud-agent', '.pipe'], cam: () => scene3d.home(),
     body: () => st.goal ? `الهدف الحالي: «${esc(st.goal.text)}». الوكيل قسّمه لحاله لـ${st.steps.length} خطوات، شوفها فوق.`
       : `اكبس الزر وبنعطيه هدف: «${GOAL_TEXT}». هو بيقسّمه لخطوات لحاله.`,
     action: () => !st.goal && { label: 'أعطِ الوكيل الهدف', run: () => WW.post('/goal', { text: GOAL_TEXT }) } },
-  { t: '٢ · بيقرأ العدّاد والحسّاسات', spot: ['.meter', '#hud-meter', '.room'],
+  { t: '٢ · بيقرأ العدّاد والحسّاسات', spot: ['.pin.meter', '#hud-meter', '.pin.room'], cam: () => scene3d.focusPoint(scene3d.anchors.meter, 7),
     body: () => `العدّاد الآن: <b class="mono" dir="ltr">${fmt(st.meter.power_w, 0)} W</b>، فولتية <b class="mono" dir="ltr">${fmt(st.meter.voltage_v, 0)} V</b>. فوق كل غرفة: فيها حدا ولا لأ (حسّاس الحركة بيعطي بس فاضية/مشغولة، بدون كاميرات)، والحرارة، والاستهلاك.` },
-  { t: '٣ · بيعرف كل جهاز من بصمته', spot: ['#p-print'],
+  { t: '٣ · بيعرف كل جهاز من بصمته', spot: ['#p-print'], cam: () => scene3d.home(),
     body: () => `ما عنا عدّاد لكل جهاز. لما جهاز ينطفي، العدّاد بينزل «درجة». الوكيل بيقارن حجم الدرجة مع البصمات اللي تعلّمها وبيعرف مين الجهاز. هاد اسمه NILM.` },
-  { t: '٤ · بيكشف الهدر', spot: () => [demoRoomSel(), '#p-room'],
+  { t: '٤ · بيكشف الهدر', spot: () => [demoRoomSel(), '#p-room'], cam: () => scene3d.focusRoom(demoRoomId()),
     body: () => { const w = st.rooms.find(r => r.waste);
       return w ? `لقى هدر بـ<b>${esc(w.name)}</b>: فاضية وفي جهاز شغّال. لاحظ الغرفة صارت حمرا.`
         : st.source === 'simulator' ? 'اكبس الزر وبنعمل هدر: غرفة فاضية والمكيّف شغّال والشباك مفتوح. استنى ثواني والوكيل بيكتشفه.'
         : 'بالمختبر: غطّي حسّاس الحركة (الغرفة فاضية) والمروحة شغّالة، واستنى شوي.'; },
     action: () => st.source === 'simulator' && !st.pending && { label: 'اعمل هدر', run: () => WW.post('/scenario', { name: 'bedroom_empty_window' }) } },
-  { t: '٥ · بيطلب موافقتك قبل أي إجراء', spot: ['#p-approval'],
+  { t: '٥ · بيطلب موافقتك قبل أي إجراء', spot: ['#p-approval'], cam: () => scene3d.focusRoom(demoRoomId()),
     body: () => st.pending ? `هاي بطاقة الموافقة (نفسها بتطلع عالتلفون، والجهاز بيزمّر). <b>اكبس موافق أو ارفض بنفسك.</b> إذا رفضت أو سكتت ← ما بصير إشي.`
       : st.last_approval ? `آخر قرار: ${esc({ approved: 'وافقت', rejected: 'رفضت، فما صار إشي', expired: 'خلصت المهلة، فما صار إشي', blocked: 'حارس السياسات منعه', cancelled: 'انلغى' }[st.last_approval.status] || '')}.`
       : 'لسا ما في طلب. ارجع خطوة واعمل هدر، أو استنى الوكيل.' },
-  { t: '٦ · الريليه بينفّذ والعدّاد بيتأكّد', spot: () => [pendingOrLastDevSel(), '#p-print', '.meter'],
+  { t: '٦ · الريليه بينفّذ والعدّاد بيتأكّد', spot: () => [pendingOrLastDevSel(), '#p-print', '.pin.meter'], cam: () => scene3d.focusRoom(demoRoomId()),
     body: () => { const s = lastStep(); const v = st.devices.find(d => d.agent_off === 2);
       return `بعد موافقتك، الوكيل بيبعت أمر للريليه، والجهاز بينطفي فعليًا (شوف الأنيميشن وقف والخط انطفى). بعدها بيقيس العدّاد: ${s && s.match ? `نزل <b class="mono" dir="ltr">${Math.abs(Math.round(s.d))} W</b> وطابق بصمة ${esc(s.match.dev.name)}.` : 'لازم يشوف نزول بحجم بصمة الجهاز.'} ${v ? `✓ ${esc(v.name)}: متأكّد بالعدّاد.` : ''}`; } },
-  { t: '٧ · التوفير مقاس، والأمان بالكود', spot: ['#hud-meter', '.dev.locked'],
+  { t: '🚗 · شاحن السيارة الكهربائية', when: () => !!st.ev, spot: ['.pin.car', '.pin[data-pin^="dev:ev"]'],
+    cam: () => scene3d.anchors.car && scene3d.focusPoint(scene3d.anchors.car, 8),
+    body: () => { const e = st.ev;
+      return e.charging
+        ? `السيارة عم تشحن <b class="mono" dir="ltr">${fmt(e.power_w / 1000, 1)} kW</b>. الوكيل عرف إنه الشاحن من <b>البصمة</b>: درجة +${fmt((e.recognized_step_w || 0) / 1000, 1)} kW على العدّاد. البطارية ${Math.round(e.soc_pct || 0)}٪ ${e.minutes_to_target > 0 ? `وبدها ${Math.floor(e.minutes_to_target / 60)} س و ${e.minutes_to_target % 60} د لـ ${e.target_soc}٪.` : `ووصلت الهدف (${e.target_soc}٪).`} بيبعتلك إشعار لما يبلّش ولما يخلص (kWh والدنانير). وبالمسا إذا البيت قرّب من حد القاطع، بيقترح يأجّل الشحن لنص الليل، <b>بشرط</b> السيارة تكون جاهزة قبل ${esc(e.ready_by)}، وبيستنى موافقتك.`
+        : `اكبس الزر: السيارة بتوصل والبطارية ٣٠٪ وبتنشبك عالشاحن (7.4 kW). شوف الكابل بيضوي والعدّاد بيقفز، والوكيل بيعرفها من بصمتها.`; },
+    action: () => st.ev && !st.ev.charging && st.source === 'simulator' && { label: 'السيارة وصلت', run: () => WW.post('/scenario', { name: 'ev_arrives' }) } },
+  { t: '٧ · التوفير مقاس، والأمان بالكود', spot: ['#hud-meter', '.chip.locked'], cam: () => scene3d.home(),
     body: () => `التوفير اللي بنعرضه بس اللي العدّاد قاسه: <b class="mono" dir="ltr">${fmt(st.savings.kwh, 2)} kWh</b> = <b class="mono" dir="ltr">${fmt(st.savings.jod, 3)} JD</b>. الأجهزة اللي عليها 🔒 (ثلاجة، إنذار حريق) ممنوع حدا يطفيها، والمنع مكتوب بالكود مش بالذكاء الاصطناعي. وزر الطوارئ بيرجّع كل إشي طبيعي.` },
 ];
 
-function demoRoomSel() {
+function demoRoomId() {
+  const pendDev = st.devices.find(d => d.id === pendingDeviceId());
   const w = st.rooms.find(r => r.waste);
-  const id = w ? w.id : (st.rooms.find(r => r.id === 'bedroom') || st.rooms.find(r => r.id === 'meeting') || st.rooms[0]).id;
-  return `.room[data-room="${id}"]`;
+  return pendDev ? pendDev.room : w ? w.id : (st.rooms.find(r => r.id === 'bedroom') || st.rooms.find(r => r.id === 'meeting') || st.rooms[0]).id;
 }
+function demoRoomSel() { return `.pin[data-pin="room:${demoRoomId()}"]`; }
 function pendingOrLastDevSel() {
   const id = pendingDeviceId() || (st.devices.find(d => d.agent_off > 0) || {}).id;
-  return id ? `.dev[data-dev="${id}"]` : '.dev.on';
+  return id ? `.pin[data-pin="dev:${id}"]` : '.chip.on';
 }
 
 function renderTour() {
+  if (TOUR[ui.tour].when && !TOUR[ui.tour].when()) { ui.tour = Math.min(TOUR.length - 1, ui.tour + 1); }
   const step = TOUR[ui.tour];
   const spots = typeof step.spot === 'function' ? step.spot() : step.spot;
   document.querySelectorAll('.spot').forEach(e => e.classList.remove('spot'));
   for (const sel of spots) document.querySelectorAll(sel).forEach(e => e.classList.add('spot'));
   document.body.classList.add('touring');
+  if (ui.tourFocus !== ui.tour) { ui.tourFocus = ui.tour; if (step.cam) step.cam(); }
   const act = step.action && step.action();
   const dots = TOUR.map((_, i) => `<button class="td${i === ui.tour ? ' on' : ''}" data-act="tour-go" data-step="${i}" aria-label="خطوة ${i + 1}"></button>`).join('');
   WW.render($('tour'), `
@@ -506,7 +394,8 @@ function renderTour() {
   $('tour').hidden = false;
 }
 function closeTour() {
-  ui.tour = null;
+  ui.tour = null; ui.tourFocus = null;
+  if (scene3d) scene3d.home();
   $('tour').hidden = true;
   document.body.classList.remove('touring');
   document.querySelectorAll('.spot').forEach(e => e.classList.remove('spot'));
@@ -528,7 +417,7 @@ WW.onAction({
   room: d => { ui.room = d.id; ui.device = null; update(); },
   device: d => { const dev = st.devices.find(x => x.id === d.id); ui.device = d.id; ui.room = dev && dev.room; update(); },
   meter: () => { ui.tour = 2; update(); },
-  view: d => { ui.view = d.v; localSet('ww-house-view', d.v); fit(); update(); },
+  view: d => { ui.view = d.v; localSet('ww-house-view3', d.v); scene3d.setView(d.v); update(); },
   toggle: d => {
     const dev = st.devices.find(x => x.id === d.id);
     if (!dev) return;
@@ -578,9 +467,9 @@ function initSites() {
 
 initSites();
 window.addEventListener('resize', () => {
-  clearTimeout(fit.t);
-  fit.t = setTimeout(() => { built = ''; refresh(); }, 200);   // rebuild: the number of columns may change
+  clearTimeout(refresh.t);   // rebuild when switching between phone and wide layouts
+  refresh.t = setTimeout(() => { const n = $('scene').clientWidth < 600; if (n !== refresh.narrow) { refresh.narrow = n; built = ''; refresh(); } }, 250);
 });
-window.addEventListener('scroll', placePins, { passive: true });
+refresh.narrow = $('scene').clientWidth < 600;
 refresh();
 setInterval(refresh, 1000);
