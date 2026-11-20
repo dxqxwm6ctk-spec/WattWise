@@ -32,7 +32,10 @@ def norm(text: str) -> str:
 
 def read_goal(text: str) -> float | None:
     """The bill target in JD written inside the goal text, if any (5 to 1000)."""
-    m = re.search(r"\d+(?:\.\d+)?", norm(text))
+    t = norm(text)
+    # "15%" or "15 بالميه" is a reduction target, not dinars (see backend/goal.py).
+    t = re.sub(r"\d+(?:\.\d+)?\s*(?:%|٪|بالميه|في الميه|بالمئه|بالمائه)", " ", t)
+    m = re.search(r"\d+(?:\.\d+)?", t)
     if not m:
         return None
     value = float(m.group(0))

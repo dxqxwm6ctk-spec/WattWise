@@ -34,6 +34,12 @@ NEW_DEVICE_W = {"ac": 1100, "light": 30, "heater": 1800, "tv": 110, "washer": 60
                 "router": 12, "fridge": 150, "medical": 80, "other": 75}
 
 
+# Synthetic power factor per kind (typical textbook values, NOT measured). A real
+# PZEM-004T reports the PF of the whole circuit; the backend works out each
+# device's PF from the jump when it switches (backend/nilm.py).
+KIND_PF = {"light": 0.95, "heater": 1.0, "fan": 0.80, "ac": 0.85, "tv": 0.90, "pc": 0.95, "washer": 0.70,
+           "fridge": 0.80, "router": 0.55, "other": 0.90, "fire_alarm": 0.60, "medical": 0.90}
+
 
 def http_json(method: str, url: str, body: dict | None = None) -> dict:
     data = json.dumps(body).encode() if body is not None else None
@@ -55,6 +61,7 @@ class House:
         self.on = {k: d.get("on", True) for k, d in self.devices.items()}
         self.setpoint = {k: d["setpoint"] for k, d in self.devices.items() if "setpoint" in d}
         self.extra_w: dict[str, float] = {}      # devices added from the app: id -> true watts
+        self.extra_kind: dict[str, str] = {}     # and their kind (for the synthetic PF)
         self.speed = speed
         self.clock = datetime.now().replace(hour=19, minute=30, second=0, microsecond=0).timestamp()
         self.energy_kwh = start_kwh
@@ -70,6 +77,7 @@ class House:
         if learning and learning["device_id"] not in self.extra_w:
             base = NEW_DEVICE_W.get(learning["kind"], 75)
             self.extra_w[learning["device_id"]] = round(base * random.uniform(0.9, 1.1))
+            self.extra_kind[learning["device_id"]] = learning["kind"]
         # A device being learned is switched on by the user, before it exists in the backend.
         self.learning_id = learning["device_id"] if learning else None
         # Drop loads from a cancelled "add device" flow.
@@ -123,6 +131,16 @@ class House:
         if self.scenario == "unknown_load":   # a load the backend does not know about
             power += UNKNOWN_LOAD_W
         power = max(0.0, power)
+        # Reactive power of everything that is on -> PF of the whole circuit (what the PZEM shows).
+        reactive = 0.0
+        for k in all_ids:
+            kind = self.extra_kind.get(k) or self.devices.get(k, {}).get("kind", "other")
+            pf_k = KIND_PF.get(kind, 0.9)
+            reactive += self.device_w(k) * math.tan(math.acos(pf_k))
+        if self.scenario == "unknown_load":
+            reactive += UNKNOWN_LOAD_W * math.tan(math.acos(0.75))
+        apparent = math.hypot(power, reactive)
+        pf = power / apparent if apparent else 1.0
         minute = self.clock / 60
         volt = 229.4 + math.sin(minute) * 0.8
         self.energy_kwh += power / 1000 * (self.speed / 3600)
@@ -134,7 +152,8 @@ class House:
                 "power_w": round(power, 1),
                 "energy_kwh": round(self.energy_kwh, 3),
                 "voltage_v": round(volt, 1),
-                "current_a": round(power / volt / 0.94, 2),
+                "current_a": round(apparent / volt, 2),
+                "pf": round(pf, 3),
                 "freq_hz": round(50 + math.sin(minute * 1.7) * 0.03, 2),
             },
             "rooms": [

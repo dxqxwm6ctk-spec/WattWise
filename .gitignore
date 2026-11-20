@@ -9,3 +9,4 @@ venv/
 .DS_Store
 frontend/flutter/
 demo_video/
+firmware/**/config.h
