@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend import actions, agent, assistant, config, db, discovery, report, schedules, state
+from backend import actions, agent, assistant, bill_reader, config, db, discovery, report, schedules, state
 
 
 async def _agent_loop():
@@ -109,6 +109,17 @@ class NewDevice(BaseModel):
 
 class Command(BaseModel):
     text: str = Field(max_length=300)
+
+
+class BillPhoto(BaseModel):
+    # base64 of a JPG/PNG/WEBP photo (a data: URL is fine). Used once, never saved.
+    image_b64: str = Field(max_length=6_000_000)
+
+
+class BillNumbers(BaseModel):
+    kwh: float = Field(gt=0, le=100_000)
+    days: float | None = Field(default=None, gt=0, le=120)
+    amount_jod: float | None = Field(default=None, gt=0, le=100_000)
 
 
 class NewSchedule(BaseModel):
@@ -269,6 +280,25 @@ def post_command_run(site: str, body: Command):
 @app.get("/api/sites/{site}/why")
 def get_why(site: str):
     return _run(assistant.why_bill, site)
+
+
+@app.get("/api/bill/status")
+def get_bill_status():
+    """Can the server read bill photos now (is there an API key)? If not, the apps show the manual form."""
+    with db.connect() as conn:
+        return bill_reader.status(conn)
+
+
+@app.post("/api/sites/{site}/bill/photo")
+def post_bill_photo(site: str, body: BillPhoto):
+    """Claude reads the bill photo; the code checks it against the tariff and the meter. Photo is not stored."""
+    return _run(bill_reader.from_photo, site, body.image_b64)
+
+
+@app.post("/api/sites/{site}/bill/manual")
+def post_bill_manual(site: str, body: BillNumbers):
+    """Same analysis from numbers typed by hand (works with no key and no internet)."""
+    return _run(bill_reader.from_manual, site, body.kwh, body.days, body.amount_jod)
 
 
 @app.get("/api/sites/{site}/weekly.txt", response_class=PlainTextResponse)

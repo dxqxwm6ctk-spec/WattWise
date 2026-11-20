@@ -39,6 +39,13 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Same features in the phone web page and the Flutter app (new Schedules tab); AC set temperature removed from the UI (on/off only)
 - [ ] Voice input inside the Flutter app (needs a speech package; the web pages already have the mic)
 
+## Bill photo analysis
+- [x] Bill photo -> Claude vision reads kWh, period, tiers, amount (structured JSON); code checks it against the tariff and the meter; photo never stored (tests with a fake model)
+- [x] Manual entry fallback (kWh, days, JOD) when there is no key, no internet, or the budget is spent
+- [x] Web dashboard + phone page (upload/camera) and Flutter app (camera/gallery, `image_picker`)
+- [x] "ليش الفاتورة هيك؟" compares with the last bill
+- [ ] Try it with a real key on a real (anonymized) bill photo
+
 ## Data to fill (team)
 - [ ] Verify tariff tiers in `config/tariff.json` against a real, anonymized bill
 - [ ] Official CO2 grid emission factor for Jordan, with source

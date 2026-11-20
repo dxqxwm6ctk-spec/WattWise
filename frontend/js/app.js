@@ -25,6 +25,7 @@ const ui = {
   sched: { dev: null, on: '', off: '', msg: '' },
   heater: { hint: '', res: null, busy: false, msg: '' },
   why: { res: null, busy: false }, rep: { text: '', busy: false },
+  bill: { status: null, busy: false, res: null, msg: '', manual: false, kwh: '', days: '', amount: '' },
 };
 let st = null;
 
@@ -437,11 +438,57 @@ function billExtras() {
         <span style="font-size:13.5px;line-height:1.6;color:#4A6418">${esc(w.action)}</span>
         <span style="font-size:11.5px;color:#77756C">${esc(w.note)}</span></div>` : ''}
     </div>
+    ${billCard()}
     <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
       <button data-act="report" class="btn-line" style="height:50px;border-radius:16px;border-color:#1A1B16;font-size:15px;font-weight:700">${rep.busy ? 'عم نجهّز…' : rep.text ? 'جهّز تقرير جديد' : 'جهّز التقرير الأسبوعي'}</button>
       ${rep.text ? `<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.75;padding:12px;border-radius:12px;background:#F3F1EA;max-height:220px;overflow:auto">${esc(rep.text)}</div>
         <a href="/api/sites/${WW.site}/weekly.txt" download class="btn-dark" style="height:46px;border-radius:14px;font-size:14px;display:grid;place-items:center;text-decoration:none">نزّل الملف</a>` : ''}
     </div>`;
+}
+
+// Bill photo from the camera or the gallery. Claude reads it when there is a key; otherwise type 3 numbers.
+function billCard() {
+  const b = ui.bill, r = b.res, noPhoto = b.status && !b.status.photo;
+  const bn = r && r.bill;
+  const nums = !bn ? '' : [
+    bn.kwh != null && `${fmt(bn.kwh, 0)} ك.و.س`, bn.days && `${bn.days} يوم`,
+    bn.amount_jod != null && `${fmt(bn.amount_jod, 2)} دينار`,
+  ].filter(Boolean).map(x => `<span style="padding:4px 10px;border-radius:999px;background:#F3F1EA;font-size:12.5px;font-weight:600">${esc(x)}</span>`).join('');
+  const pick = (id, label, cap) => `<label class="btn-line" style="flex:1;height:48px;border-radius:16px;border-color:#1A1B16;font-size:14px;display:grid;place-items:center;cursor:pointer;${noPhoto || b.busy ? 'opacity:.45;pointer-events:none' : ''}">
+      ${label}<input id="${id}" type="file" accept="image/*" ${cap ? 'capture="environment"' : ''} hidden></label>`;
+  const manual = !(b.manual || noPhoto) ? '' : `<div style="display:flex;flex-direction:column;gap:8px">
+      <input id="bill-kwh" inputmode="decimal" value="${esc(b.kwh)}" placeholder="الاستهلاك (ك.و.س)" aria-label="الاستهلاك بالكيلوواط ساعة" style="${field}">
+      <div style="display:flex;gap:8px">
+        <input id="bill-days" inputmode="numeric" value="${esc(b.days)}" placeholder="عدد الأيام" aria-label="عدد أيام الفاتورة" style="${field};flex:1">
+        <input id="bill-amount" inputmode="decimal" value="${esc(b.amount)}" placeholder="المبلغ (دينار)" aria-label="مبلغ الفاتورة بالدينار" style="${field};flex:1">
+      </div>
+      <button data-act="bill-manual" class="btn-dark" style="height:48px;border-radius:16px;font-size:15px">حلّل الأرقام</button></div>`;
+  const result = !r ? '' : `<div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${nums}</div>
+      ${r.explanation.map(x => `<span style="font-size:14px;line-height:1.65">${esc(x)}</span>`).join('')}
+      ${r.checks.map(x => `<div style="padding:10px 12px;border-radius:12px;background:#F3F1EA;font-size:12.5px;line-height:1.55;color:#5E5C55">${esc(x)}</div>`).join('')}
+      ${r.ideas.map(x => `<span style="font-size:13.5px;line-height:1.6;color:#4A6418">• ${esc(x)}</span>`).join('')}
+      <span style="font-size:11.5px;color:#77756C">${esc(r.note)}</span></div>`;
+  return `
+    <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
+      <span class="sub">حلّل فاتورتك من صورة</span>
+      <div style="display:flex;gap:8px">${pick('bill-cam', b.busy ? 'عم نقرأ…' : '📷 صوّر الفاتورة', true)}${pick('bill-gal', 'من المعرض', false)}</div>
+      ${noPhoto ? `<span style="font-size:12.5px;line-height:1.55;color:#8A5A00">${esc(b.status.reason_ar)}</span>`
+        : `<button data-act="bill-toggle-manual" style="background:none;border:none;color:#5E5C55;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit">أو اكتب الأرقام بإيدك</button>`}
+      ${b.msg ? `<span style="font-size:12.5px;line-height:1.55;color:#8A5A00">${esc(b.msg)}</span>` : ''}
+      ${manual}${result}
+      <span style="font-size:11px;color:#77756C">الصورة بتنقرأ مرة وحدة وما بتنحفظ. بنحتفظ بس بالأرقام.</span>
+    </div>`;
+}
+
+async function billSend(promise) {
+  ui.bill.busy = true; ui.bill.msg = ''; renderAll();
+  try {
+    const r = await promise;
+    if (r.needs_manual) { ui.bill.manual = true; ui.bill.msg = r.message; }
+    else ui.bill.res = r;
+  } catch (e) { ui.bill.msg = e.message; }
+  ui.bill.busy = false; renderAll();
 }
 
 let recog = null;
@@ -503,6 +550,11 @@ const newHandlers = {
     try { ui.why.res = await WW.api('GET', `/api/sites/${WW.site}/why`); } catch (e) { showError(e.message); }
     ui.why.busy = false; renderAll();
   },
+  'bill-toggle-manual': () => { ui.bill.manual = !ui.bill.manual; renderAll(); },
+  'bill-manual': () => {
+    if (!(Number(ui.bill.kwh) > 0)) { ui.bill.msg = 'اكتب الكيلوواط ساعة (ك.و.س) من الفاتورة.'; renderAll(); return; }
+    return billSend(WW.billManual(ui.bill));
+  },
   report: async () => {
     ui.rep.busy = true; renderAll();
     try { ui.rep.text = await (await fetch(`/api/sites/${WW.site}/weekly.txt`)).text(); } catch (e) { showError(e.message); }
@@ -517,6 +569,16 @@ document.addEventListener('input', ev => {
   if (id === 'heater-hint') ui.heater.hint = v;
   if (id === 'sched-on') ui.sched.on = v;
   if (id === 'sched-off') ui.sched.off = v;
+  if (id === 'bill-kwh') ui.bill.kwh = v;
+  if (id === 'bill-days') ui.bill.days = v;
+  if (id === 'bill-amount') ui.bill.amount = v;
+});
+document.addEventListener('change', ev => {
+  if ((ev.target.id === 'bill-cam' || ev.target.id === 'bill-gal') && ev.target.files[0]) {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    billSend(WW.billPhoto(file));
+  }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.id === 'cmd-text') parseCommand(); });
 
@@ -621,5 +683,6 @@ window.addEventListener('message', ev => {
   if (ev.origin === location.origin && ev.data && ev.data.type === 'open-wizard') openWizard();
 });
 
+WW.billStatus().then(x => { ui.bill.status = x; }).catch(() => {});
 refresh();
 setInterval(refresh, 1000);

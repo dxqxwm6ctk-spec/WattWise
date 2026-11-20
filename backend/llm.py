@@ -43,6 +43,10 @@ class Provider:
     def run(self, system: str, user: str, tools: list[dict], call_tool, final_tools: set[str]) -> RunResult:
         raise NotImplementedError
 
+    def read_image(self, system: str, prompt: str, image_b64: str, media_type: str, schema: dict) -> tuple[dict, RunResult]:
+        """Look at one image and answer with JSON that matches `schema` (used by the bill reader)."""
+        raise NotImplementedError
+
 
 class AnthropicProvider(Provider):
     """Claude through the official `anthropic` SDK, manual tool loop."""
@@ -97,6 +101,33 @@ class AnthropicProvider(Provider):
                                      "content": json.dumps(out, ensure_ascii=False, default=str)})
             messages.append({"role": "user", "content": tool_results})
         raise ProviderError("too_many_rounds")
+
+    def read_image(self, system, prompt, image_b64, media_type, schema):
+        try:
+            r = self.client.with_options(timeout=config.LLM_VISION_TIMEOUT_S).beta.messages.create(
+                model=self.model,
+                max_tokens=8000,
+                system=system,
+                messages=[{"role": "user", "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_b64}},
+                    {"type": "text", "text": prompt},
+                ]}],
+                # The answer must be JSON that matches the schema (structured outputs).
+                output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
+                betas=["server-side-fallback-2026-07-01"],
+                fallbacks="default",
+            )
+        except self._anthropic.APIError as e:
+            raise ProviderError(f"{type(e).__name__}") from e
+        result = RunResult(input_tokens=r.usage.input_tokens or 0, output_tokens=r.usage.output_tokens or 0)
+        if r.stop_reason in ("refusal", "max_tokens"):
+            raise ProviderError(r.stop_reason)
+        text = "".join(b.text for b in r.content if b.type == "text")
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as e:
+            raise ProviderError("bad_json") from e
+        return data, result
 
 
 # ---------------- availability and spending cap ----------------

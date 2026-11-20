@@ -11,6 +11,7 @@
 | Household tariff tiers (`config/tariff.json`) | taken from the design, which cites the EMRC 2025 household tariff | **to verify against a real anonymized bill** |
 | CO2 grid emission factor | official source to be chosen | **missing, shown as "—"** |
 | Weather and solar radiation | Open-Meteo (free, no key, open data), `backend/weather.py`, default location Irbid | in use, optional: skipped when offline |
+| Electricity bill photo (optional) | the owner's own bill, uploaded by the owner; read once by Claude (vision), **never stored**; only kWh, days and JOD are kept; the model is told not to output names, addresses or account numbers. For the demo, use a bill with the name and numbers covered | in use when a key is set; manual entry otherwise |
 | LLM planner (optional) | Anthropic Claude API; it only receives the synthetic/sensor snapshot (rooms, watts, tariff, weather), never personal data | in use when a key is set |
 
 No personal data is collected. The PIR only reports occupied/empty. No cameras.
