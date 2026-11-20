@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../api.dart';
 import '../theme.dart';
 import '../widgets/assistant_widgets.dart';
+import '../widgets/device_visuals.dart';
 import '../widgets/meter_widgets.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -22,6 +23,8 @@ class HomeScreen extends StatelessWidget {
       CommandCard(api: api),
       const SizedBox(height: 12),
       _SummaryCard(st: st),
+      const SizedBox(height: 12),
+      RunningNowCard(devices: st['devices'] as List<dynamic>, pendingDeviceId: pending?['device_id'] as String?),
       const SizedBox(height: 12),
       pending != null
           ? _ApprovalCard(p: pending, onApprove: () => run(() => onApprove(pending['id'])), onReject: () => run(() => onReject(pending['id'])))
