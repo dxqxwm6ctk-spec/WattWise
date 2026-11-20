@@ -60,6 +60,10 @@ class House:
         self.energy_kwh = start_kwh
         self.scenario = "normal"
         self.fault_until = 0.0
+        # Home EV charger (synthetic): the car's battery, filled while the charger is on.
+        self.ev_cfg = cfg.get("ev") or {}
+        self.ev_soc = float(self.ev_cfg.get("sim", {}).get("start_soc", 55))
+        self.ev_draw_w = 0.0
 
     # --- apply what the backend asked for ---
     def apply(self, cmd: dict) -> None:
@@ -80,6 +84,8 @@ class House:
             self.scenario = cmd["scenario"]
             if self.scenario == "sensor_fault":
                 self.fault_until = time.time() + 25
+            if self.scenario == "ev_arrives":   # the car comes home with a low battery
+                self.ev_soc = float(self.ev_cfg.get("sim", {}).get("arrive_soc", 30))
 
     # --- physics (simple on purpose) ---
     def device_w(self, dev_id: str) -> float:
@@ -94,7 +100,21 @@ class House:
             return d["rated_w"] * (0.6 + 0.4 * math.sin(minute / 3))
         if d["kind"] == "ac":
             return d["rated_w"] * (1 + (24 - self.setpoint.get(dev_id, 24)) * 0.06)
+        if d["kind"] == "ev":
+            return self.ev_draw_w
         return d["rated_w"]
+
+    def step_ev(self) -> None:
+        """Charge the car: full power up to 90 %, then the car tapers the current down (like real EVs)."""
+        ev_on = any(self.on.get(k) for k, d in self.devices.items() if d["kind"] == "ev")
+        rated = next((d["rated_w"] for d in self.devices.values() if d["kind"] == "ev"), 0)
+        if not ev_on or self.ev_soc >= 100 or not rated:
+            self.ev_draw_w = 0.0
+            return
+        taper = 1.0 if self.ev_soc < 90 else max(0.08, (100 - self.ev_soc) / 10)
+        self.ev_draw_w = rated * taper * random.uniform(0.985, 1.0)
+        battery = self.ev_cfg.get("battery_kwh", 60)
+        self.ev_soc = min(100.0, self.ev_soc + self.ev_draw_w / 1000 * (self.speed / 3600) / battery * 100 * 0.92)
 
     def occupied(self, room: str) -> bool:
         if self.scenario == "holiday":
@@ -118,6 +138,7 @@ class House:
         return round(t + random.uniform(-0.15, 0.15), 1)
 
     def reading(self) -> dict:
+        self.step_ev()
         all_ids = list(self.devices) + list(self.extra_w)
         power = sum(self.device_w(k) for k in all_ids) + random.uniform(-20, 20)
         if self.scenario == "unknown_load":   # a load the backend does not know about
@@ -144,6 +165,7 @@ class House:
                  "occupied": self.occupied(r), "window_open": self.window_open(r)}
                 for r in self.rooms
             ],
+            **({"ev": {"soc_pct": round(self.ev_soc, 1), "plugged": True}} if self.ev_cfg else {}),
         }
 
 

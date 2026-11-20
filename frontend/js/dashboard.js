@@ -41,6 +41,7 @@ function toolbar() {
       <option value="holiday">عطلة (البيت فاضي)</option>
       <option value="sensor_fault">عطل حسّاسات</option>
       <option value="unknown_load">حمل غريب (جهاز مش مسجّل)</option>
+      <option value="ev_arrives">السيارة الكهربائية وصلت وعم تشحن</option>
       <option value="normal">رجّع طبيعي</option>
     </select>` : '';
   return `${other}${scen}

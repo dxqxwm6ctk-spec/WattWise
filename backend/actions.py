@@ -105,7 +105,8 @@ def ingest(conn, payload: dict) -> None:
         if d["is_on"] and dt_h:
             conn.execute("UPDATE devices SET energy_wh = energy_wh + ? WHERE site=? AND id=?",
                          (d["signature_w"] * dt_h, site, d["id"]))
-        if d["agent_off"] == AGENT_OFF_VERIFIED:
+        # A paused EV charge is only moved to later, not saved, so it is not counted.
+        if d["agent_off"] == AGENT_OFF_VERIFIED and d["kind"] != "ev":
             held_off_w += d["signature_w"]
 
     # Measured savings: only for actions the meter has already confirmed.
@@ -128,6 +129,9 @@ def ingest(conn, payload: dict) -> None:
              None if r.get("occupied") is None else int(r["occupied"]),
              None if r.get("window_open") is None else int(r["window_open"])),
         )
+
+    from backend import ev   # local import: ev.py uses this module too
+    ev.store_reading(conn, site, payload.get("ev"), meter_ts)
 
     # AI layer 1: is the meter reading what the known devices explain?
     rooms = payload.get("rooms", [])
@@ -283,6 +287,8 @@ def approve(conn, site: str, approval_id: int) -> dict:
     db.audit(conn, site, "T1", "agent", "command",
              f"أمر للمقبس الذكي: {'تشغيل' if a['turn_on'] else 'إطفاء'} {d['name']}.")
     set_phase(conn, site, "executing")
+    from backend import ev
+    ev.after_approval(conn, site, a, json.loads(a["details"] or "{}"))   # smart charging: resume timer
     return db.one(conn.execute("SELECT * FROM approvals WHERE id=?", (a["id"],)))
 
 
@@ -356,6 +362,12 @@ def set_scenario(conn, site: str, name: str) -> None:
         raise ActionError("سيناريو مش معروف.")
     db.set_state(conn, f"scenario:{site}", name)
     demo = config.load_sites()[site].get("demo_waste")
+    if name == "ev_arrives":
+        evd = next((d for d in db.devices(conn, site) if d["kind"] == "ev"), None)
+        if not evd:
+            raise ActionError("ما في شاحن سيارة بهالموقع.")
+        db.set_device(conn, site, evd["id"], is_on=1, agent_off=AGENT_OFF_NONE)
+        db.audit(conn, site, "MANUAL", "human", "manual_switch", f"شبكنا السيارة على {evd['name']} (محاكاة).")
     if name == "bedroom_empty_window" and demo:
         db.set_device(conn, site, demo["device"], is_on=1, agent_off=AGENT_OFF_NONE)
     if get_phase(conn, site) not in ("pending", "executing"):
@@ -374,6 +386,7 @@ SCENARIOS = {
     "holiday": "عطلة: البيت كله فاضي والأجهزة ضلّت شغّالة.",
     "sensor_fault": "عطل حسّاسات: المحاكي بيوقف يبعت قراءات شوي.",
     "unknown_load": "حمل غريب: جهاز مش مسجّل (≈ 700 واط) انشغل بالبيت.",
+    "ev_arrives": "السيارة الكهربائية وصلت والبطارية ٣٠٪، وصاحب البيت شبكها عالشاحن.",
 }
 
 

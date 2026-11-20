@@ -4,9 +4,9 @@ import calendar
 import json
 import time
 
-from backend import actions, anomaly, billing, config, db, forecast, llm, mv, schedules, weather
+from backend import actions, anomaly, billing, config, db, ev, forecast, llm, mv, schedules, weather
 
-CATEGORY = {"ac": "المكيّفات", "fan": "المكيّفات", "fridge": "الثلاجة", "heater": "سخّان الماء",
+CATEGORY = {"ac": "المكيّفات", "fan": "المكيّفات", "fridge": "الثلاجة", "heater": "سخّان الماء", "ev": "شحن السيارة",
             "light": "الإنارة"}
 
 
@@ -167,4 +167,5 @@ def build(conn, site: str) -> dict:
         "learn": db.get_state(conn, f"learn:{site}"),
         "comfort": {"min_c": config.COMFORT_MIN_TEMP_C, "max_c": config.COMFORT_MAX_TEMP_C},
         "automation": schedules.listing(conn, site),
+        "ev": ev.status(conn, site),
     }
