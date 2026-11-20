@@ -1,9 +1,11 @@
 // "الأجهزة" tab: manual control of every device, AC set point, and the add-device wizard.
 
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../api.dart';
 import '../theme.dart';
+import '../widgets/device_visuals.dart';
 
 const deviceTypes = [
   (k: 'ac', label: 'مكيّف', locked: false),
@@ -30,6 +32,21 @@ class DevicesScreen extends StatefulWidget {
 
 class _DevicesScreenState extends State<DevicesScreen> {
   bool wizardOpen = false;
+  bool onlyRunning = false;
+
+  Widget _filterChip(String label, bool selected, VoidCallback onTap) => GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? WW.ink : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: selected ? WW.ink : WW.line, width: 1.5),
+          ),
+          child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? WW.paper : WW.ink)),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +55,11 @@ class _DevicesScreenState extends State<DevicesScreen> {
     }
     final st = widget.st;
     final devices = st['devices'] as List<dynamic>;
-    final onCount = devices.where((d) => d['is_on'] == true).length;
     final comfort = st['comfort'] as Map<String, dynamic>;
+    final pending = st['pending'] as Map<String, dynamic>?;
+    final pendingId = pending?['device_id'] as String?;
+    final pendingOn = pending?['turn_on'] == true;
+    final shown = onlyRunning ? devices.where((d) => d['is_on'] == true).toList() : devices;
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       SizedBox(
@@ -63,25 +83,60 @@ class _DevicesScreenState extends State<DevicesScreen> {
               style: TextStyle(fontSize: 13.5, height: 1.6, color: Color(0xFF6B4A00))),
         ),
       ],
-      const SizedBox(height: 8),
-      Text('$onCount شغّال من ${devices.length}', style: const TextStyle(fontSize: 13, color: WW.sub)),
-      for (final d in devices) ...[
+      const SizedBox(height: 10),
+      RunningNowCard(devices: devices, pendingDeviceId: pendingId),
+      const SizedBox(height: 10),
+      Row(children: [
+        _filterChip('الكل', !onlyRunning, () => setState(() => onlyRunning = false)),
+        const SizedBox(width: 8),
+        _filterChip('الشغّالة بس', onlyRunning, () => setState(() => onlyRunning = true)),
+      ]),
+      for (final d in shown) ...[
         const SizedBox(height: 8),
-        _DeviceTile(d: d, comfort: comfort, api: widget.api, run: widget.run),
+        _DeviceTile(key: ValueKey(d['id']), d: d, comfort: comfort, api: widget.api, run: widget.run, pending: d['id'] == pendingId, pendingTurnOn: pendingOn),
       ],
+      if (shown.isEmpty)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Text('ما في ولا جهاز شغّال هلأ.', textAlign: TextAlign.center, style: TextStyle(color: WW.sub)),
+        ),
     ]);
   }
 }
 
-class _DeviceTile extends StatelessWidget {
-  const _DeviceTile({required this.d, required this.comfort, required this.api, required this.run});
+class _DeviceTile extends StatefulWidget {
+  const _DeviceTile({super.key, required this.d, required this.comfort, required this.api, required this.run, required this.pending, this.pendingTurnOn = false});
   final dynamic d;
   final Map<String, dynamic> comfort;
   final WattWiseApi api;
   final Future<void> Function(Future<void> Function()) run;
+  final bool pendingTurnOn;
+  final bool pending; // the agent asked to switch this device and waits for the owner
+
+  @override
+  State<_DeviceTile> createState() => _DeviceTileState();
+}
+
+class _DeviceTileState extends State<_DeviceTile> {
+  // Shown right away when the owner taps, so the animation starts at once.
+  // Cleared when the server answers (if it refuses, the card goes back).
+  bool? optimistic;
+
+  dynamic get d => widget.d;
+
+  Future<void> _send(bool on, {bool confirmed = false}) async {
+    HapticFeedback.lightImpact();
+    setState(() => optimistic = on);
+    await widget.run(() => widget.api.toggle(d['id'], on, confirmed: confirmed));
+    if (mounted) setState(() => optimistic = null);
+  }
 
   Future<void> _toggle(BuildContext context) async {
     final on = d['is_on'] == true;
+    if (d['tier'] == 'T2') {
+      HapticFeedback.heavyImpact();
+      return widget.run(() => widget.api.toggle(d['id'], !on)); // the server explains why it is blocked
+    }
     if (d['sensitive'] == true && on) {
       final ok = await showDialog<bool>(
         context: context,
@@ -94,30 +149,107 @@ class _DeviceTile extends StatelessWidget {
           ],
         ),
       );
-      if (ok == true) await run(() => api.toggle(d['id'], false, confirmed: true));
+      if (ok == true) await _send(false, confirmed: true);
       return;
     }
-    await run(() => api.toggle(d['id'], !on));
+    await _send(!on);
   }
 
   @override
   Widget build(BuildContext context) {
-    final on = d['is_on'] == true;
     final locked = d['tier'] == 'T2';
-    final state = locked ? 'محمي · دايمًا شغّال' : on ? 'شغّال' : 'مطفي';
-    return WWBox(
-      padding: 14,
-      child: Column(children: [
-        Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${d['name']}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 2),
-              Text('${d['room_name']} · $state', style: const TextStyle(fontSize: 12, color: WW.sub)),
-            ]),
+    final on = optimistic ?? (d['is_on'] == true);
+    final kind = '${d['kind']}';
+    final accent = deviceAccent(kind);
+    // While waiting for the server we show the device's known signature.
+    final watts = optimistic == null ? (d['est_w'] as num) : (on ? d['signature_w'] as num : 0);
+    final state = locked
+        ? 'محمي · دايمًا شغّال'
+        : on
+            ? runningWord(kind)
+            : d['agent_off'] != 0
+                ? 'طفّاه WattWise بموافقتك'
+                : 'مطفي';
+    const dur = Duration(milliseconds: 450);
+
+    return AnimatedContainer(
+      duration: dur,
+      curve: Curves.easeInOutCubic,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: on ? const [WW.darkCard1, WW.darkCard2] : const [Colors.white, Colors.white],
+        ),
+        border: Border.all(
+          color: widget.pending ? WW.amber : on ? Color.lerp(WW.darkCard1, accent, 0.35)! : WW.line,
+          width: widget.pending ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: on ? accent.withValues(alpha: 0.22) : Colors.transparent,
+            blurRadius: 22,
+            spreadRadius: -6,
+            offset: const Offset(0, 8),
           ),
-          WWToggle(on: on, locked: locked, onTap: () => _toggle(context)),
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          DeviceIcon(kind: kind, on: on, locked: locked, size: 54, dark: on),
+          const SizedBox(width: 12),
+          Expanded(
+            child: AnimatedDefaultTextStyle(
+              duration: dur,
+              style: TextStyle(color: on ? WW.paper : WW.ink, fontFamily: DefaultTextStyle.of(context).style.fontFamily),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${d['name']}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Row(children: [
+                  if (on) ...[LiveDot(color: accent, size: 6), const SizedBox(width: 2)],
+                  Flexible(
+                    child: Text('${d['room_name']} · $state',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: on ? const Color(0xFFA9A79D) : WW.sub)),
+                  ),
+                ]),
+              ]),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            WWToggle(on: on, locked: locked, onDark: on, onTap: () => _toggle(context)),
+            const SizedBox(height: 6),
+            AnimatedWatts(
+              watts: watts,
+              style: WW.mono.copyWith(fontSize: 13, fontWeight: FontWeight.w600, color: on ? accent : const Color(0xFFB9B6AA)),
+              unitStyle: WW.mono.copyWith(fontSize: 10, color: on ? const Color(0xFF8E8C82) : const Color(0xFFB9B6AA)),
+            ),
+          ]),
         ]),
+        AnimatedSize(
+          duration: dur,
+          curve: Curves.easeOutCubic,
+          child: widget.pending
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(color: WW.pendingBg, borderRadius: BorderRadius.circular(12)),
+                    child: Row(children: [
+                      const LiveDot(color: Color(0xFFE8A21A), size: 6),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text('WattWise بدّه ${widget.pendingTurnOn ? 'يشغّله' : 'يطفيه'} · بانتظار موافقتك بصفحة البيت',
+                            style: const TextStyle(fontSize: 12, color: WW.pendingText, fontWeight: FontWeight.w600)),
+                      ),
+                    ]),
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
+        ),
       ]),
     );
   }

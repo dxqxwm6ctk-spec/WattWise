@@ -24,6 +24,7 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Web approval page (PWA, works offline on the local network) as backup for the Flutter app
 - [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands (78 passing)
 - [x] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API (tested as a web build against the simulator)
+- [x] Flutter app: live animated device cards (fan spins, lamp glows, heater waves), "running now" strip, counting watts (tested as a web build against the simulator)
 - [ ] Run the Flutter app on a real Android phone on the local Wi-Fi
 - [x] LLM planner + explainer with tool use, spending cap, provider abstraction, rule-based fallback (tested with a fake provider; 38 tests passing)
 - [ ] Try the LLM planner with a real API key (team puts the key in `.env`)
