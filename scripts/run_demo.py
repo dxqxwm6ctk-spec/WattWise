@@ -62,6 +62,7 @@ def main() -> None:
                 f.unlink()
         env["WATTWISE_DB"] = str(db)
 
+    env["WATTWISE_PORT"] = str(args.port)   # the backend announces this port to the phone app
     py = sys.executable
     procs = [subprocess.Popen([py, "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", str(args.port),
                                "--log-level", "warning"], cwd=ROOT, env=env)]

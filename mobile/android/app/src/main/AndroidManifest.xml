@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- The app talks to our own backend on the local Wi-Fi (plain HTTP, no internet needed). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Only to scan the dashboard's QR code (the server address). Nothing is recorded. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <application
         android:label="WattWise"
         android:usesCleartextTraffic="true"

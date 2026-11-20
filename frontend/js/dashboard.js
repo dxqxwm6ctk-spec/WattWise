@@ -489,5 +489,7 @@ document.addEventListener('input', ev => {
 });
 
 $('phone-frame').src = 'app.html?site=' + encodeURIComponent(WW.site) + '&embed=1';
+// Show the address that is inside the QR code (for typing it by hand if needed).
+fetch('/api/connect').then(r => r.json()).then(d => { $('connect-url').textContent = d.url; }).catch(() => {});
 refresh();
 setInterval(refresh, 1000);

@@ -7,11 +7,11 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend import actions, agent, config, db, report, state
+from backend import actions, agent, config, db, discovery, report, state
 
 
 async def _agent_loop():
@@ -27,7 +27,10 @@ async def _agent_loop():
 async def lifespan(app: FastAPI):
     db.init_db()
     task = asyncio.create_task(_agent_loop())
+    announcer = discovery.Announcer()   # lets the phone app find this laptop on the Wi-Fi
+    announcer.start()
     yield
+    announcer.stop()
     task.cancel()
 
 
@@ -108,7 +111,18 @@ class NewDevice(BaseModel):
 
 @app.get("/api/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "app": "wattwise"}
+
+
+@app.get("/api/connect")
+def connect_info():
+    """The address the phone app should use (also inside the QR code)."""
+    return {"url": discovery.server_url()}
+
+
+@app.get("/api/connect/qr.svg")
+def connect_qr():
+    return Response(discovery.qr_svg(discovery.server_url()), media_type="image/svg+xml")
 
 
 @app.post("/api/readings")

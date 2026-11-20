@@ -3,6 +3,8 @@ uvicorn>=0.29
 pydantic>=2.6
 # scikit-learn is used in the next step (anomaly detection, forecasting, M&V baseline)
 scikit-learn>=1.4
+# QR code on the dashboard so the phone app can find the server (pure Python, offline)
+qrcode>=7.4
 # optional LLM planner (the app runs without it, on the rule-based planner)
 anthropic>=2.11
 pytest>=8

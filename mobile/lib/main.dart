@@ -10,10 +10,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'discovery.dart';
 import 'screens/bill_screen.dart';
 import 'screens/devices_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/safety_screen.dart';
+import 'screens/scan_screen.dart';
 import 'theme.dart';
 
 void main() => runApp(const WattWiseApp());
@@ -47,12 +49,16 @@ class RootPage extends StatefulWidget {
 
 class _RootPageState extends State<RootPage> {
   static const _urlKey = 'server_url';
+  // What the "where is the server?" dialog can return besides a typed address.
+  static const _choiceSearch = '#search';
+  static const _choiceScan = '#scan';
 
   WattWiseApi? api;
   Map<String, dynamic>? st;
   String? connectionError;
   int tab = 0;
   Timer? timer;
+  bool searching = false;
 
   @override
   void initState() {
@@ -71,10 +77,38 @@ class _RootPageState extends State<RootPage> {
     var url = prefs.getString(_urlKey);
     // When the web build is served by our own backend, use the same address.
     if (url == null && kIsWeb && Uri.base.scheme.startsWith('http')) url = Uri.base.origin;
-    if (url == null) {
-      if (mounted) _askServer();
+    // Use the saved address if the server answers there; otherwise look for it on the network.
+    if (url != null && (kIsWeb || await isWattWise(url))) {
+      _connect(url);
       return;
     }
+    await _searchAndConnect();
+  }
+
+  /// Looks for the laptop on the Wi-Fi. If it is not found, asks the user.
+  Future<void> _searchAndConnect() async {
+    if (!mounted) return;
+    setState(() => searching = true);
+    final url = await findServer();
+    if (!mounted) return;
+    setState(() => searching = false);
+    if (url == null) {
+      _askServer(notFound: true);
+      return;
+    }
+    await _save(url);
+    _connect(url);
+  }
+
+  Future<void> _save(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_urlKey, url);
+  }
+
+  Future<void> _scanQr() async {
+    final url = await Navigator.push<String>(context, MaterialPageRoute(builder: (_) => const ScanScreen()));
+    if (url == null || !mounted) return;
+    await _save(url);
     _connect(url);
   }
 
@@ -89,28 +123,49 @@ class _RootPageState extends State<RootPage> {
     timer = Timer.periodic(const Duration(seconds: 1), (_) => _refresh());
   }
 
-  Future<void> _askServer() async {
+  Future<void> _askServer({bool notFound = false}) async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
-    final ctrl = TextEditingController(text: prefs.getString(_urlKey) ?? 'http://192.168.1.10:8000');
-    final url = await showDialog<String>(
+    final ctrl = TextEditingController(text: prefs.getString(_urlKey) ?? '');
+    final choice = await showDialog<String>(
       context: context,
       barrierDismissible: api != null,
       builder: (c) => AlertDialog(
-        title: const Text('وين السيرفر؟'),
-        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('اكتب عنوان اللابتوب اللي شغّال عليه WattWise. لازم الهاتف واللابتوب يكونوا على نفس الـ Wi-Fi.'),
-          const SizedBox(height: 12),
-          TextField(controller: ctrl, textDirection: TextDirection.ltr, keyboardType: TextInputType.url),
+        title: Text(notFound ? 'ما لقينا اللابتوب' : 'وين السيرفر؟'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('تأكد إنه WattWise شغّال على اللابتوب، وإنه الهاتف واللابتوب على نفس الـ Wi-Fi.'),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(c, _choiceScan),
+            style: FilledButton.styleFrom(backgroundColor: WW.ink),
+            icon: const Icon(Icons.qr_code_scanner),
+            label: const Text('امسح الـ QR من لوحة التحكم'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.pop(c, _choiceSearch),
+            icon: const Icon(Icons.wifi_find),
+            label: const Text('دوّر مرة تانية'),
+          ),
+          const SizedBox(height: 14),
+          const Text('أو اكتب العنوان بإيدك:', style: TextStyle(fontSize: 13, color: WW.sub)),
+          TextField(
+            controller: ctrl,
+            textDirection: TextDirection.ltr,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(hintText: 'http://192.168.1.10:8000'),
+          ),
         ]),
         actions: [
-          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), style: FilledButton.styleFrom(backgroundColor: WW.ink), child: const Text('اتصل')),
+          TextButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('اتصل')),
         ],
       ),
     );
-    if (url == null || url.isEmpty) return;
-    await prefs.setString(_urlKey, url);
-    _connect(url);
+    if (choice == null || choice.isEmpty) return;
+    if (choice == _choiceSearch) return _searchAndConnect();
+    if (choice == _choiceScan) return _scanQr();
+    await _save(choice);
+    _connect(choice);
   }
 
   Future<void> _refresh() async {
@@ -146,7 +201,17 @@ class _RootPageState extends State<RootPage> {
     final s = st, a = api;
     Widget body;
     if (a == null) {
-      body = const Center(child: Text('بانتظار عنوان السيرفر…'));
+      body = Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (searching) const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(searching ? 'عم ندوّر على اللابتوب على الـ Wi-Fi…' : 'بانتظار عنوان السيرفر…'),
+          if (!searching) ...[
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: _askServer, child: const Text('وين السيرفر؟')),
+          ],
+        ]),
+      );
     } else if (s == null) {
       body = Center(
         child: Padding(
