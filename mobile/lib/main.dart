@@ -65,6 +65,8 @@ class _RootPageState extends State<RootPage> {
   String? connectionError;
   int tab = 0;
   Timer? timer;
+  // True while a state request is on its way, so slow answers never pile up.
+  bool refreshing = false;
 
   // The splash stays at least this long, so it never just flickers.
   bool splashMinDone = false;
@@ -190,7 +192,8 @@ class _RootPageState extends State<RootPage> {
 
   Future<void> _refresh() async {
     final a = api;
-    if (a == null) return;
+    if (a == null || refreshing) return;
+    refreshing = true;
     try {
       final s = await a.getState();
       if (mounted) setState(() { st = s; connectionError = null; failedTries = 0; });
@@ -204,14 +207,20 @@ class _RootPageState extends State<RootPage> {
         askedAfterFailures = true;
         _askServer();
       }
+    } finally {
+      refreshing = false;
     }
   }
 
   /// A notification was tapped: go to the home tab. If "طفّيه؟" was pressed,
   /// ask the backend for an approval request (the human still has to approve it).
+  /// It is also called after every refresh, to catch a tap that came before the first
+  /// state. It only moves to the home tab when there really was a tap; before this
+  /// check, every refresh (once a second) threw the user back to the home tab.
   void _onNotificationOpened() {
     final a = api;
     if (a == null || st == null || !mounted) return;
+    if (!Notifier.instance.takeOpened()) return;
     final alertId = Notifier.instance.pendingTurnOff;
     Notifier.instance.pendingTurnOff = null;
     setState(() => tab = 0);

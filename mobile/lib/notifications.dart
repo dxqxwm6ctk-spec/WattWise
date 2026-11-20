@@ -37,6 +37,24 @@ class Notifier {
   /// Called when a notification needs the app's attention (tap or action button).
   void Function()? onOpened;
 
+  // True only between a real notification tap and the moment the app handles it.
+  bool _openedPending = false;
+
+  /// Returns true once per notification tap, then false until the next tap.
+  /// The app uses this so that ordinary refreshes never move the user to another tab.
+  bool takeOpened() {
+    final was = _openedPending;
+    _openedPending = false;
+    return was;
+  }
+
+  /// Records a tap the same way a real notification does (used by tests too).
+  void markOpened({int? turnOffAlert}) {
+    if (turnOffAlert != null) pendingTurnOff = turnOffAlert;
+    _openedPending = true;
+    onOpened?.call();
+  }
+
   Future<void> init() async {
     if (kIsWeb || _ready) return; // the web page has its own browser notifications
     final darwin = DarwinInitializationSettings(
@@ -73,8 +91,8 @@ class Notifier {
 
   void _onResponse(NotificationResponse r) {
     final data = r.payload == null ? null : jsonDecode(r.payload!) as Map<String, dynamic>;
-    if (r.actionId == actionTurnOff && data?['alert'] is int) pendingTurnOff = data!['alert'] as int;
-    onOpened?.call();
+    final alert = r.actionId == actionTurnOff && data?['alert'] is int ? data!['alert'] as int : null;
+    markOpened(turnOffAlert: alert);
   }
 
   /// Called after every state refresh. Shows a notification for each new warning
