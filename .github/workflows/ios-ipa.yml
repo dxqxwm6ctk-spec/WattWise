@@ -44,18 +44,36 @@ jobs:
 
       - name: Build iOS app (no signing)
         run: |
+          set -o pipefail   # a failed xcodebuild must fail this step, even through "| tail"
           SERVER="${{ github.event.inputs.server }}"
           if [ -z "$SERVER" ]; then SERVER="$DEFAULT_SERVER"; fi
           echo "Server baked into the app: $SERVER"
-          flutter build ios --release --no-codesign --dart-define=WATTWISE_SERVER="$SERVER"
+          # 1) Flutter writes the Xcode settings (with the server address baked in).
+          flutter build ios --release --no-codesign --config-only --dart-define=WATTWISE_SERVER="$SERVER"
+          # 2) Xcode builds the app (and compiles the Dart code) with signing switched off for every
+          #    target. Errors are printed in the last lines below.
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath ../build/xc \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
+            build | tail -n 40
+          test -f ../build/xc/Build/Products/Release-iphoneos/Runner.app/Info.plist
+          test -f ../build/xc/Build/Products/Release-iphoneos/Runner.app/Frameworks/App.framework/App
 
       - name: Package Runner.app into an .ipa
         run: |
           rm -rf Payload WattWise.ipa
           mkdir Payload
-          cp -R build/ios/iphoneos/Runner.app Payload/
+          cp -R build/xc/Build/Products/Release-iphoneos/Runner.app Payload/
           zip -qry WattWise.ipa Payload
           ls -lh WattWise.ipa
+          # Check the .ipa before uploading: Sideloadly needs Payload/Runner.app/Info.plist,
+          # and a real app is several MB (a broken build is only a few KB).
+          unzip -l WattWise.ipa | grep -q " Payload/Runner.app/Info.plist$"
+          unzip -l WattWise.ipa | grep -q " Payload/Runner.app/Frameworks/App.framework/App$"
+          SIZE=$(stat -f%z WattWise.ipa)
+          echo "IPA size: $SIZE bytes"
+          test "$SIZE" -gt 2000000
 
       - uses: actions/upload-artifact@v4
         with:

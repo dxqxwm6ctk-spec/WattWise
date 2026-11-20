@@ -181,7 +181,7 @@ class _DeviceTileState extends State<_DeviceTile> {
         ],
       ),
     );
-    if (ok == true) await run(() => api.removePlug(d['id']));
+    if (ok == true) await widget.run(() => widget.api.removePlug(d['id']));
   }
 
   @override
