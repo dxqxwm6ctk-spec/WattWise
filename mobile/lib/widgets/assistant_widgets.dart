@@ -3,9 +3,13 @@
 //
 // The server understands the words and the Policy Guard checks every action.
 // Nothing runs until the owner presses "إيه، نفّذ".
+// The mic button only turns speech into text; the text then goes through the
+// exact same path as typing (parse, show the plan, wait for the owner's yes).
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import '../api.dart';
 import '../theme.dart';
@@ -62,6 +66,66 @@ class _CommandCardState extends State<CommandCard> {
   bool busy = false;
   String msg = '';
 
+  // Mic: speech to text on the phone (Arabic). Nothing is recorded or stored.
+  final speech = SpeechToText();
+  bool micReady = false; // initialize() succeeded once
+  bool listening = false;
+
+  Future<void> toggleMic() async {
+    if (listening) {
+      await speech.stop();
+      if (mounted) setState(() => listening = false);
+      return;
+    }
+    if (!micReady) {
+      // Asks for the mic (and on iPhone, speech recognition) permission the first time.
+      micReady = await speech.initialize(
+        onError: (_) {
+          if (mounted) setState(() => listening = false);
+        },
+        onStatus: (s) {
+          if ((s == 'done' || s == 'notListening') && mounted) setState(() => listening = false);
+        },
+      );
+      if (!micReady) {
+        if (mounted) showError(context, 'المايك مش متاح هون. اكتب الأمر بدالو.');
+        return;
+      }
+    }
+    // Prefer Jordanian Arabic, then any Arabic the phone has, else the phone's default.
+    final locales = await speech.locales();
+    String? locale;
+    for (final want in ['ar_JO', 'ar-JO', 'ar']) {
+      for (final l in locales) {
+        if (l.localeId == want || (want == 'ar' && l.localeId.startsWith('ar'))) {
+          locale = l.localeId;
+          break;
+        }
+      }
+      if (locale != null) break;
+    }
+    setState(() { listening = true; res = null; msg = ''; });
+    await speech.listen(
+      onResult: onSpeech,
+      listenOptions: SpeechListenOptions(
+        localeId: locale,
+        listenFor: const Duration(seconds: 15),
+        pauseFor: const Duration(seconds: 3),
+        partialResults: true,
+        cancelOnError: true,
+      ),
+    );
+  }
+
+  void onSpeech(SpeechRecognitionResult r) {
+    if (!mounted) return;
+    setState(() => text.text = r.recognizedWords);
+    if (r.finalResult) {
+      setState(() => listening = false);
+      parse(); // same as pressing "نفّذ": shows the plan, the owner still has to approve
+    }
+  }
+
   Future<void> parse() async {
     if (text.text.trim().isEmpty || busy) return;
     setState(() { busy = true; msg = ''; });
@@ -85,6 +149,7 @@ class _CommandCardState extends State<CommandCard> {
 
   @override
   void dispose() {
+    speech.cancel();
     text.dispose();
     super.dispose();
   }
@@ -98,7 +163,26 @@ class _CommandCardState extends State<CommandCard> {
       padding: 14,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Expanded(child: TextField(controller: text, decoration: wwField('قول: طفّي مكيّف النوم'), onSubmitted: (_) => parse())),
+          Expanded(child: TextField(controller: text, decoration: wwField(listening ? 'عم بسمعك…' : 'قول: طفّي مكيّف النوم'), onSubmitted: (_) => parse())),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 50,
+            height: 50,
+            child: Tooltip(
+              message: listening ? 'عم بسمعك، اضغط للإيقاف' : 'احكي',
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  backgroundColor: listening ? const Color(0xFFE8553F) : Colors.transparent,
+                  foregroundColor: listening ? Colors.white : WW.ink,
+                  side: const BorderSide(color: WW.ink, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: busy ? null : toggleMic,
+                child: Icon(listening ? Icons.stop : Icons.mic, size: 22),
+              ),
+            ),
+          ),
           const SizedBox(width: 8),
           darkButton(busy ? '…' : 'نفّذ', parse, height: 50),
         ]),
