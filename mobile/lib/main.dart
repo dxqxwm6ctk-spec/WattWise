@@ -53,6 +53,10 @@ class _RootPageState extends State<RootPage> {
   // What the "where is the server?" dialog can return besides a typed address.
   static const _choiceSearch = '#search';
   static const _choiceScan = '#scan';
+  // Optional server baked in at build time, for example the online Railway copy:
+  //   flutter build ios --dart-define=WATTWISE_SERVER=https://example.up.railway.app
+  // Empty by default, so normal builds still look for the laptop on the Wi-Fi.
+  static const _builtInServer = String.fromEnvironment('WATTWISE_SERVER');
 
   WattWiseApi? api;
   Map<String, dynamic>? st;
@@ -78,6 +82,7 @@ class _RootPageState extends State<RootPage> {
     var url = prefs.getString(_urlKey);
     // When the web build is served by our own backend, use the same address.
     if (url == null && kIsWeb && Uri.base.scheme.startsWith('http')) url = Uri.base.origin;
+    if (url == null && _builtInServer.isNotEmpty) url = _builtInServer;
     // Use the saved address if the server answers there; otherwise look for it on the network.
     if (url != null && (kIsWeb || await isWattWise(url))) {
       _connect(url);
