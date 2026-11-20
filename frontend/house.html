@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WattWise · البيت التفاعلي</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/house.css?v=1">
+</head>
+<body>
+<div class="hp">
+
+  <header class="hp-top">
+    <a class="brand" href="index.html" id="back-link">
+      <div class="logo">W/</div>
+      <div>
+        <div class="brand-title">البيت التفاعلي <span id="site-name"></span></div>
+        <div class="brand-sub" id="site-sub"></div>
+      </div>
+    </a>
+    <div class="hp-tools">
+      <div class="seg" id="site-seg"></div>
+      <div class="seg">
+        <button class="seg-b" data-act="view" data-v="iso" id="v-iso">3D</button>
+        <button class="seg-b" data-act="view" data-v="flat" id="v-flat">مخطط</button>
+      </div>
+      <button class="tb tour-b" data-act="tour-open">▶ كيف بيشتغل؟</button>
+      <a class="tb ghost" href="index.html" id="dash-link">لوحة التحكم</a>
+    </div>
+  </header>
+
+  <!-- The process, always visible: lights up with the agent's real phase. -->
+  <nav class="pipe" id="pipe" aria-label="مراحل عمل الوكيل"></nav>
+
+  <div class="hp-body">
+    <section class="stage" id="stage">
+      <div class="stage-hud">
+        <div class="hud-meter" id="hud-meter"></div>
+        <div class="hud-agent" id="hud-agent"></div>
+      </div>
+      <div class="scene" id="scene"><div class="plan" id="plan"></div><div class="pins" id="pins"></div></div>
+      <div class="stage-legend">
+        <span><i class="lg lg-flow"></i>تيار الكهربا (سرعته = الاستهلاك)</span>
+        <span><i class="lg lg-waste"></i>هدر</span>
+        <span><i class="lg lg-pend"></i>بانتظار موافقتك</span>
+        <span>🔒 جهاز ممنوع (حماية بالكود)</span>
+        <span id="data-note"></span>
+      </div>
+    </section>
+
+    <aside class="side" id="side">
+      <div class="panel" id="p-approval"></div>
+      <div class="panel" id="p-room"></div>
+      <div class="panel" id="p-print"></div>
+    </aside>
+  </div>
+</div>
+
+<!-- Guided "how it works" tour -->
+<div class="tour" id="tour" hidden></div>
+<div class="toast" id="toast"></div>
+
+<script src="js/common.js?v=3"></script>
+<script src="js/house.js?v=1"></script>
+</body>
+</html>

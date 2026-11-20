@@ -682,8 +682,9 @@ WW.onAction({
   },
   tariff: d => act(() => WW.post('/tariff', { type: d.type })),
   'open-wiz': () => {
-    const f = $('phone-frame');
-    if (f.contentWindow) f.contentWindow.postMessage({ type: 'open-wizard' }, location.origin);
+    const f = openPhone();
+    const send = () => f.contentWindow && f.contentWindow.postMessage({ type: 'open-wizard' }, location.origin);
+    if (f.dataset.loaded) send(); else f.addEventListener('load', send, { once: true });
   },
 });
 
@@ -708,7 +709,20 @@ document.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target.id === 'goal-text') document.querySelector('[data-act="set-goal"]').click();
 });
 
-$('phone-frame').src = 'app.html?site=' + encodeURIComponent(WW.site) + '&embed=1';
+// Phone preview lives in a drawer and loads only when opened (saves polling when unused).
+function openPhone() {
+  const f = $('phone-frame');
+  if (!f.src) {
+    f.addEventListener('load', () => { f.dataset.loaded = '1'; }, { once: true });
+    f.src = 'app.html?site=' + encodeURIComponent(WW.site) + '&embed=1';
+  }
+  $('phone-drawer').hidden = false;
+  return f;
+}
+$('phone-open').addEventListener('click', openPhone);
+$('phone-drawer').addEventListener('click', ev => { if (ev.target.closest('[data-close]')) $('phone-drawer').hidden = true; });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') $('phone-drawer').hidden = true; });
+$('house-link').href = 'house.html?site=' + encodeURIComponent(WW.site);
 // Show the address that is inside the QR code (for typing it by hand if needed).
 fetch('/api/connect').then(r => r.json()).then(d => { $('connect-url').textContent = d.url; }).catch(() => {});
 refresh();

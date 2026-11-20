@@ -102,7 +102,8 @@ def build(conn, site: str) -> dict:
     pending_out = None
     if pending:
         pending_out = {
-            "id": pending["id"], "title": pending["title"], "reason": pending["reason"],
+            "id": pending["id"], "device_id": pending["device_id"],
+            "title": pending["title"], "reason": pending["reason"],
             "details": json.loads(pending["details"] or "{}"),
             "expires_in_s": max(0, round(pending["expires_ts"] - now)),
             "timeout_s": config.APPROVAL_TIMEOUT_S,
