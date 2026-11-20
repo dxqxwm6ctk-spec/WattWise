@@ -5,7 +5,13 @@ const $ = id => document.getElementById(id);
 
 const SITE_SCALE = { home: { maxW: 4000, unit: 'kW' }, building: { maxW: 12000, unit: 'kW' }, lab: { maxW: 200, unit: 'W' } };
 const scale = SITE_SCALE[WW.site] || SITE_SCALE.home;
-const ui = { confirmId: null, goalText: 'خلّي فاتورة هالشهر تحت 30 دينار بدون ما تزعّج حدا بالبيت', goalTarget: '30' };
+const ui = {
+  confirmId: null, goalText: 'خلّي فاتورة هالشهر تحت 30 دينار بدون ما تزعّج حدا بالبيت',
+  cmd: { text: '', res: null, busy: false, msg: '' }, listening: false,
+  sched: { dev: null, on: '', off: '', msg: '' },
+  heater: { hint: '', res: null, busy: false, msg: '' },
+  why: { res: null, busy: false }, rep: { text: '', busy: false },
+};
 let st = null;
 const lbl = (key, fallback) => (st && st.labels && st.labels[key]) || fallback;
 let chart = null;
@@ -133,21 +139,19 @@ function goal() {
       </div>
       <div style="font-size:13.5px;line-height:1.45;color:${s.text}">${esc(s.label)}</div>
     </div>`).join('');
+  const form = `<div class="goal-form">
+      <input class="text" id="goal-text" value="${esc(ui.goalText)}" aria-label="اكتب هدفك بكلامك العادي"
+        placeholder="اكتب هدفك بكلامك: مثلاً بدي الفاتورة ما تتعدى ٢٥ دينار وما بدي حدا يحس بشي">
+      <button class="btn-lime" data-act="set-goal">${st.goal ? 'غيّر الهدف' : 'حوّله لخطة'}</button>
+    </div>`;
   let body;
   if (st.goal) {
     const t = st.goal.bill_target_jd;
     body = `<div style="font-size:clamp(20px,2.2vw,28px);font-weight:600;line-height:1.45;text-wrap:pretty">«${esc(st.goal.text)}»</div>
       ${t ? `<div class="muted">سقف الفاتورة: <span style="color:#B8F04A" class="mono">${fmt(t)} JD</span></div>` : ''}
-      ${planBox()}
-      <div><button class="tb ghost" data-act="clear-goal" style="height:30px;font-size:12px">تغيير الهدف</button></div>`;
+      ${form}${planBox()}`;
   } else {
-    body = `<div class="muted">أعطِ الوكيل هدف (مش سؤال)، وهو بيقسّمه لخطوات لحاله:</div>
-      <div class="goal-form">
-        <input class="text" id="goal-text" value="${esc(ui.goalText)}" aria-label="نص الهدف">
-        <label class="muted" style="display:flex;align-items:center;gap:6px">سقف الفاتورة
-          <input class="num" id="goal-target" type="number" min="1" value="${esc(ui.goalTarget)}" dir="ltr"> JD</label>
-        <button class="btn-lime" data-act="set-goal">أعطِ الوكيل الهدف</button>
-      </div>`;
+    body = `<div class="muted">أعطِ الوكيل هدف (مش سؤال) بكلامك العادي، وهو بيفهم الرقم وبيقسّمه لخطوات لحاله:</div>${form}`;
   }
   return `
     <div class="head">
@@ -164,10 +168,14 @@ function goal() {
 function planBox() {
   const p = st.plan;
   if (!p || !p.steps.length) return '';
-  const by = p.by === 'llm' ? 'خطة من النموذج الذكي' : 'خطة القواعد';
-  return `<div style="border:1px solid #2A2C25;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
-      <div class="muted" style="font-size:12px">${by}</div>
-      ${p.steps.map((x, i) => `<div style="font-size:13.5px;line-height:1.5"><span class="mono" style="color:#B8F04A">${i + 1}.</span> ${esc(x)}</div>`).join('')}
+  const by = p.by === 'llm' ? 'فهمها النموذج الذكي · بتتنفّذ عبر حارس السياسات' : 'قواعد بسيطة · بدون AI';
+  const tag = i => (p.tags || [])[i] === 'T1'
+    ? '<span class="mono" style="font-size:11px;color:#F2B544;flex:none;min-width:92px">T1 · بموافقتك</span>'
+    : '<span class="mono" style="font-size:11px;color:#B8F04A;flex:none;min-width:92px">T0 · تلقائي</span>';
+  return `<div style="border-radius:14px;border:1px solid #2E3A1C;background:#121609;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;font-size:11.5px;color:#8E8C82"><span>خطة الوكيل</span><span>${by}</span></div>
+      ${p.summary ? `<div style="font-size:14.5px;line-height:1.6;color:#ECEBE4">${esc(p.summary)}</div>` : ''}
+      ${p.steps.map((x, i) => `<div style="display:flex;gap:10px;align-items:baseline;font-size:13px;line-height:1.55">${tag(i)}<span style="color:#D9D7CF">${esc(x)}</span></div>`).join('')}
     </div>`;
 }
 
@@ -252,12 +260,7 @@ function devicesGrid() {
     const state = locked ? 'محمي · دايمًا شغّال' : on ? 'شغّال' : 'مطفي';
     const note = (d.added ? 'جديد · ' : '') + (locked ? 'T2 · ممنوع بالكود' : d.sensitive ? 'حساس · بيقطع تطبيق الموافقة' : !d.allow ? 'يدوي فقط · الوكيل ما بيقترح' : 'T1 · تحكم يدوي')
       + (d.agent_off ? ' · طفاه الوكيل بموافقتك' : '');
-    const ac = d.kind === 'ac' && d.setpoint != null ? `
-      <div style="display:flex;align-items:center;gap:4px" dir="ltr">
-        <button data-act="setpoint" data-id="${esc(d.id)}" data-delta="-1" style="width:28px;height:28px;border-radius:8px;border:1px solid #3A3C33;background:transparent;color:#ECEBE4;cursor:pointer;font-size:15px">−</button>
-        <span style="font-family:var(--mono);font-size:13px;min-width:32px;text-align:center">${fmt(d.setpoint)}°</span>
-        <button data-act="setpoint" data-id="${esc(d.id)}" data-delta="1" style="width:28px;height:28px;border-radius:8px;border:1px solid #3A3C33;background:transparent;color:#ECEBE4;cursor:pointer;font-size:15px">+</button>
-      </div>` : '';
+    const ac = '';   // on/off only: the AC set temperature is not controlled from the UI
     return `
       <div style="border-radius:14px;border:1px solid ${locked ? '#3A2A26' : on ? '#2E3A1C' : '#23251F'};background:#181A15;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0">
         <div style="display:flex;align-items:flex-start;gap:10px">
@@ -284,9 +287,175 @@ function devicesGrid() {
         <button class="btn-lime" data-act="open-wiz" style="height:34px;font-size:13px">+ ضيف جهاز</button>
       </div>
     </div>
-    ${learning}${confirm}
+    ${learning}${confirm}${commandBar()}
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px">${cards}</div>
     <div class="note">* بصمة تقديرية من لوحة الجهاز، لسا ما قسناها على العدّاد.</div>`;
+}
+
+// Typed or spoken orders. The server understands them, the Policy Guard checks each
+// action, and NOTHING runs until the user presses "yes".
+const micOk = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+function commandBar() {
+  const c = ui.cmd, r = c.res;
+  let result = '';
+  if (r) {
+    const items = r.items.map(i => `<div style="display:flex;gap:10px;align-items:baseline;font-size:13.5px">
+        <span style="font-weight:700;color:${i.ok ? '#B8F04A' : '#E8553F'}">${i.ok ? '✓' : '✕'}</span>
+        <span style="color:#D9D7CF">${esc(i.label)}</span><span style="color:#A9A79D;font-size:12px">${esc(i.why)}</span></div>`).join('');
+    const canRun = r.items.some(i => i.ok);
+    result = `<div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:14px;line-height:1.6;color:#ECEBE4">${esc(r.clarify || r.reply)}</span>${items}
+        <span style="font-size:11.5px;color:#A9A79D">فهمته بالقواعد البسيطة (بدون AI). حارس السياسات فحص كل إجراء.</span>
+        <div style="display:flex;gap:8px">
+          ${canRun ? '<button class="btn-lime" style="height:38px;font-size:13px" data-act="cmd-run">إيه، نفّذ</button>' : ''}
+          <button class="btn-ghost" data-act="cmd-cancel">لا</button>
+        </div></div>`;
+  }
+  return `<div class="cmd-box">
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <input class="field grow" id="cmd-text" value="${esc(c.text)}" aria-label="احكي أو اكتب أمرك للوكيل"
+          placeholder="احكي مع الوكيل: طفّي مكيّف النوم، شغّل إنارة الصالون، طفّي المكيّف بعد نص ساعة">
+        ${micOk ? `<button class="mic${ui.listening ? ' on' : ''}" data-act="cmd-mic" aria-label="${ui.listening ? 'عم بسمعك، اضغط للإيقاف' : 'احكي'}">🎤</button>` : ''}
+        <button class="btn-lime" style="height:42px" data-act="cmd-parse">${c.busy ? 'عم أفهم…' : 'نفّذ'}</button>
+      </div>${result}
+      ${c.msg ? `<span style="font-size:13px;color:#B8F04A">${esc(c.msg)}</span>` : ''}
+    </div>`;
+}
+
+let recog = null;
+function listen() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  if (recog) { try { recog.stop(); } catch (e) { /* already stopped */ } return; }
+  recog = new SR();
+  recog.lang = 'ar-JO'; recog.interimResults = false; recog.maxAlternatives = 1;
+  recog.onresult = e => { ui.cmd.text = e.results[0][0].transcript; parseCommand(); };
+  recog.onerror = () => toast('المايك مش متاح هون. اكتب الأمر بدالو.');
+  recog.onend = () => { recog = null; ui.listening = false; renderAll(); };
+  ui.listening = true; renderAll();
+  try { recog.start(); } catch (e) { recog = null; ui.listening = false; }
+}
+
+async function parseCommand() {
+  const text = ui.cmd.text.trim();
+  if (!text || ui.cmd.busy) return;
+  ui.cmd.busy = true; ui.cmd.msg = ''; renderAll();
+  try { ui.cmd.res = await WW.post('/command/parse', { text }); } catch (e) { toast(e.message); }
+  ui.cmd.busy = false; renderAll();
+}
+
+// Timers and daily schedules (on/off only), and the smart water-heater schedule.
+const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (متوقّع مش مقاس)` : '';
+const minLabel = n => n === 30 ? '30 دقيقة' : n === 60 ? 'ساعة' : 'ساعتين';
+
+function heaterPanel() {
+  const h = ui.heater, hr = h.res;
+  const hasHeater = st.devices.some(d => d.kind === 'heater' && d.tier === 'T1' && !d.sensitive);
+  if (!hasHeater) return '';
+  const proposal = !hr ? '' : `<div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:14px;line-height:1.6;color:#ECEBE4">${esc(hr.reply)}</span>
+      ${hr.items.map(i => `<div class="sub-box"><span class="mono" style="font-size:13px" dir="ltr">${esc(i.on_time)} → ${esc(i.off_time)}</span>
+        <span style="font-size:12.5px;color:#D9D7CF">${esc(i.why)}</span><span style="font-size:11.5px;color:#A9A79D">${estText(i.estimate)}</span></div>`).join('')}
+      <span style="font-size:12.5px;color:#C8E68A">المجموع ≈ ${fmt(hr.total.kwh, 1)} ك.و.س باليوم ≈ ${fmt(hr.total.jod, 2)} دينار (متوقّع مش مقاس)</span>
+      <div style="display:flex;gap:8px">
+        ${hr.items.length ? '<button class="btn-lime" style="height:38px;font-size:13px" data-act="heater-apply">إيه، اعتمده</button>' : ''}
+        <button class="btn-ghost" data-act="heater-cancel">لا</button>
+      </div></div>`;
+  return `<div class="panel green">
+      <span class="panel-title">سخّان الماء الذكي</span>
+      <span style="font-size:12.5px;line-height:1.6;color:#A9A79D">السخّان من أكبر الأحمال. بدل ما يضل شغّال، الوكيل بيقترح يسخّن بالساعة اللي قبل الحمّام بس، والحارس بيمنع أي فترة أطول من ٣ ساعات.</span>
+      <input class="field" id="heater-hint" value="${esc(h.hint)}" aria-label="متى بتحمّموا؟" placeholder="متى بتحمّموا؟ مثلاً: الصبح ٦ ونص والمسا ٩">
+      <button class="btn-lime" data-act="heater-suggest">${h.busy ? 'عم نخطّط…' : 'اقترحلي جدول للسخّان'}</button>
+      ${proposal}
+      ${h.msg ? `<span style="font-size:13px;line-height:1.6;color:#B8F04A">${esc(h.msg)}</span>` : ''}
+    </div>`;
+}
+
+function schedForm(a) {
+  const chips = a.devices.map(d => `<button class="chip${ui.sched.dev === d.id ? ' sel' : ''}" data-act="sched-dev" data-id="${esc(d.id)}">${esc(d.name)}</button>`).join('');
+  const btns = isFor => [30, 60, 120].map(n => `<button class="btn-ghost btn-sm" data-act="timer" data-min="${n}"${isFor ? ' data-for="1"' : ''}>${minLabel(n)}</button>`).join('');
+  return `<div class="panel">
+      <span class="panel-title">جدول أو مؤقّت لأي جهاز</span>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#8E8C82">يشتغل الساعة
+          <input class="field" type="time" id="sched-on" value="${esc(ui.sched.on)}"></label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#8E8C82">يطفي الساعة
+          <input class="field" type="time" id="sched-off" value="${esc(ui.sched.off)}"></label>
+        <button class="btn-lime" style="height:40px;font-size:13px" data-act="sched-add">ضيف الجدول</button>
+      </div>
+      ${ui.sched.msg ? `<span style="font-size:12px;color:#F2B544">${esc(ui.sched.msg)}</span>` : ''}
+      <div style="display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px solid #23251F">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12px;color:#8E8C82;min-width:84px">طفّيه بعد</span>${btns(false)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12px;color:#8E8C82;min-width:84px">شغّله لمدة</span>${btns(true)}</div>
+      </div>
+    </div>`;
+}
+
+function schedSection() {
+  const a = st.automation || { schedules: [], timers: [], devices: [] };
+  if (!a.devices.some(d => d.id === ui.sched.dev) && a.devices.length) {
+    ui.sched.dev = (a.devices.find(d => d.id === 'heater') || a.devices[0]).id;
+  }
+  const rows = a.schedules.map(r => `
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:#181A15;border:1px solid #23251F">
+      <div style="flex:1 1 240px;display:flex;flex-direction:column;gap:2px;min-width:0">
+        <span style="font-size:14px;font-weight:600">${esc(r.device_name)}${r.source === 'suggested' ? ' <span style="font-size:11px;color:#B8F04A">· مقترح ومعتمد</span>' : ''}</span>
+        <span class="mono" style="font-size:12.5px;color:#D9D7CF">${[r.on_time && 'تشغيل ' + r.on_time, r.off_time && 'إطفاء ' + r.off_time].filter(Boolean).join(' ← ')}</span>
+        <span style="font-size:11.5px;color:#8E8C82">${estText(r.estimate)}</span>
+      </div>
+      <span style="font-size:12px;color:#8E8C82">${r.enabled ? 'شغّال' : 'موقوف'}</span>
+      <button class="switch" style="background:${r.enabled ? '#3D5418' : '#2A2C25'}" data-act="sched-toggle" data-id="${r.id}" data-on="${r.enabled ? 1 : 0}" aria-label="${esc(r.device_name)}"><i style="${r.enabled ? 'left' : 'right'}:4px;background:${r.enabled ? '#B8F04A' : '#6F6D64'}"></i></button>
+      <button class="btn-ghost btn-sm" style="border-color:#4A2620;color:#E8553F" data-act="sched-del" data-id="${r.id}">حذف</button>
+    </div>`).join('');
+  const timers = a.timers.map(x => `
+    <div style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:#1E1A10;border:1px solid #5A4518">
+      <span class="mono" style="font-size:11px;color:#F2B544">TIMER</span>
+      <span style="flex:1;font-size:13.5px;color:#ECEBE4">${esc(x.text)}</span>
+      <button class="btn-ghost btn-sm" style="border-color:#5A4518;color:#F2B544" data-act="timer-del" data-id="${x.id}">إلغاء</button>
+    </div>`).join('');
+  const empty = !rows && !timers ? '<span style="font-size:12.5px;color:#6F6D64">ما في جداول لسا. جرّب «اقترحلي جدول للسخّان» أو قول للوكيل: سخّان الماء يشتغل من 6 لل 7.</span>' : '';
+  return `
+    <div class="head">
+      <div class="label">SCHEDULES · الجدولة والمؤقّتات</div>
+      <div style="font-size:11px;color:#6F6D64">تشغيل وإطفاء بس · بتشتغل بالسيرفر · الحارس بيفحص كل مرة${st.source === 'simulator' ? ' · ساعة المحاكي ×60' : ''}</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">${heaterPanel()}${schedForm(a)}</div>
+    <div style="display:flex;flex-direction:column;gap:8px">${empty}${rows}${timers}</div>`;
+}
+
+// "Why is my bill like this?" and the weekly report. Numbers come from the code.
+function analystSection() {
+  const w = ui.why.res, rep = ui.rep;
+  const why = !w ? '' : `<div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:14px;line-height:1.6;color:#ECEBE4">${esc(w.headline)}</div>
+      ${w.causes.map(c => `<div class="sub-box"><span style="font-size:13.5px;color:#D9D7CF">${esc(c.what)}</span><span style="font-size:12px;line-height:1.55;color:#A9A79D">${esc(c.evidence)}</span></div>`).join('')}
+      <div style="font-size:13.5px;line-height:1.6;color:#C8E68A">${esc(w.action)}</div>
+      <div style="font-size:11.5px;color:#A9A79D">${esc(w.note)}</div></div>`;
+  const report = !rep.text ? '' : `<div class="report-text">${esc(rep.text)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <a class="btn-ghost" style="display:inline-flex;align-items:center;text-decoration:none;color:#B8F04A;border-color:#4C6A20" href="/api/sites/${WW.site}/weekly.txt" download>نزّل الملف</a>
+        <a class="btn-ghost" style="display:inline-flex;align-items:center;text-decoration:none" href="/api/sites/${WW.site}/report" target="_blank" rel="noopener">تقرير التوفير للطباعة (PDF)</a>
+      </div>`;
+  return `
+    <div class="head">
+      <div class="label">ANALYST · محلّل الفاتورة والتقارير</div>
+      <div style="font-size:11px;color:#6F6D64">الأرقام محسوبة بالكود من القياسات، وما في إشي بيتنفّذ بدون موافقة</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span class="panel-title">ليش الفاتورة هيك؟</span>
+          <button class="btn-lime" style="height:36px;font-size:13px" data-act="why">${ui.why.busy ? 'عم نحلّل…' : w ? 'حلّل من جديد' : 'ليش الفاتورة هيك؟'}</button>
+        </div>${why}
+      </div>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span class="panel-title">التقرير الأسبوعي</span>
+          <button class="btn-lime" style="height:36px;font-size:13px" data-act="report">${rep.busy ? 'عم نجهّز…' : rep.text ? 'جهّز تقرير جديد' : 'جهّز التقرير الأسبوعي'}</button>
+        </div>${report}
+      </div>
+    </div>`;
 }
 
 // AI layer 2: expected load for this hour and the next 5, plus our measured accuracy.
@@ -359,8 +528,8 @@ function bill() {
 }
 
 function auditLog() {
-  const color = t => ({ T1: '#F2B544', STOP: '#E8553F', OK: '#B8F04A', MANUAL: '#8FC7FF', T2: '#E8553F' }[t] || '#8E8C82');
-  const tierLabel = t => t === 'MANUAL' ? 'يدوي' : t;
+  const color = t => ({ T1: '#F2B544', STOP: '#E8553F', OK: '#B8F04A', MANUAL: '#8FC7FF', SCHED: '#8FC7FF', T2: '#E8553F' }[t] || '#8E8C82');
+  const tierLabel = t => t === 'MANUAL' ? 'يدوي' : t === 'SCHED' ? 'جدول' : t;
   const rows = st.log.map(e => `
     <div style="display:grid;grid-template-columns:52px 64px minmax(0,1fr);gap:12px;align-items:baseline;padding:8px 0;border-top:1px solid #1E201B">
       <span style="font-family:var(--mono);font-size:12px;color:#6F6D64" dir="ltr">${esc(e.clock)}</span>
@@ -422,6 +591,8 @@ function renderAll() {
   WW.render($('rooms'), roomsMap());
   WW.render($('devices'), devicesGrid());
   WW.render($('bill'), bill());
+  WW.render($('sched'), schedSection());
+  WW.render($('analyst'), analystSection());
   WW.render($('log'), auditLog());
   $('meter-kw').textContent = powerStr(st.meter.power_w);
   $('meter-unit').textContent = scale.unit;
@@ -451,12 +622,53 @@ WW.onAction({
   reset: () => act(() => WW.post('/reset')),
   estop: () => act(() => WW.post('/estop')),
   'set-goal': () => act(() => {
-    const target = parseFloat($('goal-target').value);
     const text = $('goal-text').value.trim();
     ui.goalText = text;
-    return WW.post('/goal', { text, bill_target_jd: target || null });
+    return WW.post('/goal', { text });   // the server reads the bill target from the words
   }),
-  'clear-goal': () => { st.goal = null; renderAll(); },
+  'cmd-parse': () => parseCommand(),
+  'cmd-mic': () => listen(),
+  'cmd-cancel': () => { ui.cmd.res = null; renderAll(); },
+  'cmd-run': () => act(async () => {
+    const r = await WW.post('/command/run', { text: ui.cmd.text });
+    ui.cmd = { text: '', res: null, busy: false, msg: r.done.length ? 'تم: ' + r.done.join('، ') : 'ما تنفّذ إشي.' };
+  }),
+  'sched-dev': d => { ui.sched.dev = d.id; ui.sched.msg = ''; renderAll(); },
+  'sched-add': () => act(async () => {
+    try {
+      await WW.post('/schedules', { device_id: ui.sched.dev, on_time: ui.sched.on || null, off_time: ui.sched.off || null });
+      ui.sched.on = ''; ui.sched.off = ''; ui.sched.msg = 'انضاف الجدول ✓';
+    } catch (e) { ui.sched.msg = e.message; }
+  }),
+  'sched-toggle': d => act(() => WW.post(`/schedules/${d.id}/enabled`, { enabled: d.on !== '1' })),
+  'sched-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/schedules/${d.id}`)),
+  timer: d => act(() => WW.post('/timers', { device_id: ui.sched.dev, minutes: Number(d.min), turn_on: false, run_now: d.for === '1' })),
+  'timer-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/timers/${d.id}`)),
+  'heater-suggest': async () => {
+    ui.heater.busy = true; ui.heater.msg = ''; renderAll();
+    try { ui.heater.res = await WW.post('/heater/suggest', { hint: ui.heater.hint }); } catch (e) { toast(e.message); }
+    ui.heater.busy = false; renderAll();
+  },
+  'heater-apply': () => act(async () => {
+    const r = ui.heater.res;
+    await WW.post('/heater/apply', { device_id: r.device_id, windows: r.items.map(i => ({ on_time: i.on_time, off_time: i.off_time })) });
+    ui.heater = { hint: ui.heater.hint, res: null, busy: false,
+      msg: `انحفظ جدول السخّان ✓ بيستهلك ≈ ${fmt(r.total.kwh, 1)} ك.و.س باليوم (≈ ${fmt(r.total.jod, 2)} دينار، متوقّع مش مقاس).` };
+  }),
+  'heater-cancel': () => { ui.heater.res = null; renderAll(); },
+  why: async () => {
+    ui.why.busy = true; renderAll();
+    try { ui.why.res = await WW.api('GET', `/api/sites/${WW.site}/why`); } catch (e) { toast(e.message); }
+    ui.why.busy = false; renderAll();
+  },
+  report: async () => {
+    ui.rep.busy = true; renderAll();
+    try {
+      const res = await fetch(`/api/sites/${WW.site}/weekly.txt`);
+      ui.rep.text = await res.text();
+    } catch (e) { toast(e.message); }
+    ui.rep.busy = false; renderAll();
+  },
   toggle: d => {
     const dev = st.devices.find(x => x.id === d.id);
     if (dev.sensitive && dev.is_on) { ui.confirmId = dev.id; renderAll(); return; }
@@ -484,8 +696,16 @@ document.addEventListener('change', ev => {
   }
 });
 document.addEventListener('input', ev => {
-  if (ev.target.id === 'goal-text') ui.goalText = ev.target.value;
-  if (ev.target.id === 'goal-target') ui.goalTarget = ev.target.value;
+  const id = ev.target.id, v = ev.target.value;
+  if (id === 'goal-text') ui.goalText = v;
+  if (id === 'cmd-text') ui.cmd.text = v;
+  if (id === 'heater-hint') ui.heater.hint = v;
+  if (id === 'sched-on') ui.sched.on = v;
+  if (id === 'sched-off') ui.sched.off = v;
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && ev.target.id === 'cmd-text') parseCommand();
+  if (ev.key === 'Enter' && ev.target.id === 'goal-text') document.querySelector('[data-act="set-goal"]').click();
 });
 
 $('phone-frame').src = 'app.html?site=' + encodeURIComponent(WW.site) + '&embed=1';

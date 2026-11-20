@@ -105,7 +105,6 @@ class _DeviceTile extends StatelessWidget {
     final on = d['is_on'] == true;
     final locked = d['tier'] == 'T2';
     final state = locked ? 'محمي · دايمًا شغّال' : on ? 'شغّال' : 'مطفي';
-    final isAc = d['kind'] == 'ac' && d['setpoint'] != null;
     return WWBox(
       padding: 14,
       child: Column(children: [
@@ -119,42 +118,9 @@ class _DeviceTile extends StatelessWidget {
           ),
           WWToggle(on: on, locked: locked, onTap: () => _toggle(context)),
         ]),
-        if (isAc) ...[
-          const Divider(height: 18, color: Color(0xFFEFECE3)),
-          Row(children: [
-            Expanded(
-              child: Text('الحرارة (${WW.fmt(comfort['min_c'])}–${WW.fmt(comfort['max_c'])}°)', style: const TextStyle(fontSize: 12.5, color: WW.sub)),
-            ),
-            Directionality(
-              textDirection: TextDirection.ltr,
-              child: Row(children: [
-                _StepButton(label: '−', onTap: () => run(() => api.setpoint(d['id'], (d['setpoint'] as num) - 1))),
-                SizedBox(width: 44, child: Text('${WW.fmt(d['setpoint'])}°', textAlign: TextAlign.center, style: WW.mono.copyWith(fontSize: 16))),
-                _StepButton(label: '+', onTap: () => run(() => api.setpoint(d['id'], (d['setpoint'] as num) + 1))),
-              ]),
-            ),
-          ]),
-        ],
       ]),
     );
   }
-}
-
-class _StepButton extends StatelessWidget {
-  const _StepButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: WW.paper,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: SizedBox(width: 44, height: 44, child: Center(child: Text(label, style: const TextStyle(fontSize: 18)))),
-        ),
-      );
 }
 
 /// 4 steps: type -> room -> measure the signature on the main meter -> what the agent may do.

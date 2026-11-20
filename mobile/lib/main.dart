@@ -15,6 +15,7 @@ import 'screens/bill_screen.dart';
 import 'screens/devices_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/safety_screen.dart';
+import 'screens/schedule_screen.dart';
 import 'screens/scan_screen.dart';
 import 'theme.dart';
 
@@ -225,8 +226,9 @@ class _RootPageState extends State<RootPage> {
       );
     } else {
       final screens = [
-        HomeScreen(st: s, run: run, onApprove: a.approve, onReject: a.reject),
+        HomeScreen(st: s, api: a, run: run, onApprove: a.approve, onReject: a.reject),
         DevicesScreen(st: s, api: a, run: run),
+        ScheduleScreen(st: s, api: a, run: run),
         BillScreen(st: s, api: a, run: run),
         SafetyScreen(st: s, api: a, run: run, onChangeServer: _askServer),
       ];
@@ -275,7 +277,7 @@ class _TabBar extends StatelessWidget {
   final int index;
   final ValueChanged<int> onTap;
 
-  static const labels = ['البيت', 'الأجهزة', 'الفاتورة', 'الأمان'];
+  static const labels = ['البيت', 'الأجهزة', 'الجدولة', 'الفاتورة', 'الأمان'];
 
   @override
   Widget build(BuildContext context) => Container(

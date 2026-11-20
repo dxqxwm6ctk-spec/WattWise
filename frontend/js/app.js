@@ -18,7 +18,14 @@ const TIPS = [
   'حرارة المكيّف ٢٤° بدل ٢٢° مريحة وبتقلّل الاستهلاك.',
 ];
 
-const ui = { tab: 'home', wiz: null, confirmId: null };
+const ui = {
+  tab: 'home', wiz: null, confirmId: null,
+  goalText: 'خلّي فاتورة هالشهر تحت 30 دينار بدون ما تزعّج حدا بالبيت',
+  cmd: { text: '', res: null, busy: false, msg: '' }, listening: false,
+  sched: { dev: null, on: '', off: '', msg: '' },
+  heater: { hint: '', res: null, busy: false, msg: '' },
+  why: { res: null, busy: false }, rep: { text: '', busy: false },
+};
 let st = null;
 
 function showError(msg) {
@@ -77,6 +84,7 @@ function approvalCard() {
       </div>
       <div style="font-size:19px;font-weight:700;line-height:1.35">${esc(p.title)}</div>
       <div style="font-size:14px;line-height:1.7;color:#4A4536">${esc(p.reason)}</div>
+      ${p.details.alternative ? `<div style="font-size:13px;line-height:1.6;color:#6B4A00">إذا لا: ${esc(p.details.alternative)}</div>` : ''}
       <div style="padding:10px 12px;border-radius:12px;background:#FBE7B5;display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:13px;color:#6B4A00">بيوفّر تقريبًا</span>
         <span class="mono" style="font-size:15px;font-weight:600" dir="ltr">${fmt(p.details.saving_jod_per_hour, 3)} JD / hr</span>
@@ -117,6 +125,7 @@ function homeTab() {
   const kw = MAX_W > 1000 ? fmt(w / 1000, 2) : fmt(w, 0);
   return `
     <div style="display:flex;flex-direction:column;gap:12px">
+      ${commandCard()}
       <div style="border-radius:24px;background:radial-gradient(120% 90% at 50% 0%,#2A2E22,#15160F);color:#F3F1EA;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 14px 26px -18px rgba(20,20,10,0.6);animation:ww-rise .6s both">
         <div style="display:flex;align-items:center;gap:10px" dir="ltr">
           <div style="position:relative;width:150px;height:96px;flex:none">
@@ -244,15 +253,7 @@ function devicesTab() {
             <span style="position:absolute;top:4px;${on ? 'left' : 'right'}:4px;width:24px;height:24px;border-radius:50%;background:${locked ? '#D9432E' : on ? '#B8F04A' : '#FFFFFF'};box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span>
           </button>
         </div>
-        ${d.kind === 'ac' && d.setpoint != null ? `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding-top:6px;border-top:1px solid #EFECE3">
-          <span style="font-size:12.5px;color:#77756C">الحرارة (${fmt(st.comfort.min_c)}–${fmt(st.comfort.max_c)}°)</span>
-          <div style="display:flex;align-items:center;gap:6px" dir="ltr">
-            <button data-act="setpoint" data-id="${esc(d.id)}" data-delta="-1" style="width:44px;height:44px;border-radius:14px;border:none;background:#F3F1EA;font-size:18px;cursor:pointer">−</button>
-            <span class="mono" style="font-size:16px;min-width:38px;text-align:center">${fmt(d.setpoint)}°</span>
-            <button data-act="setpoint" data-id="${esc(d.id)}" data-delta="1" style="width:44px;height:44px;border-radius:14px;border:none;background:#F3F1EA;font-size:18px;cursor:pointer">+</button>
-          </div>
-        </div>` : ''}
+
       </div>`;
   }).join('');
   return `
@@ -291,6 +292,7 @@ function billTab() {
     </div>`).join('') || '<span class="sub">لسا ما في بيانات كفاية.</span>';
   return `
     <div style="display:flex;flex-direction:column;gap:12px">
+      ${billExtras()}
       <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:12px">
         <span class="sub">نوع اشتراكك (موجود على فاتورتك)</span>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;border-radius:16px;background:#F3F1EA">${opts}</div>
@@ -316,6 +318,207 @@ function billTab() {
       ${TIPS.map(t => `<div class="box" style="font-size:14px;line-height:1.65">${t}</div>`).join('')}
     </div>`;
 }
+
+// ---------------- new design: commands, schedules, goal, why, report ----------------
+
+const micOk = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+const field = 'height:48px;border-radius:16px;border:1.5px solid #E2DFD4;background:#FFFFFF;padding:0 14px;font-size:15px;font-family:inherit;color:#1A1B16;outline:none;min-width:0';
+const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (متوقّع مش مقاس)` : '';
+const minLabel = n => n === 30 ? '30 دقيقة' : n === 60 ? 'ساعة' : 'ساعتين';
+
+// Typed or spoken order: the server understands it, the Policy Guard checks it, you confirm.
+function commandCard() {
+  const c = ui.cmd, r = c.res;
+  const result = !r ? '' : `<div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:14px;line-height:1.6">${esc(r.clarify || r.reply)}</span>
+      ${r.items.map(i => `<div style="display:flex;gap:10px;align-items:baseline;padding:10px 12px;border-radius:12px;background:#F3F1EA">
+        <span style="font-weight:700;color:${i.ok ? '#4A6418' : '#A23A26'}">${i.ok ? '✓' : '✕'}</span>
+        <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:14px">${esc(i.label)}</span><span style="font-size:12px;color:#77756C">${esc(i.why)}</span></span></div>`).join('')}
+      <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px">
+        <button data-act="cmd-cancel" class="btn-line" style="height:48px;border-radius:16px;font-size:15px">لا</button>
+        ${r.items.some(i => i.ok) ? '<button data-act="cmd-run" class="btn-dark" style="height:48px;border-radius:16px;font-size:15px">إيه، نفّذ</button>' : ''}
+      </div></div>`;
+  return `<div style="border-radius:22px;background:#FFFFFF;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:8px">
+        <input id="cmd-text" value="${esc(c.text)}" aria-label="احكي أو اكتب أمرك للوكيل" placeholder="قول: طفّي مكيّف النوم" style="flex:1;${field}">
+        ${micOk ? `<button data-act="cmd-mic" aria-label="احكي" style="width:48px;height:48px;border-radius:16px;border:1.5px solid #1A1B16;background:${ui.listening ? '#E8553F' : 'transparent'};color:${ui.listening ? '#fff' : 'inherit'};font-size:18px;cursor:pointer;flex:none">🎤</button>` : ''}
+        <button data-act="cmd-parse" class="btn-dark" style="height:48px;padding:0 14px;border-radius:16px;font-size:14px;flex:none">${c.busy ? 'عم أفهم…' : 'نفّذ'}</button>
+      </div>${result}
+      ${c.msg ? `<span style="font-size:13.5px;color:#4A6418;font-weight:600">${esc(c.msg)}</span>` : ''}
+    </div>`;
+}
+
+function schedTab() {
+  const a = st.automation || { schedules: [], timers: [], devices: [] };
+  if (!a.devices.some(d => d.id === ui.sched.dev) && a.devices.length) {
+    ui.sched.dev = (a.devices.find(d => d.id === 'heater') || a.devices[0]).id;
+  }
+  const h = ui.heater, hr = h.res;
+  const hasHeater = st.devices.some(d => d.kind === 'heater' && d.tier === 'T1' && !d.sensitive);
+  const heater = !hasHeater ? '' : `<div style="border-radius:22px;background:#E6F5C8;padding:18px;display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:17px;font-weight:700">سخّان الماء الذكي</span>
+      <span style="font-size:13px;line-height:1.65;color:#4A6418">من أكبر الأحمال. بنسخّنه قبل الحمّام بس، وما بيشتغل أكثر من ٣ ساعات متواصلة.</span>
+      <input id="heater-hint" value="${esc(h.hint)}" aria-label="متى بتحمّموا؟" placeholder="متى بتحمّموا؟ مثلاً: الصبح ٦ ونص" style="${field};border-color:#B8DB7A">
+      <button data-act="heater-suggest" class="btn-dark" style="height:50px;border-radius:16px;font-size:15px">${h.busy ? 'عم نخطّط…' : 'اقترحلي جدول للسخّان'}</button>
+      ${hr ? `<div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:14px;line-height:1.6">${esc(hr.reply)}</span>
+        ${hr.items.map(i => `<div style="padding:10px 12px;border-radius:12px;background:#FFFFFF;display:flex;flex-direction:column;gap:2px">
+          <span class="mono" style="font-size:14px;font-weight:600" dir="ltr">${esc(i.on_time)} → ${esc(i.off_time)}</span>
+          <span style="font-size:13px">${esc(i.why)}</span><span style="font-size:12px;color:#5E5C55">${estText(i.estimate)}</span></div>`).join('')}
+        <span style="font-size:13px;color:#4A6418;font-weight:600">المجموع ≈ ${fmt(hr.total.kwh, 1)} ك.و.س باليوم ≈ ${fmt(hr.total.jod, 2)} دينار (متوقّع مش مقاس)</span>
+        <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px">
+          <button data-act="heater-cancel" class="btn-line" style="height:48px;border-radius:16px;font-size:15px;border-color:#B8DB7A">لا</button>
+          ${hr.items.length ? '<button data-act="heater-apply" class="btn-dark" style="height:48px;border-radius:16px;font-size:15px">إيه، اعتمده</button>' : ''}
+        </div></div>` : ''}
+      ${h.msg ? `<span style="font-size:13.5px;line-height:1.6;color:#4A6418;font-weight:600">${esc(h.msg)}</span>` : ''}
+    </div>`;
+  const chips = a.devices.map(d => {
+    const sel = ui.sched.dev === d.id;
+    return `<button data-act="sched-dev" data-id="${esc(d.id)}" style="height:36px;white-space:nowrap;padding:0 12px;border-radius:18px;border:1.5px solid ${sel ? '#1A1B16' : '#E2DFD4'};background:${sel ? '#1A1B16' : '#FFFFFF'};color:${sel ? '#F3F1EA' : '#1A1B16'};font-size:13px;font-weight:600;cursor:pointer">${esc(d.name)}</button>`;
+  }).join('');
+  const btns = isFor => [30, 60, 120].map(n => `<button data-act="timer" data-min="${n}"${isFor ? ' data-for="1"' : ''} class="btn-line" style="height:38px;padding:0 12px;border-radius:12px;font-size:13px">${minLabel(n)}</button>`).join('');
+  const form = `<div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:12px">
+      <span class="sub">جدول أو مؤقّت لجهاز</span>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#77756C">يشتغل الساعة<input type="time" id="sched-on" value="${esc(ui.sched.on)}" style="${field};height:46px;padding:0 10px"></label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#77756C">يطفي الساعة<input type="time" id="sched-off" value="${esc(ui.sched.off)}" style="${field};height:46px;padding:0 10px"></label>
+      </div>
+      <button data-act="sched-add" class="btn-dark" style="height:48px;border-radius:16px;font-size:15px">ضيف الجدول</button>
+      ${ui.sched.msg ? `<span style="font-size:12.5px;color:#8A5A00">${esc(ui.sched.msg)}</span>` : ''}
+      <div style="display:flex;flex-direction:column;gap:8px;padding-top:6px;border-top:1px solid #EFECE3">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12.5px;color:#77756C;min-width:78px">طفّيه بعد</span>${btns(false)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12.5px;color:#77756C;min-width:78px">شغّله لمدة</span>${btns(true)}</div>
+      </div></div>`;
+  const timers = a.timers.map(x => `<div style="display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:18px;background:#FFF4D9;border:1.5px solid #E8B23A">
+      <span style="flex:1;font-size:14px">${esc(x.text)}</span>
+      <button data-act="timer-del" data-id="${x.id}" class="btn-line" style="height:36px;padding:0 12px;border-radius:12px;font-size:13px;border-color:#D9C38A">إلغاء</button></div>`).join('');
+  const rows = a.schedules.map(r => `<div style="border-radius:18px;background:#FFFFFF;padding:12px 14px;display:flex;align-items:center;gap:10px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+        <span style="font-size:15px;font-weight:600">${esc(r.device_name)}</span>
+        <span class="mono" style="font-size:13px">${[r.on_time && 'تشغيل ' + r.on_time, r.off_time && 'إطفاء ' + r.off_time].filter(Boolean).join(' ← ')}</span>
+        <span style="font-size:11.5px;color:#77756C">${estText(r.estimate)}</span>
+      </div>
+      <button data-act="sched-toggle" data-id="${r.id}" data-on="${r.enabled ? 1 : 0}" aria-label="${esc(r.device_name)}" style="width:52px;height:32px;border-radius:16px;border:none;background:${r.enabled ? '#1A1B16' : '#D8D5CA'};position:relative;cursor:pointer;flex:none;padding:0"><span style="position:absolute;top:4px;${r.enabled ? 'left' : 'right'}:4px;width:24px;height:24px;border-radius:50%;background:${r.enabled ? '#B8F04A' : '#FFFFFF'};box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span></button>
+      <button data-act="sched-del" data-id="${r.id}" style="height:36px;padding:0 10px;border-radius:12px;border:1.5px solid #F0C2B8;background:transparent;color:#A23A26;font-size:13px;font-weight:600;cursor:pointer">حذف</button></div>`).join('');
+  return `<div style="display:flex;flex-direction:column;gap:12px">
+      ${heater}${form}
+      ${timers ? '<span class="sub">مؤقّتات شغّالة</span>' + timers : ''}
+      <span class="sub" style="padding-top:4px">جداولك</span>
+      ${rows || '<span class="sub" style="line-height:1.6">ما في جداول لسا.</span>'}
+    </div>`;
+}
+
+// Goal in plain words, "why is my bill like this?" and the weekly report (top of the bill tab).
+function billExtras() {
+  const p = st.plan, w = ui.why.res, rep = ui.rep;
+  const plan = !(st.goal && p && p.steps.length) ? '' : `<div style="display:flex;flex-direction:column;gap:8px;padding-top:4px">
+      ${p.summary ? `<span style="font-size:14px;line-height:1.65">${esc(p.summary)}</span>` : ''}
+      ${p.steps.map((x, i) => {
+        const t1 = (p.tags || [])[i] === 'T1';
+        return `<div style="padding:10px 12px;border-radius:12px;background:#F3F1EA;display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:11px;color:${t1 ? '#8A5A00' : '#4A6418'};font-weight:600">${t1 ? 'T1 · بموافقتك' : 'T0 · تلقائي'}</span>
+          <span style="font-size:13.5px;line-height:1.55">${esc(x)}</span></div>`;
+      }).join('')}</div>`;
+  return `
+    <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
+      <span class="sub">هدفك بكلامك</span>
+      ${st.goal ? `<span style="font-size:15px;font-weight:600;line-height:1.5">«${esc(st.goal.text)}»</span>` : ''}
+      <input id="goal-text" value="${esc(ui.goalText)}" aria-label="اكتب هدفك بكلامك العادي" placeholder="مثلاً: بدي الفاتورة تحت ٢٥ دينار" style="${field};height:50px">
+      <button data-act="set-goal" class="btn-dark" style="height:50px;border-radius:16px;font-size:15px">${st.goal ? 'غيّر الهدف' : 'حوّله لخطة'}</button>
+      ${plan}
+    </div>
+    <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
+      <button data-act="why" class="btn-line" style="height:50px;border-radius:16px;border-color:#1A1B16;font-size:15px;font-weight:700">${ui.why.busy ? 'عم نحلّل…' : w ? 'حلّل من جديد' : 'ليش الفاتورة هيك؟'}</button>
+      ${w ? `<div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:14px;line-height:1.65">${esc(w.headline)}</span>
+        ${w.causes.map(c => `<div style="padding:10px 12px;border-radius:12px;background:#F3F1EA;display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13.5px;font-weight:600">${esc(c.what)}</span><span style="font-size:12.5px;line-height:1.55;color:#5E5C55">${esc(c.evidence)}</span></div>`).join('')}
+        <span style="font-size:13.5px;line-height:1.6;color:#4A6418">${esc(w.action)}</span>
+        <span style="font-size:11.5px;color:#77756C">${esc(w.note)}</span></div>` : ''}
+    </div>
+    <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
+      <button data-act="report" class="btn-line" style="height:50px;border-radius:16px;border-color:#1A1B16;font-size:15px;font-weight:700">${rep.busy ? 'عم نجهّز…' : rep.text ? 'جهّز تقرير جديد' : 'جهّز التقرير الأسبوعي'}</button>
+      ${rep.text ? `<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.75;padding:12px;border-radius:12px;background:#F3F1EA;max-height:220px;overflow:auto">${esc(rep.text)}</div>
+        <a href="/api/sites/${WW.site}/weekly.txt" download class="btn-dark" style="height:46px;border-radius:14px;font-size:14px;display:grid;place-items:center;text-decoration:none">نزّل الملف</a>` : ''}
+    </div>`;
+}
+
+let recog = null;
+function listen() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  if (recog) { try { recog.stop(); } catch (e) { /* already stopped */ } return; }
+  recog = new SR();
+  recog.lang = 'ar-JO'; recog.interimResults = false; recog.maxAlternatives = 1;
+  recog.onresult = e => { ui.cmd.text = e.results[0][0].transcript; parseCommand(); };
+  recog.onerror = () => showError('المايك مش متاح هون. اكتب الأمر بدالو.');
+  recog.onend = () => { recog = null; ui.listening = false; renderAll(); };
+  ui.listening = true; renderAll();
+  try { recog.start(); } catch (e) { recog = null; ui.listening = false; }
+}
+
+async function parseCommand() {
+  const text = ui.cmd.text.trim();
+  if (!text || ui.cmd.busy) return;
+  ui.cmd.busy = true; ui.cmd.msg = ''; renderAll();
+  try { ui.cmd.res = await WW.post('/command/parse', { text }); } catch (e) { showError(e.message); }
+  ui.cmd.busy = false; renderAll();
+}
+
+const newHandlers = {
+  'set-goal': () => act(() => WW.post('/goal', { text: ui.goalText.trim() })),
+  'cmd-parse': () => parseCommand(),
+  'cmd-mic': () => listen(),
+  'cmd-cancel': () => { ui.cmd.res = null; renderAll(); },
+  'cmd-run': () => act(async () => {
+    const r = await WW.post('/command/run', { text: ui.cmd.text });
+    ui.cmd = { text: '', res: null, busy: false, msg: r.done.length ? 'تم: ' + r.done.join('، ') : 'ما تنفّذ إشي.' };
+  }),
+  'sched-dev': d => { ui.sched.dev = d.id; ui.sched.msg = ''; renderAll(); },
+  'sched-add': () => act(async () => {
+    try {
+      await WW.post('/schedules', { device_id: ui.sched.dev, on_time: ui.sched.on || null, off_time: ui.sched.off || null });
+      ui.sched.on = ''; ui.sched.off = ''; ui.sched.msg = 'انضاف الجدول ✓';
+    } catch (e) { ui.sched.msg = e.message; }
+  }),
+  'sched-toggle': d => act(() => WW.post(`/schedules/${d.id}/enabled`, { enabled: d.on !== '1' })),
+  'sched-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/schedules/${d.id}`)),
+  timer: d => act(() => WW.post('/timers', { device_id: ui.sched.dev, minutes: Number(d.min), turn_on: false, run_now: d.for === '1' })),
+  'timer-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/timers/${d.id}`)),
+  'heater-suggest': async () => {
+    ui.heater.busy = true; ui.heater.msg = ''; renderAll();
+    try { ui.heater.res = await WW.post('/heater/suggest', { hint: ui.heater.hint }); } catch (e) { showError(e.message); }
+    ui.heater.busy = false; renderAll();
+  },
+  'heater-apply': () => act(async () => {
+    const r = ui.heater.res;
+    await WW.post('/heater/apply', { device_id: r.device_id, windows: r.items.map(i => ({ on_time: i.on_time, off_time: i.off_time })) });
+    ui.heater = { hint: ui.heater.hint, res: null, busy: false,
+      msg: `انحفظ جدول السخّان ✓ بيستهلك ≈ ${fmt(r.total.kwh, 1)} ك.و.س باليوم (≈ ${fmt(r.total.jod, 2)} دينار، متوقّع مش مقاس).` };
+  }),
+  'heater-cancel': () => { ui.heater.res = null; renderAll(); },
+  why: async () => {
+    ui.why.busy = true; renderAll();
+    try { ui.why.res = await WW.api('GET', `/api/sites/${WW.site}/why`); } catch (e) { showError(e.message); }
+    ui.why.busy = false; renderAll();
+  },
+  report: async () => {
+    ui.rep.busy = true; renderAll();
+    try { ui.rep.text = await (await fetch(`/api/sites/${WW.site}/weekly.txt`)).text(); } catch (e) { showError(e.message); }
+    ui.rep.busy = false; renderAll();
+  },
+};
+
+document.addEventListener('input', ev => {
+  const id = ev.target.id, v = ev.target.value;
+  if (id === 'goal-text') ui.goalText = v;
+  if (id === 'cmd-text') ui.cmd.text = v;
+  if (id === 'heater-hint') ui.heater.hint = v;
+  if (id === 'sched-on') ui.sched.on = v;
+  if (id === 'sched-off') ui.sched.off = v;
+});
+document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.id === 'cmd-text') parseCommand(); });
 
 // ---------------- safety tab ----------------
 
@@ -350,9 +553,9 @@ function renderAll() {
       </div>
       <div class="mono" style="width:40px;height:40px;border-radius:12px;background:#1A1B16;color:#B8F04A;display:grid;place-items:center;font-weight:700;font-size:14px">W/</div>
     </div>`;
-  const body = { home: homeTab, devices: devicesTab, bill: billTab, safety: safetyTab }[ui.tab]();
+  const body = { home: homeTab, devices: devicesTab, sched: schedTab, bill: billTab, safety: safetyTab }[ui.tab]();
   WW.render($('content'), header + body);
-  WW.render($('tabs'), [['home', 'البيت'], ['devices', 'الأجهزة'], ['bill', 'الفاتورة'], ['safety', 'الأمان']].map(([k, label]) =>
+  WW.render($('tabs'), [['home', 'البيت'], ['devices', 'الأجهزة'], ['sched', 'الجدولة'], ['bill', 'الفاتورة'], ['safety', 'الأمان']].map(([k, label]) =>
     `<button class="tab" data-act="tab" data-k="${k}" style="color:${ui.tab === k ? '#1A1B16' : '#9A988E'}"><i style="background:${ui.tab === k ? '#1A1B16' : 'transparent'}"></i>${label}</button>`).join(''));
 }
 
@@ -376,6 +579,7 @@ function closeWizard() {
 
 WW.onAction({
   onError: e => showError(e.message),
+  ...newHandlers,
   tab: d => { ui.tab = d.k; renderAll(); },
   approve: d => act(() => WW.post(`/approvals/${d.id}/approve`)),
   reject: d => act(() => WW.post(`/approvals/${d.id}/reject`)),

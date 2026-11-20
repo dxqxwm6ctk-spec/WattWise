@@ -7,11 +7,11 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend import actions, agent, config, db, discovery, report, state
+from backend import actions, agent, assistant, config, db, discovery, report, schedules, state
 
 
 async def _agent_loop():
@@ -105,6 +105,36 @@ class NewDevice(BaseModel):
     room: str
     name: str = Field(default="", max_length=60)
     allow: bool = True
+
+
+class Command(BaseModel):
+    text: str = Field(max_length=300)
+
+
+class NewSchedule(BaseModel):
+    device_id: str
+    on_time: str | None = None
+    off_time: str | None = None
+
+
+class NewTimer(BaseModel):
+    device_id: str
+    minutes: int
+    turn_on: bool = False
+    run_now: bool = False      # "run it for N minutes": on now, off after N
+
+
+class Enabled(BaseModel):
+    enabled: bool
+
+
+class HeaterHint(BaseModel):
+    hint: str = Field(default="", max_length=200)
+
+
+class HeaterWindows(BaseModel):
+    device_id: str
+    windows: list[dict] = Field(max_length=3)
 
 
 # ---------- device / simulator side ----------
@@ -220,6 +250,78 @@ def delete_learn(site: str):
 @app.post("/api/sites/{site}/devices")
 def post_device(site: str, body: NewDevice):
     return _run(actions.add_device, site, body.room, body.name, body.kind, body.allow)
+
+
+# ---------- talking to the agent (commands, analysis, report) ----------
+
+@app.post("/api/sites/{site}/command/parse")
+def post_command_parse(site: str, body: Command):
+    """Understand the order and show what would happen. Changes nothing."""
+    return _run(assistant.parse_command, site, body.text)
+
+
+@app.post("/api/sites/{site}/command/run")
+def post_command_run(site: str, body: Command):
+    """The human confirmed: parse again on the server and run only the allowed items."""
+    return _run(assistant.run_command, site, body.text)
+
+
+@app.get("/api/sites/{site}/why")
+def get_why(site: str):
+    return _run(assistant.why_bill, site)
+
+
+@app.get("/api/sites/{site}/weekly.txt", response_class=PlainTextResponse)
+def get_weekly(site: str):
+    text = _run(assistant.weekly_report, site)
+    return PlainTextResponse(text, headers={
+        "Content-Disposition": f'attachment; filename="wattwise-weekly-{site}.txt"'})
+
+
+# ---------- timers and schedules (on/off only) ----------
+
+@app.get("/api/sites/{site}/schedules")
+def get_schedules(site: str):
+    return _run(schedules.listing, site)
+
+
+@app.post("/api/sites/{site}/schedules")
+def post_schedule(site: str, body: NewSchedule):
+    return _run(schedules.add_schedule, site, body.device_id, body.on_time, body.off_time)
+
+
+@app.post("/api/sites/{site}/schedules/{schedule_id}/enabled")
+def post_schedule_enabled(site: str, schedule_id: int, body: Enabled):
+    _run(schedules.set_enabled, site, schedule_id, body.enabled)
+    return {"ok": True}
+
+
+@app.delete("/api/sites/{site}/schedules/{schedule_id}")
+def delete_schedule(site: str, schedule_id: int):
+    _run(schedules.delete_schedule, site, schedule_id)
+    return {"ok": True}
+
+
+@app.post("/api/sites/{site}/timers")
+def post_timer(site: str, body: NewTimer):
+    return _run(schedules.add_timer, site, body.device_id, body.minutes, body.turn_on, body.run_now)
+
+
+@app.delete("/api/sites/{site}/timers/{timer_id}")
+def delete_timer(site: str, timer_id: int):
+    _run(schedules.delete_timer, site, timer_id)
+    return {"ok": True}
+
+
+@app.post("/api/sites/{site}/heater/suggest")
+def post_heater_suggest(site: str, body: HeaterHint):
+    """A proposal only. Nothing is saved until the human confirms with /heater/apply."""
+    return _run(schedules.suggest_heater, site, body.hint)
+
+
+@app.post("/api/sites/{site}/heater/apply")
+def post_heater_apply(site: str, body: HeaterWindows):
+    return _run(schedules.apply_heater, site, body.device_id, body.windows)
 
 
 # ---------- web pages ----------

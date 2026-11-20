@@ -10,6 +10,12 @@ from backend import config
 
 AGENT = "agent"
 HUMAN = "human"
+SCHEDULE = "schedule"   # a timer or daily schedule the human set up earlier
+
+# Schedules and timers
+MIN_WINDOW_MIN = 10          # an on/off window shorter than this is a mistake
+HEATER_MAX_WINDOW_MIN = 180  # the water heater never runs more than 3 hours in one go
+MAX_TIMER_MIN = 720          # timers up to 12 hours
 
 
 @dataclass
@@ -41,12 +47,14 @@ def check_switch(device: dict, turn_on: bool, actor: str, room: dict | None,
     if is_critical(device):
         return Decision(False, "critical_load", f"{name} حمل حرج (T2) وممنوع التحكم فيه بالكود.")
 
-    # A human may switch any non-critical device by hand. Everything below is for the agent.
+    # A human may switch any non-critical device by hand.
+    # Everything below is for the agent and for timers/schedules (no human pressing a button now).
     if actor == HUMAN:
         return ok()
 
     # Allowlist: the agent only touches devices explicitly allowed.
-    if not device.get("allow"):
+    # (A schedule was chosen by the human for this device, so it skips this one check.)
+    if actor == AGENT and not device.get("allow"):
         return Decision(False, "not_in_allowlist", f"{name} مش ضمن القائمة المسموحة للوكيل.")
 
     # Sensitive devices (like the router that carries the approval app) stay manual.
@@ -103,3 +111,58 @@ def check_setpoint(device: dict, value: float) -> Decision:
 def approval_expired(created_ts: float, now: float) -> bool:
     """Silence is not consent: past the timeout, a request can no longer be approved."""
     return now - created_ts >= config.APPROVAL_TIMEOUT_S
+
+
+# ---------- timers and schedules (on/off only) ----------
+
+def _minutes(hhmm: str | None) -> int | None:
+    """"06:30" -> 390. None or a bad value -> None."""
+    try:
+        h, m = str(hhmm).strip().split(":")
+        h, m = int(h), int(m)
+    except (ValueError, AttributeError):
+        return None
+    return h * 60 + m if 0 <= h < 24 and 0 <= m < 60 else None
+
+
+def window_minutes(on_time: str, off_time: str) -> int:
+    """Length of an on->off window, also across midnight (22:00 -> 01:00 is 180)."""
+    return (_minutes(off_time) - _minutes(on_time)) % 1440
+
+
+def _can_automate(device: dict) -> Decision:
+    name = device.get("name", device.get("id", "?"))
+    if is_critical(device):
+        return Decision(False, "critical_load", f"{name} حمل حرج (T2)، ممنوع بالكود حتى لو طلبت.")
+    if device.get("sensitive"):
+        return Decision(False, "sensitive_device", f"{name} جهاز حساس، ما بيندار بمؤقّت أو جدول.")
+    return ok()
+
+
+def check_schedule(device: dict, on_time: str | None, off_time: str | None) -> Decision:
+    """May this daily on/off schedule be saved? Checked again every time it fires."""
+    d = _can_automate(device)
+    if not d.allowed:
+        return d
+    if not on_time and not off_time:
+        return Decision(False, "no_time", "لازم وقت تشغيل أو وقت إطفاء.")
+    if (on_time and _minutes(on_time) is None) or (off_time and _minutes(off_time) is None):
+        return Decision(False, "bad_time", "الوقت مش مفهوم. اكتبه مثل 06:30.")
+    if on_time and off_time:
+        w = window_minutes(on_time, off_time)
+        if w < MIN_WINDOW_MIN:
+            return Decision(False, "window_too_short", f"المدة أقل من {MIN_WINDOW_MIN} دقايق.")
+        if device.get("kind") == "heater" and w > HEATER_MAX_WINDOW_MIN:
+            return Decision(False, "heater_too_long",
+                            "حارس السياسات: السخّان ما بيشتغل أكثر من ٣ ساعات متواصلة.")
+    return ok()
+
+
+def check_timer(device: dict, minutes: int) -> Decision:
+    """May this one-off timer ("switch it off after 30 minutes") be saved?"""
+    d = _can_automate(device)
+    if not d.allowed:
+        return d
+    if not isinstance(minutes, int) or minutes < 1 or minutes > MAX_TIMER_MIN:
+        return Decision(False, "bad_minutes", "المدة مش مفهومة (من دقيقة لـ ١٢ ساعة).")
+    return ok()

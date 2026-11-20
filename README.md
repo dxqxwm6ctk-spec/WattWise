@@ -87,6 +87,10 @@ python -m pytest -q
 
 - `POST /api/readings`: `{site, meter:{power_w, energy_kwh, voltage_v, current_a, freq_hz}, rooms:[{room_id, temp_c, light, occupied, window_open}], estop_pressed}`
 - `GET /api/sites/{site}/commands`: relay states, set points, `approval_pending` (buzzer + yellow LED), `estop`
+- `POST /api/sites/{site}/command/parse` and `/command/run` `{text}`: plain-Arabic orders (run only after the user confirms)
+- `GET|POST /api/sites/{site}/schedules`, `POST /api/sites/{site}/timers`: on/off timers and daily schedules
+- `POST /api/sites/{site}/heater/suggest` and `/heater/apply`: smart water-heater schedule
+- `GET /api/sites/{site}/why` and `/weekly.txt`: bill analysis and the weekly report
 - `GET /api/sites/{site}/state`: everything the dashboard and the app show
 - `POST /api/sites/{site}/goal`, `/approvals/{id}/approve`, `/approvals/{id}/reject`, `/estop`, `/reset`, `/devices/{id}/toggle`, `/devices/{id}/setpoint`
 

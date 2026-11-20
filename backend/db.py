@@ -114,6 +114,26 @@ CREATE TABLE IF NOT EXISTS anomaly_stats (
     PRIMARY KEY (site, bucket)
 );
 
+-- Timers and daily schedules (on/off only). Times are on the site clock.
+CREATE TABLE IF NOT EXISTS schedules (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    site        TEXT    NOT NULL,
+    device_id   TEXT    NOT NULL,
+    on_time     TEXT,                      -- "HH:MM" or NULL
+    off_time    TEXT,                      -- "HH:MM" or NULL
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    source      TEXT    NOT NULL,          -- user / command / suggested
+    created_ts  REAL    NOT NULL
+);
+CREATE TABLE IF NOT EXISTS timers (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    site        TEXT    NOT NULL,
+    device_id   TEXT    NOT NULL,
+    turn_on     INTEGER NOT NULL,          -- what happens when the time comes
+    due_ts      REAL    NOT NULL,          -- on the site clock (meter_ts)
+    minutes     INTEGER NOT NULL,
+    created_ts  REAL    NOT NULL
+);
 CREATE TABLE IF NOT EXISTS system_state (
     key         TEXT PRIMARY KEY,
     value       TEXT NOT NULL

@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../api.dart';
 import '../theme.dart';
+import '../widgets/assistant_widgets.dart';
 
 const tips = [
   'السخّان: شغّليه قبل الحمّام بساعة بدل ما يضل شغّال طول اليوم.',
@@ -26,6 +27,12 @@ class BillScreen extends StatelessWidget {
     const sub = TextStyle(fontSize: 13, color: WW.sub);
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      GoalCard(st: st, api: api, run: run),
+      const SizedBox(height: 12),
+      WhyCard(api: api),
+      const SizedBox(height: 12),
+      ReportCard(api: api),
+      const SizedBox(height: 12),
       WWBox(
         radius: 22,
         padding: 18,

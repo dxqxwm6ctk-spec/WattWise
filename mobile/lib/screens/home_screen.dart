@@ -2,12 +2,15 @@
 
 import 'package:material_ui/material_ui.dart';
 
+import '../api.dart';
 import '../theme.dart';
+import '../widgets/assistant_widgets.dart';
 import '../widgets/meter_widgets.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.st, required this.run, required this.onApprove, required this.onReject});
+  const HomeScreen({super.key, required this.st, required this.api, required this.run, required this.onApprove, required this.onReject});
   final Map<String, dynamic> st;
+  final WattWiseApi api;
   final Future<void> Function(Future<void> Function()) run;
   final Future<void> Function(int id) onApprove;
   final Future<void> Function(int id) onReject;
@@ -16,6 +19,8 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final pending = st['pending'] as Map<String, dynamic>?;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      CommandCard(api: api),
+      const SizedBox(height: 12),
       _SummaryCard(st: st),
       const SizedBox(height: 12),
       pending != null
@@ -142,6 +147,10 @@ class _ApprovalCard extends StatelessWidget {
         Text('${p['title']}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, height: 1.35)),
         const SizedBox(height: 8),
         Text('${p['reason']}', style: const TextStyle(fontSize: 14, height: 1.7, color: Color(0xFF4A4536))),
+        if ((p['details'] as Map?)?['alternative'] != null) ...[
+          const SizedBox(height: 6),
+          Text('إذا لا: ${p['details']['alternative']}', style: const TextStyle(fontSize: 13, height: 1.6, color: Color(0xFF6B4A00))),
+        ],
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

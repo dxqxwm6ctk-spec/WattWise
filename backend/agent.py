@@ -15,7 +15,7 @@ LLM is missing, late, broken or over budget.
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 
-from backend import actions, billing, config, db, forecast, llm, policy, weather
+from backend import actions, billing, config, db, forecast, llm, policy, schedules, weather
 
 # Remembers what the agent is currently looking at, per site: {"device_id", "since"}
 _analyzing: dict[str, dict] = {}
@@ -92,7 +92,9 @@ def explain(waste: dict, price: float) -> tuple[str, str, dict]:
         "saving_jod_per_hour": round(d["signature_w"] / 1000 * price, 3),
         "price_jod_per_kwh": price,
         "room_temp_c": (waste["room"] or {}).get("temp_c"),
-        "alternative": "إذا رفضتي، بنخلّيه شغّال وما بنسأل عنه مرة ثانية لفترة.",
+        "alternative": ("سكّر الشباك وخلّي المكيّف شغّال، هيك ما بيبرّد الشارع."
+                        if waste["window_open"] and d["kind"] in config.COOLING_KINDS
+                        else "بنخلّيه شغّال وما بنسأل عنه مرة ثانية لفترة."),
     }
     return title, reason, details
 
@@ -129,6 +131,9 @@ def tick(conn, site: str, now: float | None = None) -> None:
         db.audit(conn, site, "T0", "system", "recovered", "رجعت القراءات. الوكيل رجع يراقب.")
         if actions.get_phase(conn, site) == "offline" and not actions.flag(conn, "safe_mode", site):
             actions.set_phase(conn, site, "normal")
+
+    # Timers and daily schedules the human set up (each one checked by the Policy Guard).
+    schedules.run_due(conn, site)
 
     # 3. Verify executed actions with the meter.
     _verify(conn, site, now)

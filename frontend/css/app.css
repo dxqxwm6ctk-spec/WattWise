@@ -9,7 +9,7 @@ button, input { font-family: inherit; }
 
 .app { height: 100%; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; }
 .content { flex: 1; overflow-y: auto; padding: 14px 20px 16px; display: flex; flex-direction: column; gap: 14px; }
-.tabs { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); padding: 8px 14px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid #E2DFD4; background: var(--paper); }
+.tabs { flex: none; display: grid; grid-template-columns: repeat(5, 1fr); padding: 8px 10px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid #E2DFD4; background: var(--paper); }
 .tab { height: 48px; border: none; background: transparent; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
 .tab i { width: 18px; height: 3px; border-radius: 2px; }
 .mono { font-family: var(--mono); }

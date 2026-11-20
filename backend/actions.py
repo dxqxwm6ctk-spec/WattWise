@@ -169,12 +169,17 @@ def set_goal(conn, site: str, text: str, bill_target_jd: float | None) -> dict:
     text = text.strip()
     if not text:
         raise ActionError("اكتب الهدف.")
+    if bill_target_jd is None:
+        from backend.assistant import read_goal   # "بدي الفاتورة تحت ٢٥ دينار" -> 25
+        bill_target_jd = read_goal(text)
     conn.execute("UPDATE goals SET active=0 WHERE site=?", (site,))
     conn.execute("INSERT INTO goals (site, created_ts, text, bill_target_jd, active) VALUES (?,?,?,?,1)",
                  (site, time.time(), text, bill_target_jd))
     goal = active_goal(conn, site)
+    summary = (f"فهمت إنك بدك الفاتورة تحت {bill_target_jd:g} دينار." if bill_target_jd
+               else "ما لقيت رقم بالدينار بكلامك، فبراقب وبوفّر بدون هدف رقمي.")
     db.set_state(conn, f"plan:{site}", {"goal_id": goal["id"], "by": "rules",
-                                         "steps": rule_plan(text, bill_target_jd), "summary": ""})
+                                         "steps": rule_plan(text, bill_target_jd), "summary": summary})
     db.audit(conn, site, "T0", "agent", "goal_received",
              f"استلمت الهدف وقسّمته لـ{len(GOAL_STEPS)} خطوات. الوضع: مراقبة.",
              {"goal": text, "steps": GOAL_STEPS})
@@ -327,6 +332,8 @@ def reset_demo(conn, site: str) -> None:
     db.set_state(conn, f"scenario:{site}", "normal")
     db.set_state(conn, f"saved_wh:{site}", 0.0)
     db.set_state(conn, f"learn:{site}", None)
+    conn.execute("DELETE FROM schedules WHERE site=?", (site,))
+    conn.execute("DELETE FROM timers WHERE site=?", (site,))
     anomaly.clear(conn, site)
     _close_pending(conn, site, CANCELLED)
     restore_normal(conn, site)

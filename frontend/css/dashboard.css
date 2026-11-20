@@ -95,3 +95,23 @@ select.tb { appearance: none; padding-left: 28px; }
   .phone { height: 720px; }
 }
 a.tb { text-decoration: none; }
+
+/* New design: command bar, schedules, analyst */
+.field { height: 42px; border-radius: 12px; border: 1px solid #3A3C33; background: #0E0F0B; color: var(--text); padding: 0 14px; font-size: 14px; font-family: inherit; outline: none; min-width: 0; }
+.field.grow { flex: 1 1 320px; }
+.field[type=time] { color-scheme: dark; height: 40px; padding: 0 10px; }
+.btn-ghost { height: 38px; white-space: nowrap; padding: 0 16px; border-radius: 10px; border: 1px solid #3A3C33; background: transparent; color: var(--text); font-size: 13px; cursor: pointer; }
+.btn-ghost:hover { background: #1B1D17; }
+.btn-sm { height: 30px; padding: 0 12px; border-radius: 9px; font-size: 12.5px; }
+.panel { border-radius: 14px; border: 1px solid #23251F; background: #181A15; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; flex: 1 1 340px; }
+.panel.green { border-color: #2E3A1C; background: #151A0F; }
+.panel-title { font-size: 15px; font-weight: 600; }
+.sub-box { padding: 10px 12px; border-radius: 10px; background: #1E201B; display: flex; flex-direction: column; gap: 2px; }
+.chip { height: 32px; white-space: nowrap; padding: 0 12px; border-radius: 16px; border: 1px solid #3A3C33; background: transparent; color: #D9D7CF; font-size: 12.5px; cursor: pointer; }
+.chip.sel { border-color: var(--lime); background: var(--lime); color: #0C0D0A; }
+.cmd-box { display: flex; flex-direction: column; gap: 10px; border-radius: 14px; border: 1px solid #2E3A1C; background: #121609; padding: 14px 16px; }
+.mic { width: 44px; height: 42px; border-radius: 12px; border: 1px solid #3A3C33; background: transparent; color: var(--text); font-size: 17px; cursor: pointer; }
+.mic.on { background: #E8553F; color: #fff; }
+.switch { width: 48px; height: 28px; border-radius: 14px; border: none; position: relative; cursor: pointer; flex: none; padding: 0; }
+.switch i { position: absolute; top: 4px; width: 20px; height: 20px; border-radius: 50%; }
+.report-text { white-space: pre-wrap; font-size: 12.5px; line-height: 1.75; color: #D9D7CF; padding: 12px; border-radius: 10px; background: #0E0F0B; max-height: 260px; overflow: auto; }

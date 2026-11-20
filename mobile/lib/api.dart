@@ -52,6 +52,34 @@ class WattWiseApi {
   Future<void> addDevice({required String kind, required String room, required String name, required bool allow}) =>
       post('/devices', {'kind': kind, 'room': room, 'name': name, 'allow': allow});
 
+  // --- goal, commands, schedules, analysis (new design) ---
+  Future<void> setGoal(String text) => post('/goal', {'text': text});
+  Future<Map<String, dynamic>> parseCommand(String text) => post('/command/parse', {'text': text});
+  Future<Map<String, dynamic>> runCommand(String text) => post('/command/run', {'text': text});
+  Future<void> addSchedule(String deviceId, String? on, String? off) =>
+      post('/schedules', {'device_id': deviceId, 'on_time': on, 'off_time': off});
+  Future<void> setScheduleEnabled(int id, bool enabled) => post('/schedules/$id/enabled', {'enabled': enabled});
+  Future<void> deleteSchedule(int id) => delete('/schedules/$id');
+  Future<void> addTimer(String deviceId, int minutes, {bool runNow = false}) =>
+      post('/timers', {'device_id': deviceId, 'minutes': minutes, 'turn_on': false, 'run_now': runNow});
+  Future<void> deleteTimer(int id) => delete('/timers/$id');
+  Future<Map<String, dynamic>> suggestHeater(String hint) => post('/heater/suggest', {'hint': hint});
+  Future<void> applyHeater(String deviceId, List<dynamic> items) => post('/heater/apply', {
+        'device_id': deviceId,
+        'windows': [for (final i in items) {'on_time': i['on_time'], 'off_time': i['off_time']}],
+      });
+
+  Future<Map<String, dynamic>> why() async {
+    final res = await http.get(_uri('/why')).timeout(const Duration(seconds: 6));
+    return _decode(res);
+  }
+
+  Future<String> weeklyReport() async {
+    final res = await http.get(_uri('/weekly.txt')).timeout(const Duration(seconds: 6));
+    if (res.statusCode >= 400) throw ApiException('ما قدرنا نجهّز التقرير.');
+    return utf8.decode(res.bodyBytes);
+  }
+
   Map<String, dynamic> _decode(http.Response res) {
     final body = utf8.decode(res.bodyBytes);
     final data = body.isEmpty ? <String, dynamic>{} : jsonDecode(body);
