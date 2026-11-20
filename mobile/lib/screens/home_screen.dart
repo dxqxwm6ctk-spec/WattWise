@@ -26,7 +26,11 @@ class HomeScreen extends StatelessWidget {
       pending != null
           ? _ApprovalCard(p: pending, onApprove: () => run(() => onApprove(pending['id'])), onReject: () => run(() => onReject(pending['id'])))
           : _StatusCard(st: st),
-      if ((st['anomaly'] as Map<String, dynamic>?)?['open'] == true) ...[
+      for (final a in _openAlerts(st)) ...[
+        const SizedBox(height: 12),
+        _AlertCard(a: a, onAct: () => run(() => api.alertAct(a['id'] as int)), onDismiss: () => run(() => api.alertDismiss(a['id'] as int))),
+      ],
+      if ((st['anomaly'] as Map<String, dynamic>?)?['open'] == true && !_openAlerts(st).any((a) => a['kind'] == 'unknown_device' || a['kind'] == 'anomaly')) ...[
         const SizedBox(height: 12),
         _AnomalyCard(a: st['anomaly'] as Map<String, dynamic>),
       ],
@@ -267,6 +271,69 @@ class _AnomalyCard extends StatelessWidget {
         const Text('استهلاك غريب', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: WW.pendingText)),
         const SizedBox(height: 4),
         Text(msg, style: const TextStyle(fontSize: 14, height: 1.7)),
+      ]),
+    );
+  }
+}
+
+
+/// Warnings that are still true and that the user did not answer yet.
+List<Map<String, dynamic>> _openAlerts(Map<String, dynamic> st) =>
+    ((st['alerts'] as Map<String, dynamic>?)?['items'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .where((a) => a['active'] == true && a['user_state'] == null)
+        .toList();
+
+/// One warning from the agent (the same one the phone showed as a notification).
+/// "طفّيه؟" only sends an approval request; nothing is switched before "إيه، طفّيه".
+class _AlertCard extends StatelessWidget {
+  const _AlertCard({required this.a, required this.onAct, required this.onDismiss});
+  final Map<String, dynamic> a;
+  final VoidCallback onAct;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final danger = a['level'] == 'danger';
+    final bg = danger ? const Color(0xFFFBE3DD) : WW.pendingBg;
+    final border = danger ? WW.red : WW.pendingBorder;
+    final text = danger ? const Color(0xFF7A2A1C) : WW.pendingText;
+    return WWBox(
+      color: bg,
+      border: border,
+      radius: 20,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('${a['title']}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: text)),
+        const SizedBox(height: 4),
+        Text('${a['body']}', style: const TextStyle(fontSize: 14, height: 1.7, color: Color(0xFF4A4840))),
+        const SizedBox(height: 10),
+        Row(children: [
+          if (a['can_act'] == true) ...[
+            Expanded(
+              flex: 14,
+              child: SizedBox(
+                height: 44,
+                child: FilledButton(
+                  onPressed: onAct,
+                  style: FilledButton.styleFrom(backgroundColor: WW.ink, foregroundColor: WW.paper, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                  child: const Text('طفّيه؟', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            flex: 10,
+            child: SizedBox(
+              height: 44,
+              child: OutlinedButton(
+                onPressed: onDismiss,
+                style: OutlinedButton.styleFrom(foregroundColor: WW.ink, side: BorderSide(color: border, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                child: const Text('تمام', style: TextStyle(fontSize: 14)),
+              ),
+            ),
+          ),
+        ]),
       ]),
     );
   }

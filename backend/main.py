@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend import actions, agent, assistant, config, db, discovery, report, schedules, state
+from backend import actions, agent, alerts, assistant, config, db, discovery, report, schedules, state
 
 
 async def _agent_loop():
@@ -197,6 +197,23 @@ def post_approve(site: str, approval_id: int):
 @app.post("/api/sites/{site}/approvals/{approval_id}/reject")
 def post_reject(site: str, approval_id: int):
     return _run(actions.reject, site, approval_id)
+
+
+@app.get("/api/sites/{site}/alerts")
+def get_alerts(site: str):
+    """Warnings from the agent. The phone app turns new ones into local notifications."""
+    return _run(alerts.listing, site, 20)
+
+
+@app.post("/api/sites/{site}/alerts/{alert_id}/act")
+def post_alert_act(site: str, alert_id: int):
+    """"طفّيه؟" on a warning: creates an approval request only. Nothing is switched yet."""
+    return _run(alerts.act, site, alert_id)
+
+
+@app.post("/api/sites/{site}/alerts/{alert_id}/dismiss")
+def post_alert_dismiss(site: str, alert_id: int):
+    return _run(alerts.dismiss, site, alert_id)
 
 
 @app.post("/api/sites/{site}/devices/{device_id}/toggle")

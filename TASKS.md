@@ -37,6 +37,8 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Timers and daily on/off schedules run in the backend, checked when saved and again when they fire; smart water-heater schedule suggestion (max 3 h window)
 - [x] "Why is my bill like this?" analysis and a weekly text report to download
 - [x] Same features in the phone web page and the Flutter app (new Schedules tab); AC set temperature removed from the UI (on/off only)
+- [x] Agent warnings (tier 0): danger near the current limit (10 A PZEM/relay in the lab, simulated 25 A breaker in the house), high power, 80 % / 95 % of the cheaper tariff tier with the expected crossing day, device left on too long, unknown device (from anomaly detection), readings lost. Shown on the dashboard (+ browser notification on localhost) and as local notifications in the Flutter app; "طفّيه؟" only creates an approval request. Tests in `tests/test_alerts.py`
+- [ ] Try the Flutter notifications on a real Android phone and on the sideloaded iPhone build
 - [ ] Voice input inside the Flutter app (needs a speech package; the web pages already have the mic)
 
 ## Data to fill (team)

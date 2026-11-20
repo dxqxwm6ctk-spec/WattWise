@@ -41,6 +41,7 @@ function toolbar() {
       <option value="holiday">عطلة (البيت فاضي)</option>
       <option value="sensor_fault">عطل حسّاسات</option>
       <option value="unknown_load">حمل غريب (جهاز مش مسجّل)</option>
+      <option value="overload">حمل زايد (تيار قريب من الحد)</option>
       <option value="normal">رجّع طبيعي</option>
     </select>` : '';
   return `${other}${scen}
@@ -527,6 +528,52 @@ function bill() {
     <div class="note">${esc(b.source || '')} المعروض قيمة الطاقة بس، بدون الدعم النقدي أو أي رسوم ثانية.${st.source === 'simulator' ? ' الاستهلاك هون من المحاكي (بيانات تركيبية).' : ''}${s.co2_kg === null ? ' معامل CO₂ لسا مش مُعبّى.' : ''}</div>`;
 }
 
+// Warnings from the agent (the same ones the phone app shows as notifications).
+function alertsSection() {
+  const al = st.alerts || { items: [] };
+  const col = l => ({ danger: '#E8553F', warn: '#F2B544' }[l] || '#8FC7FF');
+  const rows = al.items.map(a => {
+    const off = !a.active || a.user_state;
+    const status = !a.active ? 'انتهى' : a.user_state === 'acted' ? 'انبعت طلب موافقة' : a.user_state === 'dismissed' ? 'تجاهلته' : '';
+    return `<div style="display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #1E201B;opacity:${off ? 0.55 : 1}">
+      <span style="font-family:var(--mono);font-size:12px;color:#6F6D64" dir="ltr">${esc(a.clock)}</span>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:14px;font-weight:600;color:${col(a.level)}">${esc(a.title)}</span>
+        <span style="font-size:13px;line-height:1.55;color:#D9D7CF">${esc(a.body)}</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${status ? `<span class="muted" style="font-size:11.5px">${status}</span>` : ''}
+        ${a.can_act ? `<button class="btn-lime" style="height:34px" data-act="alert-act" data-id="${a.id}">طفّيه؟</button>` : ''}
+        ${a.active && !a.user_state ? `<button class="tb ghost" style="height:34px" data-act="alert-dismiss" data-id="${a.id}">تجاهل</button>` : ''}
+      </div>
+    </div>`;
+  }).join('') || '<div class="muted">ما في تنبيهات. كل إشي ضمن الطبيعي.</div>';
+  const perm = ('Notification' in window) && Notification.permission === 'default'
+    ? '<button class="tb ghost" style="height:32px" data-act="alert-perm">فعّل إشعارات المتصفح</button>' : '';
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <div class="label">ALERTS · تنبيهات الوكيل</div>
+      <div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:#6F6D64">تنبيه بس (T0). «طفّيه؟» بيبعت طلب موافقة، ما بيطفي لحاله.</span>${perm}</div>
+    </div>${rows}`;
+}
+
+// New warnings: a toast on the page, and a browser notification when allowed
+// (browsers allow it on localhost or https; the phone app uses its own notifications).
+let lastAlertId = null;
+function notifyNewAlerts() {
+  const al = st.alerts;
+  if (!al) return;
+  if (lastAlertId === null) { lastAlertId = al.last_id; return; }   // not for old ones on page load
+  const fresh = al.items.filter(a => a.id > lastAlertId && a.active).reverse();
+  lastAlertId = Math.max(lastAlertId, al.last_id);
+  for (const a of fresh) {
+    toast(`${a.title} · ${a.body}`);
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try { new Notification('WattWise · ' + a.title, { body: a.body, tag: 'ww-alert-' + a.id, icon: 'icon.svg' }); } catch (e) { /* not supported here */ }
+    }
+  }
+}
+
 function auditLog() {
   const color = t => ({ T1: '#F2B544', STOP: '#E8553F', OK: '#B8F04A', MANUAL: '#8FC7FF', SCHED: '#8FC7FF', T2: '#E8553F' }[t] || '#8E8C82');
   const tierLabel = t => t === 'MANUAL' ? 'يدوي' : t === 'SCHED' ? 'جدول' : t;
@@ -593,6 +640,8 @@ function renderAll() {
   WW.render($('bill'), bill());
   WW.render($('sched'), schedSection());
   WW.render($('analyst'), analystSection());
+  WW.render($('alerts'), alertsSection());
+  notifyNewAlerts();
   WW.render($('log'), auditLog());
   $('meter-kw').textContent = powerStr(st.meter.power_w);
   $('meter-unit').textContent = scale.unit;
@@ -681,6 +730,9 @@ WW.onAction({
     return act(() => WW.post(`/devices/${d.id}/setpoint`, { value: dev.setpoint + Number(d.delta) }));
   },
   tariff: d => act(() => WW.post('/tariff', { type: d.type })),
+  'alert-act': d => act(async () => { await WW.post(`/alerts/${d.id}/act`); toast('انبعت طلب الموافقة للتلفون. ما بنطفي إشي قبل موافقتك.'); }),
+  'alert-dismiss': d => act(() => WW.post(`/alerts/${d.id}/dismiss`)),
+  'alert-perm': () => Notification.requestPermission().then(renderAll),
   'open-wiz': () => {
     const f = $('phone-frame');
     if (f.contentWindow) f.contentWindow.postMessage({ type: 'open-wizard' }, location.origin);
