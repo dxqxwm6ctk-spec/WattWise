@@ -41,12 +41,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   // 0 = Sunday ... 6 = Saturday (the server's numbers). Shown from Saturday.
   static const dayNames = [(6, 'سبت'), (0, 'أحد'), (1, 'إثنين'), (2, 'ثلاثاء'), (3, 'أربعاء'), (4, 'خميس'), (5, 'جمعة')];
   static const allDays = [0, 1, 2, 3, 4, 5, 6];
-  static const presets = [('كل يوم', allDays), ('أيام الدوام', [0, 1, 2, 3, 4]), ('الويكند', [5, 6])];
+  static const presets = [('كل يوم', allDays), ('أيام الدوام', [0, 1, 2, 3, 4]), ('عطلة نهاية الأسبوع', [5, 6])];
 
   static String hhmm(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   static String minLabel(int n) => n == 30 ? '30 دقيقة' : n == 60 ? 'ساعة' : 'ساعتين';
   static String est(dynamic e) =>
-      e == null ? '' : '≈ ${WW.fmt(e['kwh'], 1)} ك.و.س/يوم · ≈ ${WW.fmt(e['jod'], 2)} دينار/يوم (متوقّع مش مقاس)';
+      e == null ? '' : '≈ ${WW.fmt(e['kwh'], 1)} ك.و.س/يوم · ≈ ${WW.fmt(e['jod'], 2)} دينار/يوم (تقديري، غير مُقاس)';
 
   @override
   void initState() {
@@ -105,17 +105,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final t = p['total'];
     setState(() {
       proposal = null;
-      heaterMsg = 'انحفظ جدول السخّان ✓ بيستهلك ≈ ${WW.fmt(t['kwh'], 1)} ك.و.س باليوم (≈ ${WW.fmt(t['jod'], 2)} دينار، متوقّع مش مقاس).';
+      heaterMsg = 'حُفظ جدول السخّان ✓ يستهلك ≈ ${WW.fmt(t['kwh'], 1)} ك.و.س يوميًا (≈ ${WW.fmt(t['jod'], 2)} دينار، تقديري وغير مُقاس).';
     });
   }
 
   Future<void> previewSchedule() async {
     if (onTime == null && offTime == null) {
-      setState(() => formMsg = 'اختار وقت تشغيل أو وقت إطفاء (أو الاثنين).');
+      setState(() => formMsg = 'اختر وقت تشغيل أو إطفاء (أو كليهما).');
       return;
     }
     if (days.isEmpty) {
-      setState(() => formMsg = 'اختار يوم واحد على الأقل.');
+      setState(() => formMsg = 'اختر يومًا واحدًا على الأقل.');
       return;
     }
     try {
@@ -130,7 +130,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final r = review!;
     try {
       await api.addSchedule('${r['device_id']}', r['on_time'] as String?, r['off_time'] as String?, days: days);
-      setState(() { resetForm(); formMsg = 'انحفظ الجدول ✓'; });
+      setState(() { resetForm(); formMsg = 'حُفظ الجدول ✓'; });
     } catch (e) {
       setState(() => formMsg = '$e');
     }
@@ -161,7 +161,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       siteTabs(),
       const SizedBox(height: 12),
       if (a == null)
-        const Text('عم نحمّل…', style: sub)
+        const Text('جارٍ التحميل…', style: sub)
       else if (dev != null)
         detail(a, dev)
       else
@@ -175,12 +175,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const Text('سخّان الماء الذكي', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
-            const Text('من أكبر الأحمال. بنسخّنه قبل الحمّام بس، وما بيشتغل أكثر من ٣ ساعات متواصلة.',
+            const Text('من أكبر الأحمال. نشغّله قبل الاستحمام فقط، ولا يعمل أكثر من ٣ ساعات متواصلة.',
                 style: TextStyle(fontSize: 13, height: 1.65, color: WW.greenText)),
             const SizedBox(height: 10),
-            TextField(controller: hint, decoration: wwField('متى بتحمّموا؟ مثلاً: الصبح ٦ ونص')),
+            TextField(controller: hint, decoration: wwField('متى تستحمّون؟ مثلًا: الصباح ٦:٣٠')),
             const SizedBox(height: 10),
-            darkButton(busy ? 'عم نخطّط…' : 'اقترحلي جدول للسخّان', suggest),
+            darkButton(busy ? 'جارٍ التخطيط…' : 'اقترح جدولًا للسخّان', suggest),
             if (p != null) ...[
               const SizedBox(height: 10),
               Text('${p['reply']}', style: const TextStyle(fontSize: 14, height: 1.6)),
@@ -194,14 +194,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 ])),
               ],
               const SizedBox(height: 8),
-              Text('المجموع ≈ ${WW.fmt(p['total']['kwh'], 1)} ك.و.س باليوم ≈ ${WW.fmt(p['total']['jod'], 2)} دينار (متوقّع مش مقاس)',
+              Text('المجموع ≈ ${WW.fmt(p['total']['kwh'], 1)} ك.و.س يوميًا ≈ ${WW.fmt(p['total']['jod'], 2)} دينار (تقديري، غير مُقاس)',
                   style: const TextStyle(fontSize: 13, color: WW.greenText, fontWeight: FontWeight.w600)),
               const SizedBox(height: 10),
               Row(children: [
                 Expanded(child: lineButton('لا', () => setState(() => proposal = null), height: 48, border: const Color(0xFFB8DB7A))),
                 if ((p['items'] as List).isNotEmpty) ...[
                   const SizedBox(width: 8),
-                  Expanded(flex: 14, child: darkButton('إيه، اعتمده', apply, height: 48)),
+                  Expanded(flex: 14, child: darkButton('نعم، اعتمده', apply, height: 48)),
                 ],
               ]),
             ],
@@ -255,7 +255,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   static String span(dynamic r) => '${r['on_time'] ?? '··'}→${r['off_time'] ?? '··'}';
   static String when(dynamic r) =>
-      [if (r['on_time'] != null) 'يشتغل ${r['on_time']}', if (r['off_time'] != null) 'يطفي ${r['off_time']}'].join(' ← ');
+      [if (r['on_time'] != null) 'تشغيل ${r['on_time']}', if (r['off_time'] != null) 'إطفاء ${r['off_time']}'].join(' ← ');
 
   // ---------- rooms and their devices ----------
 
@@ -289,14 +289,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ));
       out.add(const SizedBox(height: 10));
     }
-    if (out.isEmpty) out.add(const Text('ما في أجهزة بهالموقع.', style: TextStyle(fontSize: 13, color: WW.sub)));
+    if (out.isEmpty) out.add(const Text('لا توجد أجهزة في هذا الموقع.', style: TextStyle(fontSize: 13, color: WW.sub)));
     return out;
   }
 
   Widget deviceRow(Map<String, dynamic> a, dynamic d) {
     final mine = (a['schedules'] as List).where((r) => r['device_id'] == d['id']).toList();
     final hasTimer = (a['timers'] as List).any((t) => t['device_id'] == d['id']);
-    final line = mine.isEmpty ? 'بدون جدول' : mine.map(span).join('  ');
+    final line = mine.isEmpty ? 'دون جدول' : mine.map(span).join('  ');
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () => setState(() { device = '${d['id']}'; formMsg = ''; resetForm(); }),
@@ -353,17 +353,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${d['name']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-              Text('${d['room_name']} · ≈ ${d['watts']} واط · ${on ? 'شغّال هسا' : 'مطفي هسا'}', style: sub),
+              Text('${d['room_name']} · ≈ ${d['watts']} واط · ${on ? 'يعمل الآن' : 'مطفأ الآن'}', style: sub),
             ]),
           ),
           on
-              ? lineButton('طفّيه هسا', () => runHere(() => api.toggle('${d['id']}', false)), height: 40)
-              : darkButton('شغّله هسا', () => runHere(() => api.toggle('${d['id']}', true)), height: 40),
+              ? lineButton('أطفئه الآن', () => runHere(() => api.toggle('${d['id']}', false)), height: 40)
+              : darkButton('شغّله الآن', () => runHere(() => api.toggle('${d['id']}', true)), height: 40),
         ]),
         const Divider(height: 22, color: Color(0xFFEFECE3)),
-        const Text('جداول هالجهاز', style: sec),
+        const Text('جداول هذا الجهاز', style: sec),
         const SizedBox(height: 6),
-        if (mine.isEmpty) const Text('ما في جداول لهالجهاز لسا.', style: TextStyle(fontSize: 12.5, color: WW.sub)),
+        if (mine.isEmpty) const Text('لا توجد جداول لهذا الجهاز بعد.', style: TextStyle(fontSize: 12.5, color: WW.sub)),
         for (final s in mine) ...[
           greyBox([
             Row(children: [
@@ -398,9 +398,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         const Text('جدول جديد', style: sec),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: lineButton(onTime == null ? 'يشتغل الساعة…' : 'يشتغل ${hhmm(onTime!)}', () => pick(true), height: 46)),
+          Expanded(child: lineButton(onTime == null ? 'وقت التشغيل…' : 'تشغيل ${hhmm(onTime!)}', () => pick(true), height: 46)),
           const SizedBox(width: 8),
-          Expanded(child: lineButton(offTime == null ? 'يطفي الساعة…' : 'يطفي ${hhmm(offTime!)}', () => pick(false), height: 46)),
+          Expanded(child: lineButton(offTime == null ? 'وقت الإطفاء…' : 'إطفاء ${hhmm(offTime!)}', () => pick(false), height: 46)),
         ]),
         const SizedBox(height: 8),
         Wrap(spacing: 6, runSpacing: 6, children: [
@@ -425,14 +425,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             radius: 14,
             padding: 12,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('راجع قبل ما نحفظ', style: TextStyle(fontWeight: FontWeight.w700, color: WW.pendingText)),
+              const Text('راجع قبل الحفظ', style: TextStyle(fontWeight: FontWeight.w700, color: WW.pendingText)),
               const SizedBox(height: 4),
               Text('${r['device_name']} · ${r['room_name']}', style: const TextStyle(fontSize: 13.5)),
               Text(when(r), style: WW.mono.copyWith(fontSize: 13.5)),
               Text('${r['days_text']}', style: const TextStyle(fontSize: 13.5)),
               if (r['estimate'] != null) Text(est(r['estimate']), style: sub),
               const SizedBox(height: 4),
-              const Text('✓ حارس السياسات فحصه ووافق. رح يفحصه كمان مرة كل ما ييجي وقته.',
+              const Text('✓ فحصه حارس السياسات ووافق عليه، وسيفحصه مجددًا عند كل موعد.',
                   style: TextStyle(fontSize: 12, color: WW.greenText)),
               const SizedBox(height: 8),
               Row(children: [
@@ -449,7 +449,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         const SizedBox(height: 8),
         for (final isFor in [false, true]) ...[
           Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            SizedBox(width: 74, child: Text(isFor ? 'شغّله لمدة' : 'طفّيه بعد', style: const TextStyle(fontSize: 12.5, color: WW.sub))),
+            SizedBox(width: 74, child: Text(isFor ? 'تشغيل لمدة' : 'إطفاء بعد', style: const TextStyle(fontSize: 12.5, color: WW.sub))),
             for (final n in [30, 60, 120])
               lineButton(minLabel(n), () => runHere(() => api.addTimer('${d['id']}', n, runNow: isFor)), height: 36),
           ]),

@@ -28,7 +28,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('امسح الـ QR من لوحة التحكم')),
+        appBar: AppBar(title: const Text('امسح رمز QR من لوحة التحكم')),
         body: MobileScanner(onDetect: _onDetect),
       );
 }

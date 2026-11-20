@@ -17,18 +17,18 @@ class SafetyScreen extends StatelessWidget {
     final c = st['comfort'] as Map<String, dynamic>;
     final stopped = st['agent']['estop'] == true;
     final rules = [
-      'الوكيل ما بيطفي ولا جهاز بدون موافقتك. إنتِ بتقدري تتحكمي بأي جهاز يدويًا.',
-      'ما رح نخلّي حرارة أي غرفة مشغولة تطلع برّا ${WW.fmt(c['min_c'])}–${WW.fmt(c['max_c'])}°.',
-      'إذا انقطع النت أو الراوتر أو صار عطل، كل إشي بيضل طبيعي وما في إجراء تلقائي.',
-      'بنعرف إذا الغرفة فيها حدا أو لا بس، بلا كاميرات.',
+      'لا يُطفئ الوكيل أي جهاز دون موافقتك، ويمكنك التحكم بأي جهاز يدويًا.',
+      'تبقى حرارة أي غرفة مشغولة ضمن ${WW.fmt(c['min_c'])}–${WW.fmt(c['max_c'])}°.',
+      'إذا انقطع الإنترنت أو الراوتر أو حدث عطل، يبقى كل شيء على وضعه الطبيعي دون أي إجراء تلقائي.',
+      'نعرف فقط إن كانت الغرفة مشغولة أم فارغة، بلا كاميرات.',
     ];
     const sub = TextStyle(fontSize: 13, color: WW.sub);
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('إشي ما بنلمسه أبدًا', style: sub),
+      const Text('أجهزة لا نلمسها أبدًا', style: sub),
       const SizedBox(height: 10),
       const WWBox(
-        child: Text('الثلاجة، إنذار الحريق، والأجهزة الطبية وإنارة الطوارئ: ممنوعة بالكود، حتى لو وافقتي.', style: TextStyle(fontSize: 14, height: 1.7)),
+        child: Text('الثلاجة وإنذار الحريق والأجهزة الطبية وإنارة الطوارئ: ممنوعة برمجيًا، حتى لو وافقت.', style: TextStyle(fontSize: 14, height: 1.7)),
       ),
       const SizedBox(height: 14),
       const Text('قواعد البيت', style: sub),
@@ -51,11 +51,11 @@ class SafetyScreen extends StatelessWidget {
             backgroundColor: stopped ? WW.ink : WW.red,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           ),
-          child: Text(stopped ? 'رجّع شغّل WattWise' : 'وقّف WattWise هلأ', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          child: Text(stopped ? 'أعد تشغيل WattWise' : 'أوقف WattWise الآن', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         ),
       ),
       const SizedBox(height: 10),
-      TextButton(onPressed: onChangeServer, child: Text('عنوان السيرفر: ${api.baseUrl}', style: sub)),
+      TextButton(onPressed: onChangeServer, child: Text('عنوان الخادم: ${api.baseUrl}', style: sub)),
     ]);
   }
 }

@@ -6,7 +6,7 @@
 // and with the free-Apple-ID iOS build. The limit: the app must be open or recently
 // in the background (iOS pauses apps quickly), because nothing can wake it up.
 //
-// The "طفّيه؟" button does NOT switch anything. It asks the backend to create a
+// The "أطفئه؟" button does NOT switch anything. It asks the backend to create a
 // normal approval request, and the human still has to press Approve in the app.
 
 import 'dart:convert';
@@ -31,7 +31,7 @@ class Notifier {
   int? _lastApprovalId;
   bool _firstState = true;
 
-  /// The user pressed "طفّيه؟" on a notification: the alert id, handled by the app.
+  /// The user pressed "أطفئه؟" on a notification: the alert id, handled by the app.
   int? pendingTurnOff;
 
   /// Called when a notification needs the app's attention (tap or action button).
@@ -60,7 +60,7 @@ class Notifier {
     final darwin = DarwinInitializationSettings(
       notificationCategories: [
         DarwinNotificationCategory(_iosCategory, actions: [
-          DarwinNotificationAction.plain(actionTurnOff, 'طفّيه؟',
+          DarwinNotificationAction.plain(actionTurnOff, 'أطفئه؟',
               options: {DarwinNotificationActionOption.foreground}),
         ]),
       ],
@@ -124,8 +124,8 @@ class Notifier {
     if (pid != null && pid != _lastApprovalId && !_firstState) {
       await _plugin.show(
         id: 900000 + pid,
-        title: 'بدنا رأيك: ${pending!['title']}',
-        body: '${pending['reason']}\nإذا ما رديت، ما رح نعمل إشي.',
+        title: 'نحتاج موافقتك: ${pending!['title']}',
+        body: '${pending['reason']}\nإن لم تردّ، لن نفعل شيئًا.',
         notificationDetails: _details(body: '${pending['reason']}', withAction: false, danger: false),
         payload: jsonEncode({'approval': pid}),
       );
@@ -149,12 +149,12 @@ class Notifier {
         android: AndroidNotificationDetails(
           _channelId,
           _channelName,
-          channelDescription: 'استهلاك عالي، الشريحة الأغلى، خطر، وطلبات الموافقة',
+          channelDescription: 'الاستهلاك المرتفع، والشريحة الأغلى، والمخاطر، وطلبات الموافقة',
           importance: Importance.high,
           priority: danger ? Priority.max : Priority.high,
           styleInformation: BigTextStyleInformation(body), // long Arabic text is not cut
           actions: withAction
-              ? const [AndroidNotificationAction(actionTurnOff, 'طفّيه؟', showsUserInterface: true)]
+              ? const [AndroidNotificationAction(actionTurnOff, 'أطفئه؟', showsUserInterface: true)]
               : null,
         ),
         iOS: DarwinNotificationDetails(

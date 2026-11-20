@@ -291,7 +291,7 @@ def get_alerts(site: str):
 
 @app.post("/api/sites/{site}/alerts/{alert_id}/act")
 def post_alert_act(site: str, alert_id: int):
-    """"طفّيه؟" on a warning: creates an approval request only. Nothing is switched yet."""
+    """"أطفئه؟" on a warning: creates an approval request only. Nothing is switched yet."""
     return _run(alerts.act, site, alert_id)
 
 

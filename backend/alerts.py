@@ -10,7 +10,7 @@ raises short Arabic warnings for the phone app and the dashboard:
   left_on                   a device has been on for too long (water heater, washer...)
   unknown_device / anomaly  reused from anomaly detection (backend/anomaly.py)
 
-A warning may carry an action ("طفّيه؟"). Pressing it does NOT switch anything:
+A warning may carry an action ("أطفئه؟"). Pressing it does NOT switch anything:
 it only creates a normal approval request, which then goes through the Policy
 Guard and the human's Approve / Reject like every other agent action.
 
@@ -247,7 +247,7 @@ OWN_KEYS = {"current", "high_power", "tier", "anomaly", "left_on"}
 # ---------------- for the UI ----------------
 
 def _can_act(conn, site: str, a: dict) -> bool:
-    """Show the "طفّيه؟" button only if the agent would be allowed to propose it."""
+    """Show the "أطفئه؟" button only if the agent would be allowed to propose it."""
     if not a["device_id"] or not a["active"] or a["user_state"]:
         return False
     d = db.device(conn, site, a["device_id"])
@@ -288,7 +288,7 @@ def dismiss(conn, site: str, alert_id: int) -> dict:
 
 
 def act(conn, site: str, alert_id: int) -> dict:
-    """"طفّيه؟" was pressed: create an approval request. Nothing is switched here."""
+    """"أطفئه؟" was pressed: create an approval request. Nothing is switched here."""
     a = _get(conn, site, alert_id)
     if not a["device_id"]:
         raise actions.ActionError("لا يرتبط هذا التنبيه بجهاز يمكن إطفاؤه.")
