@@ -180,7 +180,8 @@ def tick(conn, site: str, now: float | None = None) -> None:
     # Ask the Policy Guard before even asking the human (and before the LLM sees it).
     allowed = []
     for w in candidates:
-        decision = policy.check_switch(w["device"], False, policy.AGENT, w["room"], estop=estop)
+        decision = policy.check_switch(w["device"], False, policy.AGENT, w["room"], estop=estop,
+                                       plug=db.plug(conn, site, w["device"]["id"]))
         if decision.allowed:
             allowed.append(w)
         elif w is waste:
@@ -337,7 +338,10 @@ def _verify(conn, site: str, now: float) -> None:
         if now - a["decided_ts"] < config.VERIFY_AFTER_S:
             continue
         d = db.device(conn, site, a["device_id"])
-        after = db.avg_power(conn, site, 1.5) or 0.0
+        plug = db.plug(conn, site, a["device_id"])
+        if plug and plug["meters"] and plug["online"] and (plug["last_seen_ts"] or 0) <= a["decided_ts"]:
+            continue   # wait for a fresh reading from the device's own smart plug
+        after = actions.power_now(conn, site, a["device_id"], 1.5)
         drop = (a["power_before"] or 0.0) - after
         conn.execute("UPDATE approvals SET power_after=?, verified_ts=? WHERE id=?", (after, now, a["id"]))
         if d and not a["turn_on"] and d["agent_off"] == actions.AGENT_OFF_UNVERIFIED:

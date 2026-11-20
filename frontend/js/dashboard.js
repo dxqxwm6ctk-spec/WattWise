@@ -276,6 +276,7 @@ function devicesGrid() {
           <span style="font-family:var(--mono);font-size:13px;color:${on ? '#ECEBE4' : '#5E5C55'}" dir="ltr">${d.est_w} W${d.signature_measured ? '' : ' *'}</span>
           ${ac}
         </div>
+        ${d.plug ? `<span style="font-size:11px;color:${d.plug.online ? '#9CC85A' : '#E8553F'}">🔌 ${d.plug.simulated && d.plug.model ? esc(d.plug.model) : esc(d.plug.brand_name) + (d.plug.model ? ' · ' + esc(d.plug.model) : '')} · ${d.plug.online ? (d.plug.meters ? 'القراءة من المقبس نفسه' : 'تشغيل وإطفاء بس') : 'المقبس مش متصل'}</span>` : ''}
         <span style="font-size:11px;color:#6F6D64">${note}</span>
       </div>`;
   }).join('');
@@ -284,7 +285,8 @@ function devicesGrid() {
       <div class="label">DEVICES · تحكّم يدوي بكل جهاز</div>
       <div style="display:flex;align-items:center;gap:12px">
         <span style="font-size:12px;color:#8E8C82">${onCount} شغّال من ${st.devices.length}</span>
-        <button class="btn-lime" data-act="open-wiz" style="height:34px;font-size:13px">+ ضيف جهاز</button>
+        <button class="btn-lime" data-act="open-plug" style="height:34px;font-size:13px">🔌 + مقبس ذكي</button>
+        <button class="tb ghost" data-act="open-wiz" style="height:34px;font-size:13px">+ جهاز بالعدّاد</button>
       </div>
     </div>
     ${learning}${confirm}${commandBar()}
@@ -684,6 +686,10 @@ WW.onAction({
   'open-wiz': () => {
     const f = $('phone-frame');
     if (f.contentWindow) f.contentWindow.postMessage({ type: 'open-wizard' }, location.origin);
+  },
+  'open-plug': () => {   // the "add smart plug" wizard lives in the phone app (js/plugs.js)
+    const f = $('phone-frame');
+    if (f.contentWindow) f.contentWindow.postMessage({ type: 'open-plug' }, location.origin);
   },
 });
 

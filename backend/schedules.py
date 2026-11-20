@@ -165,10 +165,11 @@ def _switch(conn, site: str, d: dict, turn_on: bool, message: str, actor: str = 
     if bool(d["is_on"]) == turn_on:
         return False
     if actor == "human":
-        decision = policy.check_switch(d, turn_on, policy.HUMAN, None)
+        decision = policy.check_switch(d, turn_on, policy.HUMAN, None, plug=db.plug(conn, site, d["id"]))
     else:
         decision = policy.check_switch(d, turn_on, policy.SCHEDULE, db.latest_room(conn, site, d["room"]),
-                                       estop=flag(conn, "estop", site), safe_mode=flag(conn, "safe_mode", site))
+                                       estop=flag(conn, "estop", site), safe_mode=flag(conn, "safe_mode", site),
+                                       plug=db.plug(conn, site, d["id"]))
     if not decision.allowed:
         db.audit(conn, site, "T0", "policy", "schedule_blocked",
                  f"{message} ← حارس السياسات رفض: {decision.reason_ar}")

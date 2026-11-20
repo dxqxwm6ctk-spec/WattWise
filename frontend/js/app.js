@@ -237,6 +237,7 @@ function wizard() {
 }
 
 function devicesTab() {
+  if (ui.plugWiz) return plugWizard();   // js/plugs.js
   if (ui.wiz) return wizard();
   const onCount = st.devices.filter(d => d.is_on).length;
   const confirmDev = st.devices.find(d => d.id === ui.confirmId);
@@ -253,12 +254,13 @@ function devicesTab() {
             <span style="position:absolute;top:4px;${on ? 'left' : 'right'}:4px;width:24px;height:24px;border-radius:50%;background:${locked ? '#D9432E' : on ? '#B8F04A' : '#FFFFFF'};box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span>
           </button>
         </div>
-
+        ${plugLine(d)}
       </div>`;
   }).join('');
   return `
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button data-act="open-wiz" style="height:52px;border-radius:18px;border:1.5px dashed #B9B6AA;background:transparent;color:#1A1B16;font-size:15px;font-weight:600;cursor:pointer">+ ضيفي جهاز جديد</button>
+      <button data-act="open-plug" style="height:52px;border-radius:18px;border:none;background:#1A1B16;color:#F3F1EA;font-size:15px;font-weight:700;cursor:pointer">🔌 + ضيفي مقبس ذكي (Wi-Fi)</button>
+      <button data-act="open-wiz" style="height:52px;border-radius:18px;border:1.5px dashed #B9B6AA;background:transparent;color:#1A1B16;font-size:15px;font-weight:600;cursor:pointer">+ ضيفي جهاز بالعدّاد الرئيسي</button>
       ${st.agent.safe_mode ? `<div style="border-radius:18px;background:#FFF4D9;border:1.5px solid #E8B23A;padding:14px 16px;font-size:13.5px;line-height:1.6;color:#6B4A00">الراوتر مطفي، بالحقيقة التطبيق رح ينقطع هون. WattWise بوضع آمن وما رح ينفّذ إشي.</div>` : ''}
       ${confirmDev ? `
       <div style="border-radius:20px;background:#FFF4D9;border:1.5px solid #E8B23A;padding:16px;display:flex;flex-direction:column;gap:10px">
@@ -569,6 +571,7 @@ async function act(fn) {
 
 function openWizard() {
   ui.tab = 'devices';
+  ui.plugWiz = null;
   ui.wiz = { step: 0, type: null, room: null, name: '', allow: true };
   if (st) renderAll();
 }

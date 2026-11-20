@@ -11,7 +11,8 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend import actions, agent, assistant, config, db, discovery, report, schedules, state
+from backend import actions, agent, assistant, config, db, discovery, plugs, report, schedules, smartplugs, state
+from backend.plugs import scan as plug_scan
 
 
 async def _agent_loop():
@@ -23,15 +24,28 @@ async def _agent_loop():
         await asyncio.sleep(config.AGENT_INTERVAL_S)
 
 
+async def _plug_loop():
+    """Push the wanted on/off state to every WiFi smart plug and read it back (watts)."""
+    while True:
+        try:
+            await asyncio.to_thread(smartplugs.sync_all)
+        except Exception as exc:  # a plug problem must never crash the server
+            print("plug sync failed:", exc)
+        await asyncio.sleep(config.PLUG_POLL_S)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
+    smartplugs.restore_simulated()
     task = asyncio.create_task(_agent_loop())
+    plug_task = asyncio.create_task(_plug_loop())
     announcer = discovery.Announcer()   # lets the phone app find this laptop on the Wi-Fi
     announcer.start()
     yield
     announcer.stop()
     task.cancel()
+    plug_task.cancel()
 
 
 app = FastAPI(title="WattWise", lifespan=lifespan)
@@ -105,6 +119,21 @@ class NewDevice(BaseModel):
     room: str
     name: str = Field(default="", max_length=60)
     allow: bool = True
+
+
+class PlugTarget(BaseModel):
+    brand: str
+    host: str = Field(max_length=100)
+    options: dict = Field(default_factory=dict)
+    kind: str = "other"
+
+
+class NewPlug(PlugTarget):
+    room: str
+    name: str = Field(default="", max_length=60)
+    allow: bool = True
+    confirm_high_power: bool = False
+    model: str | None = Field(default=None, max_length=60)
 
 
 class Command(BaseModel):
@@ -250,6 +279,49 @@ def delete_learn(site: str):
 @app.post("/api/sites/{site}/devices")
 def post_device(site: str, body: NewDevice):
     return _run(actions.add_device, site, body.room, body.name, body.kind, body.allow)
+
+
+# ---------- WiFi smart plugs (Shelly, TP-Link Tapo/Kasa, Tuya, Sonoff/Tasmota, simulated) ----------
+
+@app.get("/api/plugs/brands")
+def get_plug_brands():
+    return {"brands": plugs.BRANDS, "default_max_a": plugs.DEFAULT_MAX_A}
+
+
+@app.get("/api/sites/{site}/plugs/scan")
+def get_plug_scan(site: str, lan: bool = True):
+    """Look for smart plugs on the local Wi-Fi (a few seconds). Changes nothing."""
+    if site not in config.load_sites():
+        raise HTTPException(status_code=400, detail="هذا الموقع مش معروف.")
+    with db.connect() as conn:
+        used = {p["host"] for p in smartplugs.by_device(conn, site).values()}
+    found = plug_scan.scan(include_lan=lan)
+    for f in found:
+        f["added"] = f["host"] in used
+        f["brand_name"] = plugs.brand_name(f["brand"])
+        f["simulated"] = f["brand"] == "simulated"
+    return {"plugs": found}
+
+
+@app.post("/api/sites/{site}/plugs/check")
+def post_plug_check(site: str, body: PlugTarget):
+    """Talk to the plug once and show the safety check. Changes nothing."""
+    try:
+        return smartplugs.check(site, body.brand, body.host, body.options, body.kind)
+    except actions.ActionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/sites/{site}/plugs")
+def post_plug(site: str, body: NewPlug):
+    return _run(smartplugs.add, site, body.brand, body.host, body.options, body.name, body.room, body.kind,
+                body.allow, body.confirm_high_power, body.model)
+
+
+@app.delete("/api/sites/{site}/plugs/{device_id}")
+def delete_plug(site: str, device_id: str):
+    _run(smartplugs.remove, site, device_id)
+    return {"ok": True}
 
 
 # ---------- talking to the agent (commands, analysis, report) ----------

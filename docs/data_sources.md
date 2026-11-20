@@ -11,6 +11,8 @@
 | Household tariff tiers (`config/tariff.json`) | taken from the design, which cites the EMRC 2025 household tariff | **to verify against a real anonymized bill** |
 | CO2 grid emission factor | official source to be chosen | **missing, shown as "—"** |
 | Weather and solar radiation | Open-Meteo (free, no key, open data), `backend/weather.py`, default location Irbid | in use, optional: skipped when offline |
+| WiFi smart plug readings (on/off, watts, volts) | the user's own plugs on the local Wi-Fi (Shelly, TP-Link, Tuya, Sonoff/Tasmota); only the plug model, MAC and readings, nothing about people | in use when a plug is added |
+| Simulated smart plugs | `backend/plugs/simulated.py`, **synthetic** (typical watts per device type ± a few %) | in use, labelled "محاكى" |
 | LLM planner (optional) | Anthropic Claude API; it only receives the synthetic/sensor snapshot (rooms, watts, tariff, weather), never personal data | in use when a key is set |
 
 No personal data is collected. The PIR only reports occupied/empty. No cameras.

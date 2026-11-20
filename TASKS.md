@@ -37,6 +37,9 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Timers and daily on/off schedules run in the backend, checked when saved and again when they fire; smart water-heater schedule suggestion (max 3 h window)
 - [x] "Why is my bill like this?" analysis and a weekly text report to download
 - [x] Same features in the phone web page and the Flutter app (new Schedules tab); AC set temperature removed from the UI (on/off only)
+- [x] WiFi smart plugs added by the user (no electrician): drivers for Shelly, TP-Link Tapo/Kasa, Tuya/Smart Life, Sonoff (Tasmota or DIY) and a simulated plug; LAN scan; 3-step "add smart plug" wizard in the phone web page (dashboard opens it); per-plug watts feed the load signature and verification; Policy Guard blocks offline plugs and loads above the plug rating; high-power / heater warning (contactor stays recommended) + tests
+- [ ] Smart plug wizard in the Flutter app: written (`add_plug_wizard.dart`), not compiled here yet (`flutter analyze`)
+- [ ] Try one real smart plug (Shelly or Tuya) on the local Wi-Fi
 - [ ] Voice input inside the Flutter app (needs a speech package; the web pages already have the mic)
 
 ## Data to fill (team)

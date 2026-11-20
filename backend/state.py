@@ -4,7 +4,7 @@ import calendar
 import json
 import time
 
-from backend import actions, anomaly, billing, config, db, forecast, llm, mv, schedules, weather
+from backend import actions, anomaly, billing, config, db, forecast, llm, mv, schedules, smartplugs, weather
 
 CATEGORY = {"ac": "المكيّفات", "fan": "المكيّفات", "fridge": "الثلاجة", "heater": "سخّان الماء",
             "light": "الإنارة"}
@@ -41,15 +41,19 @@ def build(conn, site: str) -> dict:
     room_rows = db.rooms(conn, site)
     room_names = {r["id"]: r["name"] for r in room_rows}
 
+    plug_rows = smartplugs.by_device(conn, site)
     devices = []
     for d in devs:
+        pr = plug_rows.get(d["id"])
+        live = pr["power_w"] if pr and pr["meters"] and pr["online"] and pr["power_w"] is not None else None
         devices.append({
             "id": d["id"], "name": d["name"], "room": d["room"], "room_name": room_names.get(d["room"], d["room"]),
             "kind": d["kind"], "tier": "T2" if d["tier"] == "T2" or d["kind"] in config.FORBIDDEN_KINDS else "T1",
             "sensitive": bool(d["sensitive"]), "allow": bool(d["allow"]), "is_on": bool(d["is_on"]),
-            "setpoint": d["setpoint"], "est_w": round(d["signature_w"]) if d["is_on"] else 0,
+            "setpoint": d["setpoint"], "est_w": (round(live) if live is not None else round(d["signature_w"])) if d["is_on"] else 0,
             "signature_w": round(d["signature_w"]), "signature_measured": bool(d["signature_measured"]),
             "added": bool(d["added"]), "agent_off": d["agent_off"],
+            "plug": smartplugs.public(plug_rows.get(d["id"])),
         })
 
     pending = actions.pending_approval(conn, site)
