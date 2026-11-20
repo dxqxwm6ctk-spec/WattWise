@@ -10,7 +10,8 @@
         {"id": "kids", "name": "غرفة الأولاد", "sim": {"occupied": true, "temp_c": 25.2}},
         {"id": "kitchen", "name": "المطبخ", "sim": {"occupied": true, "temp_c": 26.0}},
         {"id": "bath", "name": "الحمّام", "sim": {"occupied": false, "temp_c": 24.0}},
-        {"id": "hall", "name": "الممر", "sim": {"occupied": false, "temp_c": 24.6}}
+        {"id": "hall", "name": "الممر", "sim": {"occupied": false, "temp_c": 24.6}},
+        {"id": "garage", "name": "الكراج", "sim": {"occupied": false, "temp_c": 27.0}}
       ],
       "devices": [
         {"id": "livingAc", "name": "مكيّف الصالون", "room": "living", "kind": "ac", "rated_w": 1150, "tier": "T1", "on": true, "setpoint": 24},
@@ -24,8 +25,12 @@
         {"id": "heater", "name": "سخّان الماء", "room": "bath", "kind": "heater", "rated_w": 2000, "tier": "T1", "on": false},
         {"id": "router", "name": "الراوتر", "room": "hall", "kind": "router", "rated_w": 12, "tier": "T1", "on": true, "sensitive": true, "allow": false},
         {"id": "fridge", "name": "الثلاجة", "room": "kitchen", "kind": "fridge", "rated_w": 140, "tier": "T2", "on": true},
-        {"id": "fireAlarm", "name": "إنذار الحريق", "room": "hall", "kind": "fire_alarm", "rated_w": 3, "tier": "T2", "on": true}
+        {"id": "fireAlarm", "name": "إنذار الحريق", "room": "hall", "kind": "fire_alarm", "rated_w": 3, "tier": "T2", "on": true},
+        {"id": "evCharger", "name": "شاحن السيارة الكهربائية", "room": "garage", "kind": "ev", "rated_w": 7400, "tier": "T1", "on": false}
       ],
+      "ev": {"battery_kwh": 60, "target_soc": 80, "ready_by": "07:00", "night_price_jod_per_kwh": null, "main_breaker_w": 9200,
+             "sim": {"arrive_soc": 30},
+             "source": "Simulated home wallbox: 7.4 kW = 230 V x 32 A single phase (IEC 61851 Mode 3). 60 kWh battery is a synthetic assumption for a mid-size EV. main_breaker_w: 40 A x 230 V, an assumed house main breaker; set it to the real one. No real car data."},
       "demo_waste": {"room": "bedroom", "device": "bedAc", "label": "١ · غرفة النوم فاضية والشباك مفتوح"},
       "labels": {"mode": "وضع البيت", "goal": "هدف العيلة", "map": "HOME MAP · غرف البيت", "meter": "عدّاد البيت", "max_w": 4000}
     },

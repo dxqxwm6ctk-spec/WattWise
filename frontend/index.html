@@ -6,7 +6,7 @@
 <title>WattWise · لوحة التحكم</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/fonts.css">
-<link rel="stylesheet" href="css/dashboard.css?v=3">
+<link rel="stylesheet" href="css/dashboard.css?v=4">
 <script src="vendor/chart.umd.js"></script>
 </head>
 <body>
@@ -19,6 +19,10 @@
         <div class="brand-title">WattWise <span id="mode-label"></span></div>
         <div class="brand-sub" id="mode-sub"></div>
       </div>
+    </div>
+    <div class="top-links">
+      <a class="tb house-link" href="house.html" id="house-link">🏠 البيت التفاعلي</a>
+      <button class="tb ghost" type="button" id="phone-open" aria-haspopup="dialog">📱 معاينة الموبايل</button>
     </div>
     <div class="toolbar" id="toolbar"></div>
   </header>
@@ -57,29 +61,34 @@
       <section class="card rise" style="animation-delay:.48s" id="log"></section>
     </main>
 
-    <aside class="aside">
-      <div class="phone">
-        <div class="phone-screen">
-          <div class="phone-status" dir="ltr">
-            <span id="phone-clock"></span>
-            <span class="notch"></span>
-            <span class="wifi">Wi-Fi</span>
-          </div>
-          <iframe id="phone-frame" title="تطبيق صاحب البيت" src="app.html"></iframe>
+  </div>
+</div>
+<!-- Phone preview: hidden until needed (backup if the real phone fails in the demo). -->
+<div class="drawer" id="phone-drawer" hidden>
+  <div class="drawer-back" data-close></div>
+  <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="معاينة تطبيق الموبايل">
+    <button class="drawer-x" type="button" data-close aria-label="سكّر">✕</button>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-status" dir="ltr">
+          <span id="phone-clock"></span>
+          <span class="notch"></span>
+          <span class="wifi">Wi-Fi</span>
         </div>
+        <iframe id="phone-frame" title="تطبيق صاحب البيت"></iframe>
       </div>
-      <div class="aside-note">معاينة تطبيق صاحب البيت (نسخة الويب الاحتياطية). التطبيق الأساسي بـ Flutter بنفس الشاشات.</div>
-      <div class="connect-card">
-        <div class="connect-title">وصّل تطبيق التلفون</div>
-        <img class="connect-qr" src="api/connect/qr.svg" alt="QR فيه عنوان السيرفر">
-        <div class="mono connect-url" dir="ltr" id="connect-url"></div>
-        <div class="aside-note">التطبيق بيلاقي اللابتوب لحاله على نفس الـ Wi-Fi. إذا ما لقاه، امسح هاد الـ QR من التطبيق.</div>
-      </div>
-    </aside>
+    </div>
+    <div class="aside-note">معاينة تطبيق صاحب البيت (نسخة الويب الاحتياطية). التطبيق الأساسي بـ Flutter بنفس الشاشات.</div>
+    <div class="connect-card">
+      <div class="connect-title">وصّل تطبيق التلفون</div>
+      <img class="connect-qr" src="api/connect/qr.svg" alt="QR فيه عنوان السيرفر" loading="lazy">
+      <div class="mono connect-url" dir="ltr" id="connect-url"></div>
+      <div class="aside-note">التطبيق بيلاقي اللابتوب لحاله على نفس الـ Wi-Fi. إذا ما لقاه، امسح هاد الـ QR من التطبيق.</div>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 <script src="js/common.js?v=3"></script>
-<script src="js/dashboard.js?v=3"></script>
+<script src="js/dashboard.js?v=4"></script>
 </body>
 </html>

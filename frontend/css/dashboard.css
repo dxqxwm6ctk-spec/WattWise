@@ -63,8 +63,18 @@ select.tb { appearance: none; padding-left: 28px; }
 .sw-dash { border-top: 1px dashed var(--muted); }
 
 /* phone preview */
-.aside { flex: 0 0 auto; margin: 0 auto; position: sticky; top: 20px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-.phone { width: 372px; max-width: calc(100vw - 32px); height: 780px; border-radius: 54px; background: #050504; padding: 11px; box-shadow: 0 0 0 1px #2A2C25, 0 40px 80px rgba(0,0,0,0.5); }
+.top-links { display: flex; gap: 8px; flex-wrap: wrap; }
+.tb.house-link { background: var(--lime); color: var(--bg); border: none; font-weight: 600; }
+.tb.house-link:hover { background: #D6FF85; color: var(--bg); }
+/* phone preview drawer (opened by the "معاينة الموبايل" button) */
+.drawer { position: fixed; inset: 0; z-index: 50; }
+.drawer[hidden] { display: none; }
+.drawer-back { position: absolute; inset: 0; background: rgba(5,5,4,.6); backdrop-filter: blur(3px); }
+.drawer-panel { position: absolute; top: 0; bottom: 0; left: 0; width: min(420px, 100vw); overflow-y: auto; background: var(--card); border-right: 1px solid var(--line);
+  padding: 56px 16px 28px; display: flex; flex-direction: column; align-items: center; gap: 14px; animation: ww-slide .35s cubic-bezier(.2,.7,.2,1); }
+@keyframes ww-slide { from { transform: translateX(-100%) } to { transform: none } }
+.drawer-x { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--card2); color: var(--text); font-size: 16px; cursor: pointer; }
+.phone { width: 372px; max-width: calc(100vw - 32px); height: min(780px, calc(100vh - 120px)); flex: none; border-radius: 54px; background: #050504; padding: 11px; box-shadow: 0 0 0 1px #2A2C25, 0 40px 80px rgba(0,0,0,0.5); }
 .phone-screen { width: 100%; height: 100%; border-radius: 44px; overflow: hidden; background: #F3F1EA; display: flex; flex-direction: column; }
 .phone-status { height: 50px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; font-family: var(--mono); font-size: 13px; font-weight: 500; color: #1A1B16; }
 .notch { width: 96px; height: 28px; border-radius: 14px; background: #000; }
@@ -92,7 +102,6 @@ select.tb { appearance: none; padding-left: 28px; }
 @media (max-width: 720px) {
   .card { padding: 18px 16px; }
   .big-kw span:first-child { font-size: 40px; }
-  .phone { height: 720px; }
 }
 a.tb { text-decoration: none; }
 

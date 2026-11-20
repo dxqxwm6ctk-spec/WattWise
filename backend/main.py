@@ -72,6 +72,7 @@ class Reading(BaseModel):
     meter: Meter
     rooms: list[RoomReading] = []
     estop_pressed: bool = False
+    ev: dict | None = None          # optional: what a home EV charger reports (battery %, plugged in)
 
 
 class Goal(BaseModel):

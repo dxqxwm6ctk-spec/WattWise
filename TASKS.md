@@ -37,6 +37,9 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Timers and daily on/off schedules run in the backend, checked when saved and again when they fire; smart water-heater schedule suggestion (max 3 h window)
 - [x] "Why is my bill like this?" analysis and a weekly text report to download
 - [x] Same features in the phone web page and the Flutter app (new Schedules tab); AC set temperature removed from the UI (on/off only)
+- [x] Interactive 3D house page (`house.html`, three.js bundled offline): realistic rooms, furniture, lighting and day/night, animated devices, energy flow, click-to-zoom, approval card, NILM step recognition, guided "how it works" tour that drives the real system; phone mockup on the dashboard moved behind a "معاينة الموبايل" button
+- [x] Home EV charger (simulated 7.4 kW): session recognised by its meter step, measured kWh, start/end notifications, smart-charging proposal (evening peak, approval, resume timer), excluded from savings
+- [ ] Show the interactive house inside the Flutter app (WebView or native)
 - [ ] Voice input inside the Flutter app (needs a speech package; the web pages already have the mic)
 
 ## Data to fill (team)

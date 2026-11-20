@@ -15,7 +15,7 @@ LLM is missing, late, broken or over budget.
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 
-from backend import actions, billing, config, db, forecast, llm, policy, schedules, weather
+from backend import actions, billing, config, db, ev, forecast, llm, policy, schedules, weather
 
 # Remembers what the agent is currently looking at, per site: {"device_id", "since"}
 _analyzing: dict[str, dict] = {}
@@ -58,6 +58,8 @@ def detect_waste(conn, site: str, now: float) -> list[dict]:
     found = []
     for d in db.devices(conn, site):
         if not d["is_on"] or not d["allow"] or policy.is_critical(d) or d["sensitive"]:
+            continue
+        if d["kind"] == "ev":   # a car charging in an empty garage is normal; handled by backend/ev.py
             continue
         empty_s = empty_for_seconds(conn, site, d["room"], now)
         if empty_s is None or empty_s < config.WASTE_EMPTY_S:
@@ -138,6 +140,7 @@ def tick(conn, site: str, now: float | None = None) -> None:
     # 3. Verify executed actions with the meter.
     _verify(conn, site, now)
     forecast.track(conn, site)
+    ev.track(conn, site, now)   # EV charging sessions: recognise, measure, notify
 
     if estop or actions.flag(conn, "safe_mode", site):
         _analyzing.pop(site, None)
@@ -150,6 +153,10 @@ def tick(conn, site: str, now: float | None = None) -> None:
     if not actions.active_goal(conn, site) or actions.pending_approval(conn, site):
         return
     if actions.get_phase(conn, site) == "executing":
+        return
+
+    # Smart EV charging (evening peak): propose a pause, the human decides.
+    if ev.maybe_propose(conn, site, now):
         return
 
     candidates = [w for w in detect_waste(conn, site, now)
@@ -346,7 +353,9 @@ def _verify(conn, site: str, now: float) -> None:
                 db.set_device(conn, site, d["id"], signature_w=round(drop), signature_measured=1,
                               agent_off=actions.AGENT_OFF_VERIFIED)
                 db.audit(conn, site, "OK", "agent", "verified",
-                         f"العدّاد أكّد انخفاض ≈ {round(drop)} واط يطابق بصمة {d['name']}. بدأ حساب التوفير المُقاس.",
+                         f"العدّاد أكّد انخفاض ≈ {round(drop)} واط يطابق بصمة {d['name']}. "
+                         + ("هاد تأجيل للشحن مش توفير، فما بنحسبه بالتوفير." if d["kind"] == "ev"
+                            else "بدأ حساب التوفير المُقاس."),
                          {"before_w": round(a["power_before"] or 0), "after_w": round(after)})
                 actions.set_phase(conn, site, "verified")
             else:
