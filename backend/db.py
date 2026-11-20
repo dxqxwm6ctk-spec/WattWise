@@ -176,6 +176,28 @@ CREATE TABLE IF NOT EXISTS smart_plugs (
     PRIMARY KEY (site, device_id)
 );
 
+-- Device fingerprints the user confirmed in teach mode (saved only with the user's "yes").
+CREATE TABLE IF NOT EXISTS fingerprints (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    site        TEXT    NOT NULL,
+    room        TEXT    NOT NULL,
+    name        TEXT    NOT NULL,          -- the user's words, e.g. "لابتوب"
+    kind        TEXT    NOT NULL,
+    watts       REAL    NOT NULL,          -- step size on the meter
+    pf          REAL,                      -- power factor of the step (NULL if the meter has none)
+    samples     INTEGER NOT NULL DEFAULT 1,
+    created_ts  REAL    NOT NULL,
+    source      TEXT    NOT NULL           -- teach / unknown
+);
+-- The conversation with the AI about the room's devices.
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    site        TEXT    NOT NULL,
+    ts          REAL    NOT NULL,
+    role        TEXT    NOT NULL,          -- ai / user
+    text        TEXT    NOT NULL,
+    data        TEXT
+);
 CREATE TABLE IF NOT EXISTS system_state (
     key         TEXT PRIMARY KEY,
     value       TEXT NOT NULL

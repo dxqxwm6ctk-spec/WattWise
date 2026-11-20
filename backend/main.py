@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend import (actions, agent, alerts, assistant, bill_reader, config, connectivity, db, discovery, plugs, report,
-                     schedules, smartplugs, state)
+                     schedules, smartplugs, state, teach)
 from backend.plugs import scan as plug_scan
 
 
@@ -69,7 +69,14 @@ class Meter(BaseModel):
     voltage_v: float | None = None
     current_a: float | None = None
     freq_hz: float | None = None
-    pf: float | None = Field(default=None, ge=0, le=1)   # power factor (PZEM-004T)
+    pf: float | None = Field(default=None, ge=0, le=1)   # power factor (PZEM-004T v3)
+
+
+class Circuit(BaseModel):
+    """Optional: the PZEM clamped on one room's breaker (teach mode)."""
+    room_id: str
+    power_w: float
+    pf: float | None = Field(default=None, ge=0, le=1)
 
 
 class RoomReading(BaseModel):
@@ -87,6 +94,7 @@ class Reading(BaseModel):
     meter_ts: float | None = None
     meter: Meter
     rooms: list[RoomReading] = []
+    circuit: Circuit | None = None
     estop_pressed: bool = False
     ev: dict | None = None          # optional: what a home EV charger reports (battery %, plugged in)
 
@@ -137,6 +145,12 @@ class NewPlug(PlugTarget):
     allow: bool = True
     confirm_high_power: bool = False
     model: str | None = Field(default=None, max_length=60)
+class TeachStart(BaseModel):
+    room: str
+
+
+class ChatText(BaseModel):
+    text: str = Field(max_length=300)
 
 
 class Command(BaseModel):
@@ -378,6 +392,37 @@ def post_plug(site: str, body: NewPlug):
 def delete_plug(site: str, device_id: str):
     _run(smartplugs.remove, site, device_id)
     return {"ok": True}
+# ---------- teach mode: the AI learns each room's appliances by talking ----------
+
+@app.get("/api/sites/{site}/teach")
+def get_teach(site: str):
+    return _run(teach.state, site)
+
+
+@app.post("/api/sites/{site}/teach/start")
+def post_teach_start(site: str, body: TeachStart):
+    return _run(teach.start, site, body.room)
+
+
+@app.post("/api/sites/{site}/teach/done")
+def post_teach_done(site: str):
+    return _run(teach.finish, site)
+
+
+@app.post("/api/sites/{site}/teach/cancel")
+def post_teach_cancel(site: str):
+    return _run(teach.cancel, site)
+
+
+@app.post("/api/sites/{site}/teach/say")
+def post_teach_say(site: str, body: ChatText):
+    """The user's reply in the conversation. Saving fingerprints needs an explicit yes."""
+    return _run(teach.say, site, body.text)
+
+
+@app.delete("/api/sites/{site}/fingerprints/{fp_id}")
+def delete_fingerprint(site: str, fp_id: int):
+    return _run(teach.delete_fingerprint, site, fp_id)
 
 
 # ---------- talking to the agent (commands, analysis, report) ----------

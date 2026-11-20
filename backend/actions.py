@@ -127,6 +127,8 @@ def ingest(conn, payload: dict) -> None:
     rooms = payload.get("rooms", [])
     anomaly.observe(conn, site, power, meter_ts, occupied=any(r.get("occupied") for r in rooms),
                     learning=db.get_state(conn, f"learn:{site}", None) is not None)
+    # Steps on the meter: recognise saved device fingerprints, flag unknown devices, teach mode.
+    nilm.observe(conn, site, payload, now)
 
     # The physical emergency-stop button on the ESP32.
     if payload.get("estop_pressed") and not flag(conn, "estop", site):
@@ -149,7 +151,14 @@ def commands_for(conn, site: str) -> dict:
         "learning": _learning(conn, site),
         # Simulated WiFi smart plugs: their real watts, for the simulator's main meter.
         "plug_loads": smartplugs.sim_loads(conn, site),
+        # Teach mode: the PZEM is on this room's breaker (simulator sends that circuit too).
+        "room_meter": _room_meter(conn, site),
     }
+
+
+def _room_meter(conn, site: str) -> dict | None:
+    from backend import teach   # teach imports actions
+    return teach.room_meter(conn, site)
 
 
 def _learning(conn, site: str) -> dict | None:
@@ -375,6 +384,10 @@ def reset_demo(conn, site: str) -> None:
     anomaly.clear(conn, site)
     conn.execute("DELETE FROM alerts WHERE site=?", (site,))
     db.set_state(conn, f"on_since:{site}", {})
+    nilm.clear(conn, site)
+    db.set_state(conn, f"teach:{site}", None)
+    db.set_state(conn, f"chat_ctx:{site}", None)
+    db.set_state(conn, f"meter_room:{site}", None)
     _close_pending(conn, site, CANCELLED)
     restore_normal(conn, site)
     for d in config.load_sites()[site]["devices"]:
@@ -425,6 +438,7 @@ SCENARIOS = {
     "unknown_load": "حمل غريب: جهاز مش مسجّل (≈ 700 واط) انشغل بالبيت.",
     "ev_arrives": "السيارة الكهربائية وصلت والبطارية ٣٠٪، وصاحب البيت شبكها عالشاحن.",
     "overload": "حمل زايد: السخّان والغسالة اشتغلوا مع المكيّفات، التيار قرّب من حد القاطع (محاكى).",
+    "stranger_device": "جهاز غريب ≈ 60 واط انشبك بالمطبخ، ما إله بصمة محفوظة.",
 }
 
 

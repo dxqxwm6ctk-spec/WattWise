@@ -5,7 +5,7 @@ import json
 import time
 
 from backend import (actions, alerts, anomaly, billing, config, connectivity, db, ev, forecast, impact, llm,
-                     mv, nilm, schedules, smartplugs, weather)
+                     mv, nilm, schedules, smartplugs, teach, weather)
 
 CATEGORY = {"ac": "المكيّفات", "fan": "المكيّفات", "fridge": "الثلاجة", "heater": "سخّان الماء", "ev": "شحن السيارة",
             "light": "الإنارة"}
@@ -174,4 +174,6 @@ def build(conn, site: str) -> dict:
         "comfort": {"min_c": config.COMFORT_MIN_TEMP_C, "max_c": config.COMFORT_MAX_TEMP_C},
         "automation": schedules.listing(conn, site),
         "ev": ev.status(conn, site),
+        # Teach mode chat, saved device fingerprints and unknown-device alerts.
+        "teach": teach.state(conn, site),
     }

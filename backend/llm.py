@@ -312,3 +312,50 @@ def decide(provider: Provider, goal_text: str, snapshot: dict) -> tuple[dict | N
                 "reason": str(i.get("reason_ar", "")).strip()[:600],
                 "alternative": str(i.get("alternative_ar", "")).strip()[:300]}, r
     return None, r
+
+
+# ---------------- job 3: read the owner's reply in "teach mode" ----------------
+
+READ_SYSTEM = (
+    "You help WattWise, an energy agent, understand the owner's short reply in Jordanian Arabic. "
+    "The meter found some electrical devices (numbered candidates with watts and a guess). "
+    "The owner may confirm the guesses (intent yes), refuse (no), give names to some numbers (labels), "
+    "or ask to ignore some (ignore, with ignore=true on those items). For one unknown device, the reply "
+    "is usually its name and maybe its room; put the name in item n=1 and the room id in room_id. "
+    "Use only the numbers and room ids given. Keep names short, in the owner's words. Never invent devices. "
+    "Call submit_reading once."
+)
+
+
+def read_tools(room_ids: list[str]) -> list[dict]:
+    return [{
+        "name": "submit_reading",
+        "description": "What the owner's reply means.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "intent": {"type": "string", "enum": ["yes", "no", "labels", "ignore", "unclear"]},
+                "items": {"type": "array", "items": {
+                    "type": "object",
+                    "properties": {"n": {"type": "integer"}, "name": {"type": "string"},
+                                   "ignore": {"type": "boolean"}},
+                    "required": ["n", "name", "ignore"], "additionalProperties": False}},
+                "room_id": {"type": "string", "enum": room_ids + [""]},
+            },
+            "required": ["intent", "items", "room_id"],
+            "additionalProperties": False,
+        },
+    }]
+
+
+def read_reply(provider: Provider, question: str, candidates: list[dict], rooms: list[dict],
+               reply: str) -> tuple[dict | None, RunResult]:
+    """Returns {"intent", "items", "room_id"} or None when the answer is unusable (rules take over)."""
+    user = json.dumps({"question_type": question, "candidates": candidates, "rooms": rooms, "reply": reply},
+                      ensure_ascii=False)
+    r = provider.run(READ_SYSTEM, user, read_tools([x["id"] for x in rooms]), lambda *_: {}, {"submit_reading"})
+    if r.final_tool != "submit_reading" or r.final_input.get("intent") == "unclear":
+        return None, r
+    i = r.final_input
+    items = [it for it in i.get("items", []) if isinstance(it, dict)]
+    return {"intent": i.get("intent"), "items": items, "room_id": i.get("room_id") or ""}, r
