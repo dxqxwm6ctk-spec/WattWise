@@ -76,6 +76,10 @@ ALERT_COOLDOWN_S = _env_float("ALERT_COOLDOWN_S", 300)
 # How often the agent loop runs.
 AGENT_INTERVAL_S = _env_float("AGENT_INTERVAL_S", 1)
 
+# --- WiFi smart plugs (backend/smartplugs.py) ---
+# How often each plug is pushed its wanted state and read back.
+PLUG_POLL_S = _env_float("PLUG_POLL_S", 2)
+
 # --- Weather tool (Open-Meteo, free, no key). Default: Irbid. ---
 WEATHER_ENABLED = os.environ.get("WEATHER_ENABLED", "1") != "0"
 WEATHER_LAT = _env_float("WEATHER_LAT", 32.56)

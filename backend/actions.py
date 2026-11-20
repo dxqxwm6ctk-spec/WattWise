@@ -136,6 +136,7 @@ def ingest(conn, payload: dict) -> None:
 def commands_for(conn, site: str) -> dict:
     """What the ESP32 / simulator should do now. Polled every second."""
     require_site(site)
+    from backend import smartplugs   # late import: smartplugs imports this module
     devs = db.devices(conn, site)
     return {
         "relays": {d["id"]: bool(d["is_on"]) for d in devs},
@@ -146,6 +147,8 @@ def commands_for(conn, site: str) -> dict:
         "scenario": db.get_state(conn, f"scenario:{site}", "normal"),
         # While the user adds a device in the app (simulator plugs in a matching load).
         "learning": _learning(conn, site),
+        # Simulated WiFi smart plugs: their real watts, for the simulator's main meter.
+        "plug_loads": smartplugs.sim_loads(conn, site),
     }
 
 
@@ -214,7 +217,7 @@ def set_goal(conn, site: str, text: str, bill_target_jd: float | None) -> dict:
 
 def human_toggle(conn, site: str, device_id: str, turn_on: bool, confirmed: bool = False) -> dict:
     d = require_device(conn, site, device_id)
-    decision = policy.check_switch(d, turn_on, policy.HUMAN, None)
+    decision = policy.check_switch(d, turn_on, policy.HUMAN, None, plug=db.plug(conn, site, device_id))
     if not decision.allowed:
         db.audit(conn, site, "T2", "policy", "blocked",
                  f"محاولة تحكم بـ{d['name']} ← مرفوضة بالكود. {decision.reason_ar}")
@@ -286,7 +289,8 @@ def approve(conn, site: str, approval_id: int) -> dict:
     room = db.latest_room(conn, site, d["room"])
     # The Policy Guard checks again at execution time: things may have changed.
     decision = policy.check_switch(d, bool(a["turn_on"]), policy.AGENT, room,
-                                   estop=flag(conn, "estop", site), safe_mode=flag(conn, "safe_mode", site))
+                                   estop=flag(conn, "estop", site), safe_mode=flag(conn, "safe_mode", site),
+                                   plug=db.plug(conn, site, d["id"]))
     now = time.time()
     if not decision.allowed:
         conn.execute("UPDATE approvals SET status=?, decided_ts=? WHERE id=?", (BLOCKED, now, a["id"]))
@@ -295,7 +299,7 @@ def approve(conn, site: str, approval_id: int) -> dict:
         set_phase(conn, site, "rejected")
         raise ActionError(decision.reason_ar)
 
-    before = db.avg_power(conn, site, 3) or 0.0
+    before = power_now(conn, site, d["id"], 3)
     conn.execute("UPDATE approvals SET status=?, decided_ts=?, power_before=? WHERE id=?",
                  (APPROVED, now, before, a["id"]))
     db.audit(conn, site, "OK", "human", "approved",
@@ -308,6 +312,15 @@ def approve(conn, site: str, approval_id: int) -> dict:
     from backend import ev
     ev.after_approval(conn, site, a, json.loads(a["details"] or "{}"))   # smart charging: resume timer
     return db.one(conn.execute("SELECT * FROM approvals WHERE id=?", (a["id"],)))
+
+
+def power_now(conn, site: str, device_id: str, seconds: float) -> float | None:
+    """Power to compare before/after an action: the device's own smart plug if it measures,
+    otherwise the main meter (NILM-lite step). None when the meter has no fresh reading."""
+    p = db.plug(conn, site, device_id)
+    if p and p["meters"] and p["online"] and p["power_w"] is not None:
+        return p["power_w"]
+    return db.avg_power(conn, site, seconds)
 
 
 def reject(conn, site: str, approval_id: int) -> dict:

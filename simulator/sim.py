@@ -62,6 +62,7 @@ class House:
         self.setpoint = {k: d["setpoint"] for k, d in self.devices.items() if "setpoint" in d}
         self.extra_w: dict[str, float] = {}      # devices added from the app: id -> true watts
         self.extra_kind: dict[str, str] = {}     # and their kind (for the synthetic PF)
+        self.plug_w: dict[str, float] = {}       # simulated WiFi smart plugs: id -> watts drawn now
         self.speed = speed
         self.clock = datetime.now().replace(hour=19, minute=30, second=0, microsecond=0).timestamp()
         self.energy_kwh = start_kwh
@@ -88,6 +89,8 @@ class House:
         for dev_id in list(self.extra_w):
             if dev_id not in cmd["relays"] and dev_id != self.learning_id:
                 del self.extra_w[dev_id]
+        # Simulated smart plugs: the backend tells us what each one really draws.
+        self.plug_w = cmd.get("plug_loads") or {}
         if cmd["scenario"] != self.scenario:
             self.scenario = cmd["scenario"]
             if self.scenario == "sensor_fault":
@@ -147,8 +150,8 @@ class House:
 
     def reading(self) -> dict:
         self.step_ev()
-        all_ids = list(self.devices) + list(self.extra_w)
-        power = sum(self.device_w(k) for k in all_ids) + random.uniform(-20, 20)
+        all_ids = list(self.devices) + [k for k in self.extra_w if k not in self.plug_w]
+        power = sum(self.device_w(k) for k in all_ids) + sum(self.plug_w.values()) + random.uniform(-20, 20)
         if self.scenario == "unknown_load":   # a load the backend does not know about
             power += UNKNOWN_LOAD_W
         power = max(0.0, power)

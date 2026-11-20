@@ -153,6 +153,28 @@ CREATE TABLE IF NOT EXISTS alerts (
     user_state  TEXT                       -- NULL / dismissed / acted
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_site_key ON alerts(site, key);
+-- WiFi smart plugs (one row per device that sits on a plug). See backend/smartplugs.py.
+CREATE TABLE IF NOT EXISTS smart_plugs (
+    site        TEXT    NOT NULL,
+    device_id   TEXT    NOT NULL,
+    brand       TEXT    NOT NULL,          -- shelly / tplink / tuya / tasmota / sonoff / simulated
+    host        TEXT    NOT NULL,          -- IP address on the local Wi-Fi (or sim-...)
+    model       TEXT,
+    options     TEXT    NOT NULL DEFAULT '{}',  -- brand settings (Tuya local key...). Never sent to the UI.
+    meters      INTEGER NOT NULL DEFAULT 0,     -- 1 if the plug measures watts
+    max_w       REAL    NOT NULL,          -- plug rating in watts (10 A x 230 V = 2300 W)
+    online      INTEGER NOT NULL DEFAULT 1,
+    fails       INTEGER NOT NULL DEFAULT 0,     -- failed polls in a row
+    power_w     REAL,
+    energy_kwh  REAL,
+    voltage_v   REAL,
+    reported_on INTEGER,                   -- what the plug says now
+    confirmed_on INTEGER,                  -- last state where plug and backend agreed
+    last_seen_ts REAL,
+    overload    INTEGER NOT NULL DEFAULT 0, -- 1 while above 90% of the rating (alert sent)
+    error       TEXT,
+    PRIMARY KEY (site, device_id)
+);
 
 CREATE TABLE IF NOT EXISTS system_state (
     key         TEXT PRIMARY KEY,
@@ -295,6 +317,9 @@ def avg_pq(conn, site: str, t_from: float, t_to: float) -> tuple[float | None, f
     qs = [nilm.reactive(r["power_w"], r["pf"]) for r in rows_]
     q = None if any(x is None for x in qs) else sum(qs) / len(qs)
     return p, q
+def plug(conn, site: str, device_id: str) -> dict | None:
+    """The smart plug a device sits on, or None (relay / simulated house device)."""
+    return one(conn.execute("SELECT * FROM smart_plugs WHERE site=? AND device_id=?", (site, device_id)))
 
 
 def set_device(conn, site: str, device_id: str, **fields) -> None:

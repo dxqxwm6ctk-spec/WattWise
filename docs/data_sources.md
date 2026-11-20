@@ -17,6 +17,8 @@
 | Internet check | one small request to `https://api.open-meteo.com/` every 10 s (`backend/connectivity.py`), sends no data | in use |
 | Weather and solar radiation | Open-Meteo (free, no key, open data), `backend/weather.py`, default location Irbid | in use, optional: skipped when offline |
 | Electricity bill photo (optional) | the owner's own bill, uploaded by the owner; read once by Claude (vision), **never stored**; only kWh, days and JOD are kept; the model is told not to output names, addresses or account numbers. For the demo, use a bill with the name and numbers covered | in use when a key is set; manual entry otherwise |
+| WiFi smart plug readings (on/off, watts, volts) | the user's own plugs on the local Wi-Fi (Shelly, TP-Link, Tuya, Sonoff/Tasmota); only the plug model, MAC and readings, nothing about people | in use when a plug is added |
+| Simulated smart plugs | `backend/plugs/simulated.py`, **synthetic** (typical watts per device type ± a few %) | in use, labelled "محاكى" |
 | LLM planner (optional) | Anthropic Claude API; it only receives the synthetic/sensor snapshot (rooms, watts, tariff, weather), never personal data | in use when a key is set |
 
 No personal data is collected. The PIR only reports occupied/empty. No cameras.

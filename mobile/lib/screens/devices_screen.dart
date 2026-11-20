@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../api.dart';
 import '../theme.dart';
 import '../widgets/device_visuals.dart';
+import 'add_plug_wizard.dart';
 
 const deviceTypes = [
   (k: 'ac', label: 'مكيّف', locked: false),
@@ -47,9 +48,13 @@ class _DevicesScreenState extends State<DevicesScreen> {
           child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? WW.paper : WW.ink)),
         ),
       );
+  bool plugOpen = false;
 
   @override
   Widget build(BuildContext context) {
+    if (plugOpen) {
+      return AddPlugWizard(st: widget.st, api: widget.api, run: widget.run, onClose: () => setState(() => plugOpen = false));
+    }
     if (wizardOpen) {
       return AddDeviceWizard(st: widget.st, api: widget.api, run: widget.run, onClose: () => setState(() => wizardOpen = false));
     }
@@ -64,6 +69,15 @@ class _DevicesScreenState extends State<DevicesScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       SizedBox(
         height: 52,
+        child: FilledButton(
+          onPressed: () => setState(() => plugOpen = true),
+          style: FilledButton.styleFrom(backgroundColor: WW.ink, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
+          child: const Text('🔌 + ضيفي مقبس ذكي (Wi-Fi)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        ),
+      ),
+      const SizedBox(height: 8),
+      SizedBox(
+        height: 52,
         child: OutlinedButton(
           onPressed: () => setState(() => wizardOpen = true),
           style: OutlinedButton.styleFrom(
@@ -71,7 +85,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
             side: const BorderSide(color: Color(0xFFB9B6AA), width: 1.5),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           ),
-          child: const Text('+ ضيفي جهاز جديد', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          child: const Text('+ ضيفي جهاز بالعدّاد الرئيسي', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         ),
       ),
       if (st['agent']['safe_mode'] == true) ...[
@@ -153,6 +167,21 @@ class _DeviceTileState extends State<_DeviceTile> {
       return;
     }
     await _send(!on);
+  }
+
+  Future<void> _remove(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('نشيل ${d['name']}؟'),
+        content: const Text('رح ينشال الجهاز ومقبسه من WattWise. المقبس نفسه بيضل متل ما هو.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), style: FilledButton.styleFrom(backgroundColor: WW.ink), child: const Text('إيه، شيله')),
+        ],
+      ),
+    );
+    if (ok == true) await run(() => api.removePlug(d['id']));
   }
 
   @override
@@ -250,6 +279,7 @@ class _DeviceTileState extends State<_DeviceTile> {
                 )
               : const SizedBox(width: double.infinity),
         ),
+        PlugLine(d: d, onRemove: () => _remove(context)),
       ]),
     );
   }

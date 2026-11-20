@@ -55,6 +55,33 @@ class WattWiseApi {
   // --- warnings: "طفّيه؟" only creates an approval request, it switches nothing ---
   Future<void> alertAct(int id) => post('/alerts/$id/act');
   Future<void> alertDismiss(int id) => post('/alerts/$id/dismiss');
+  // --- WiFi smart plugs (Shelly, TP-Link Tapo/Kasa, Tuya, Sonoff/Tasmota, simulated) ---
+  Future<Map<String, dynamic>> plugBrands() async {
+    final res = await http.get(Uri.parse('$baseUrl/api/plugs/brands')).timeout(const Duration(seconds: 4));
+    return _decode(res);
+  }
+
+  /// Looks for plugs on the local Wi-Fi. Takes a few seconds.
+  Future<List<dynamic>> scanPlugs() async {
+    final res = await http.get(_uri('/plugs/scan')).timeout(const Duration(seconds: 20));
+    return (_decode(res)['plugs'] as List?) ?? [];
+  }
+
+  Future<Map<String, dynamic>> checkPlug(Map<String, dynamic> target, String kind) async {
+    final res = await http
+        .post(_uri('/plugs/check'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({...target, 'kind': kind}))
+        .timeout(const Duration(seconds: 15));
+    return _decode(res);
+  }
+
+  Future<void> addPlug(Map<String, dynamic> body) async {
+    final res = await http
+        .post(_uri('/plugs'), headers: {'Content-Type': 'application/json'}, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 15));
+    _decode(res);
+  }
+
+  Future<void> removePlug(String deviceId) => delete('/plugs/$deviceId');
 
   // --- goal, commands, schedules, analysis (new design) ---
   Future<void> setGoal(String text) => post('/goal', {'text': text});

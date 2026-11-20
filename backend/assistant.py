@@ -149,7 +149,7 @@ def parse_command(conn, site: str, text: str) -> dict:
         else:
             turn_on = on and not off
             item.update(action="on" if turn_on else "off", label=f"{'تشغيل' if turn_on else 'إطفاء'} {d['name']}")
-            decision = policy.check_switch(d, turn_on, policy.HUMAN, None)
+            decision = policy.check_switch(d, turn_on, policy.HUMAN, None, plug=db.plug(conn, site, d["id"]))
             if decision.allowed and d["sensitive"] and not turn_on:
                 decision = policy.Decision(False, "sensitive_device",
                                            f"{d['name']} بيقطع تطبيق الموافقة. طفّيه من صفحة الأجهزة بتأكيد إضافي.")

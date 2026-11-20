@@ -35,17 +35,24 @@ def is_critical(device: dict) -> bool:
 
 
 def check_switch(device: dict, turn_on: bool, actor: str, room: dict | None,
-                 estop: bool = False, safe_mode: bool = False) -> Decision:
+                 estop: bool = False, safe_mode: bool = False, plug: dict | None = None) -> Decision:
     """May `actor` switch `device` on/off right now?
 
     device: a row from the devices table.
     room:   the latest sensor reading of the device's room (or None).
+    plug:   the smart_plugs row if the device sits on a WiFi smart plug (or None).
     """
     name = device.get("name", device.get("id", "?"))
 
     # Tier 2: nobody touches critical loads. Not the agent, not the app.
     if is_critical(device):
         return Decision(False, "critical_load", f"{name} حمل حرج (T2) وممنوع التحكم فيه بالكود.")
+
+    # Smart plug rules apply to everyone, the human too (they protect the wiring, not comfort).
+    if plug is not None:
+        d = check_plug(device, turn_on, plug)
+        if not d.allowed:
+            return d
 
     # A human may switch any non-critical device by hand.
     # Everything below is for the agent and for timers/schedules (no human pressing a button now).
@@ -92,6 +99,19 @@ def check_switch(device: dict, turn_on: bool, actor: str, room: dict | None,
         if light is None or light < config.DARK_LIGHT_LEVEL:
             return Decision(False, "comfort_dark", "الغرفة فيها ناس والإضاءة الطبيعية قليلة.")
 
+    return ok()
+
+
+def check_plug(device: dict, turn_on: bool, plug: dict) -> Decision:
+    """A smart plug must be reachable, and never switch ON a load bigger than its rating."""
+    name = device.get("name", device.get("id", "?"))
+    if not plug.get("online"):
+        return Decision(False, "plug_offline", f"المقبس الذكي تبع {name} مش متصل، فما بنقدر ننفّذ.")
+    max_w = plug.get("max_w") or 0
+    if turn_on and max_w and (device.get("signature_w") or 0) > max_w:
+        return Decision(False, "plug_overload",
+                        f"{name} بيسحب ≈ {device['signature_w']:.0f} واط، أكثر من حد المقبس ({max_w:.0f} واط). "
+                        "ممنوع تشغيله على هالمقبس.")
     return ok()
 
 
