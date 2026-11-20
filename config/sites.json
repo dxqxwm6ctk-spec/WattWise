@@ -1,14 +1,14 @@
 {
-  "_note": "Sites, rooms and devices. 'home' is the simulated house and 'building' a simulated 10-room office floor (digital twins, synthetic data). 'lab' is the real test room with the ESP32. rated_w is the nameplate value, used only as a first guess until the meter measures the real load signature. 'sim' values are only read by the simulator.",
+  "_note": "Sites, rooms and devices. 'home' is the simulated house and 'building' a simulated 10-room office floor (digital twins, synthetic data). 'lab' is the real test room with the ESP32. rated_w is the nameplate value, used only as a first guess until the meter measures the real load signature. 'sim' values are only read by the simulator; 'sim.unlabeled' are synthetic devices the backend does not know, used by teach mode (the AI learns them from the meter).",
   "sites": {
     "home": {
       "name": "بيت العيلة",
       "source": "simulator",
       "rooms": [
-        {"id": "living", "name": "الصالون", "sim": {"occupied": true, "temp_c": 24.5}},
-        {"id": "bedroom", "name": "غرفة النوم", "sim": {"occupied": true, "temp_c": 23.8}},
-        {"id": "kids", "name": "غرفة الأولاد", "sim": {"occupied": true, "temp_c": 25.2}},
-        {"id": "kitchen", "name": "المطبخ", "sim": {"occupied": true, "temp_c": 26.0}},
+        {"id": "living", "name": "الصالون", "sim": {"occupied": true, "temp_c": 24.5, "unlabeled": [{"name": "laptop", "w": 62, "pf": 0.57}, {"name": "floor lamp LED", "w": 9, "pf": 0.6}]}},
+        {"id": "bedroom", "name": "غرفة النوم", "sim": {"occupied": true, "temp_c": 23.8, "unlabeled": [{"name": "phone charger", "w": 6, "pf": 0.5}, {"name": "bedside lamp", "w": 25, "pf": 0.99}]}},
+        {"id": "kids", "name": "غرفة الأولاد", "sim": {"occupied": true, "temp_c": 25.2, "unlabeled": [{"name": "laptop", "w": 61, "pf": 0.58}, {"name": "small LED desk light", "w": 8, "pf": 0.62}, {"name": "big halogen light", "w": 40, "pf": 0.99}]}},
+        {"id": "kitchen", "name": "المطبخ", "sim": {"occupied": true, "temp_c": 26.0, "unlabeled": [{"name": "LED strip over the sink", "w": 12, "pf": 0.9}]}},
         {"id": "bath", "name": "الحمّام", "sim": {"occupied": false, "temp_c": 24.0}},
         {"id": "hall", "name": "الممر", "sim": {"occupied": false, "temp_c": 24.6}},
         {"id": "garage", "name": "الكراج", "sim": {"occupied": false, "temp_c": 27.0}}
@@ -32,6 +32,8 @@
              "sim": {"arrive_soc": 30},
              "source": "Simulated home wallbox: 7.4 kW = 230 V x 32 A single phase (IEC 61851 Mode 3). 60 kWh battery is a synthetic assumption for a mid-size EV. main_breaker_w: 40 A x 230 V, an assumed house main breaker; set it to the real one. No real car data."},
       "demo_waste": {"room": "bedroom", "device": "bedAc", "label": "١ · غرفة النوم فاضية والشباك مفتوح"},
+      "limits": {"max_current_a": 25, "_note": "Simulated main breaker of the digital-twin house (synthetic, for the overload warning demo)."},
+      "overload_devices": ["heater", "washer"],
       "labels": {"mode": "وضع البيت", "goal": "هدف العيلة", "map": "HOME MAP · غرف البيت", "meter": "عدّاد البيت", "max_w": 4000}
     },
     "lab": {
@@ -44,6 +46,7 @@
         {"id": "lamp", "name": "اللمبة", "room": "lab", "kind": "light", "rated_w": 40, "tier": "T1", "on": true, "relay_channel": 1},
         {"id": "fan", "name": "المروحة (بدل المكيّف)", "room": "lab", "kind": "fan", "rated_w": 45, "tier": "T1", "on": true, "relay_channel": 2}
       ],
+      "limits": {"max_current_a": 10, "_note": "PZEM-004T v3.0 10A version and the kit relay (verify the relay label says 10A 250VAC)."},
       "labels": {"mode": "وضع المختبر", "goal": "هدف المختبر", "map": "LAB · غرفة المختبر", "meter": "عدّاد المختبر", "max_w": 200}
     },
     "building": {
@@ -51,7 +54,7 @@
       "source": "simulator",
       "rooms": [
         {"id": "lobby", "name": "الاستقبال", "sim": {"occupied": true, "temp_c": 24.8}},
-        {"id": "office1", "name": "مكتب ١", "sim": {"occupied": true, "temp_c": 24.2}},
+        {"id": "office1", "name": "مكتب ١", "sim": {"occupied": true, "temp_c": 24.2, "unlabeled": [{"name": "laptop", "w": 65, "pf": 0.55}, {"name": "desk fan", "w": 45, "pf": 0.86}]}},
         {"id": "office2", "name": "مكتب ٢", "sim": {"occupied": false, "temp_c": 25.0}},
         {"id": "office3", "name": "مكتب ٣", "sim": {"occupied": true, "temp_c": 24.6}},
         {"id": "office4", "name": "مكتب ٤", "sim": {"occupied": false, "temp_c": 25.4}},

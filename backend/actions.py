@@ -4,10 +4,11 @@ Both the web API (human actions) and the agent loop call these functions, so
 every change goes through the same Policy Guard checks and the same audit log.
 """
 
+import calendar
 import json
 import time
 
-from backend import anomaly, config, db, policy
+from backend import anomaly, billing, config, db, impact, nilm, policy
 
 # Approval statuses
 PENDING, APPROVED, REJECTED, EXPIRED, BLOCKED, CANCELLED = (
@@ -16,20 +17,6 @@ SKIPPED = "skipped"   # the LLM planner decided not to ask about this device
 
 # devices.agent_off values
 AGENT_OFF_NONE, AGENT_OFF_UNVERIFIED, AGENT_OFF_VERIFIED = 0, 1, 2
-
-def rule_plan(text: str, bill_target_jd: float | None) -> list[str]:
-    """The plan the rule-based agent follows (used when there is no LLM)."""
-    steps = [
-        "أراقب العدّاد وكل غرفة كل ثانية.",
-        "أدوّر على أجهزة شغّالة بغرف فاضية.",
-        "أتأكد إنه الإطفاء ما بيكسر حدود الراحة ولا بيلمس جهاز ممنوع.",
-        "أسألك قبل أي إطفاء، وإذا ما رديت ما بعمل إشي.",
-        "أتأكد من التوفير بالعدّاد وأحسبه بالدينار.",
-    ]
-    if bill_target_jd:
-        steps.append(f"أقارن الفاتورة المتوقعة بهدفك ({bill_target_jd:g} دينار).")
-    return steps
-
 
 GOAL_STEPS = [
     "قراءة العدّاد والحسّاسات والطقس",
@@ -113,13 +100,16 @@ def ingest(conn, payload: dict) -> None:
     if held_off_w and dt_h:
         saved = db.get_state(conn, f"saved_wh:{site}", 0.0) + held_off_w * dt_h
         db.set_state(conn, f"saved_wh:{site}", saved)
+        db.set_state(conn, f"saved_day:{site}",
+                     impact.add_today(db.get_state(conn, f"saved_day:{site}", None), meter_ts, held_off_w * dt_h))
 
     power = float(meter["power_w"])
     conn.execute(
         "INSERT INTO meter_readings (site, ts, meter_ts, source, power_w, baseline_w, energy_kwh, "
-        "voltage_v, current_a, freq_hz) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "voltage_v, current_a, freq_hz, pf) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (site, now, meter_ts, payload.get("source", "device"), power, power + held_off_w,
-         meter.get("energy_kwh"), meter.get("voltage_v"), meter.get("current_a"), meter.get("freq_hz")),
+         meter.get("energy_kwh"), meter.get("voltage_v"), meter.get("current_a"), meter.get("freq_hz"),
+         meter.get("pf")),
     )
     for r in payload.get("rooms", []):
         conn.execute(
@@ -137,6 +127,8 @@ def ingest(conn, payload: dict) -> None:
     rooms = payload.get("rooms", [])
     anomaly.observe(conn, site, power, meter_ts, occupied=any(r.get("occupied") for r in rooms),
                     learning=db.get_state(conn, f"learn:{site}", None) is not None)
+    # Steps on the meter: recognise saved device fingerprints, flag unknown devices, teach mode.
+    nilm.observe(conn, site, payload, now)
 
     # The physical emergency-stop button on the ESP32.
     if payload.get("estop_pressed") and not flag(conn, "estop", site):
@@ -146,6 +138,7 @@ def ingest(conn, payload: dict) -> None:
 def commands_for(conn, site: str) -> dict:
     """What the ESP32 / simulator should do now. Polled every second."""
     require_site(site)
+    from backend import smartplugs   # late import: smartplugs imports this module
     devs = db.devices(conn, site)
     return {
         "relays": {d["id"]: bool(d["is_on"]) for d in devs},
@@ -156,7 +149,16 @@ def commands_for(conn, site: str) -> dict:
         "scenario": db.get_state(conn, f"scenario:{site}", "normal"),
         # While the user adds a device in the app (simulator plugs in a matching load).
         "learning": _learning(conn, site),
+        # Simulated WiFi smart plugs: their real watts, for the simulator's main meter.
+        "plug_loads": smartplugs.sim_loads(conn, site),
+        # Teach mode: the PZEM is on this room's breaker (simulator sends that circuit too).
+        "room_meter": _room_meter(conn, site),
     }
+
+
+def _room_meter(conn, site: str) -> dict | None:
+    from backend import teach   # teach imports actions
+    return teach.room_meter(conn, site)
 
 
 def _learning(conn, site: str) -> dict | None:
@@ -168,25 +170,53 @@ def _learning(conn, site: str) -> dict | None:
 
 # ---------- goal ----------
 
+def projected_bill(conn, site: str) -> float | None:
+    """This month's bill if consumption continues at the same pace (JD, energy charge only)."""
+    meter = db.latest_meter(conn, site)
+    if not meter or not meter.get("energy_kwh"):
+        return None
+    tariff = config.load_tariff()
+    ttype = db.get_state(conn, f"tariff_type:{site}", tariff["default_type"])
+    t = time.localtime(meter["meter_ts"])
+    days = calendar.monthrange(t.tm_year, t.tm_mon)[1]
+    elapsed = max(0.5, t.tm_mday - 1 + (t.tm_hour + t.tm_min / 60) / 24)
+    return billing.bill_for(meter["energy_kwh"] / elapsed * days, tariff, ttype)
+
+
 def set_goal(conn, site: str, text: str, bill_target_jd: float | None) -> dict:
     require_site(site)
     text = text.strip()
     if not text:
         raise ActionError("اكتب الهدف.")
+    percent = None
     if bill_target_jd is None:
-        from backend.assistant import read_goal   # "بدي الفاتورة تحت ٢٥ دينار" -> 25
+        from backend.assistant import read_goal, read_goal_percent   # "تحت ٢٥ دينار" -> 25, "وفّر ٢٠٪" -> 20
         bill_target_jd = read_goal(text)
+        percent = read_goal_percent(text)
+        projected = projected_bill(conn, site)
+        if bill_target_jd is None and percent and projected:
+            # "save 20%" becomes a bill target: this month's projected bill minus 20%.
+            bill_target_jd = max(1.0, round(projected * (1 - percent / 100), 1))
     conn.execute("UPDATE goals SET active=0 WHERE site=?", (site,))
     conn.execute("INSERT INTO goals (site, created_ts, text, bill_target_jd, active) VALUES (?,?,?,?,1)",
                  (site, time.time(), text, bill_target_jd))
     goal = active_goal(conn, site)
-    summary = (f"فهمت إنك بدك الفاتورة تحت {bill_target_jd:g} دينار." if bill_target_jd
-               else "ما لقيت رقم بالدينار بكلامك، فبراقب وبوفّر بدون هدف رقمي.")
-    db.set_state(conn, f"plan:{site}", {"goal_id": goal["id"], "by": "rules",
-                                         "steps": rule_plan(text, bill_target_jd), "summary": summary})
+    from backend import goal as goal_reader   # rule-based reading of the goal (no LLM needed)
+    intent = goal_reader.understand(conn, site, text, bill_target_jd)
+    steps = goal_reader.plan_steps(intent)
+    summary = goal_reader.summary(intent)
+    if percent and bill_target_jd:
+        summary = (f"فهمت إنك بدك توفّر {percent:g}٪: الفاتورة المتوقعة هالشهر بتصير هدفها "
+                   f"{bill_target_jd:g} دينار بدل {projected_bill(conn, site):.1f}. "
+                   "هذا هدف، والتوفير الحقيقي بنحسبه بس من العدّاد.")
+    db.set_state(conn, f"plan:{site}", {
+        "goal_id": goal["id"], "by": "rules", "steps": steps, "summary": summary,
+        "intent": intent,
+        "focus": {"rooms": [r["id"] for r in intent["rooms"]], "kinds": intent["kinds"]},
+    })
     db.audit(conn, site, "T0", "agent", "goal_received",
-             f"استلمت الهدف وقسّمته لـ{len(GOAL_STEPS)} خطوات. الوضع: مراقبة.",
-             {"goal": text, "steps": GOAL_STEPS})
+             f"استلمت الهدف وقسّمته لـ{len(steps)} خطوات: " + " · ".join(steps),
+             {"goal": text, "steps": steps, "intent": intent})
     if get_phase(conn, site) not in ("stopped",):
         set_phase(conn, site, "normal")
     return active_goal(conn, site)
@@ -196,7 +226,7 @@ def set_goal(conn, site: str, text: str, bill_target_jd: float | None) -> dict:
 
 def human_toggle(conn, site: str, device_id: str, turn_on: bool, confirmed: bool = False) -> dict:
     d = require_device(conn, site, device_id)
-    decision = policy.check_switch(d, turn_on, policy.HUMAN, None)
+    decision = policy.check_switch(d, turn_on, policy.HUMAN, None, plug=db.plug(conn, site, device_id))
     if not decision.allowed:
         db.audit(conn, site, "T2", "policy", "blocked",
                  f"محاولة تحكم بـ{d['name']} ← مرفوضة بالكود. {decision.reason_ar}")
@@ -268,7 +298,8 @@ def approve(conn, site: str, approval_id: int) -> dict:
     room = db.latest_room(conn, site, d["room"])
     # The Policy Guard checks again at execution time: things may have changed.
     decision = policy.check_switch(d, bool(a["turn_on"]), policy.AGENT, room,
-                                   estop=flag(conn, "estop", site), safe_mode=flag(conn, "safe_mode", site))
+                                   estop=flag(conn, "estop", site), safe_mode=flag(conn, "safe_mode", site),
+                                   plug=db.plug(conn, site, d["id"]))
     now = time.time()
     if not decision.allowed:
         conn.execute("UPDATE approvals SET status=?, decided_ts=? WHERE id=?", (BLOCKED, now, a["id"]))
@@ -277,7 +308,7 @@ def approve(conn, site: str, approval_id: int) -> dict:
         set_phase(conn, site, "rejected")
         raise ActionError(decision.reason_ar)
 
-    before = db.avg_power(conn, site, 3) or 0.0
+    before = power_now(conn, site, d["id"], 3)
     conn.execute("UPDATE approvals SET status=?, decided_ts=?, power_before=? WHERE id=?",
                  (APPROVED, now, before, a["id"]))
     db.audit(conn, site, "OK", "human", "approved",
@@ -290,6 +321,15 @@ def approve(conn, site: str, approval_id: int) -> dict:
     from backend import ev
     ev.after_approval(conn, site, a, json.loads(a["details"] or "{}"))   # smart charging: resume timer
     return db.one(conn.execute("SELECT * FROM approvals WHERE id=?", (a["id"],)))
+
+
+def power_now(conn, site: str, device_id: str, seconds: float) -> float | None:
+    """Power to compare before/after an action: the device's own smart plug if it measures,
+    otherwise the main meter (NILM-lite step). None when the meter has no fresh reading."""
+    p = db.plug(conn, site, device_id)
+    if p and p["meters"] and p["online"] and p["power_w"] is not None:
+        return p["power_w"]
+    return db.avg_power(conn, site, seconds)
 
 
 def reject(conn, site: str, approval_id: int) -> dict:
@@ -337,10 +377,17 @@ def reset_demo(conn, site: str) -> None:
     db.set_state(conn, f"safe_mode:{site}", False)
     db.set_state(conn, f"scenario:{site}", "normal")
     db.set_state(conn, f"saved_wh:{site}", 0.0)
+    db.set_state(conn, f"saved_day:{site}", None)
     db.set_state(conn, f"learn:{site}", None)
     conn.execute("DELETE FROM schedules WHERE site=?", (site,))
     conn.execute("DELETE FROM timers WHERE site=?", (site,))
     anomaly.clear(conn, site)
+    conn.execute("DELETE FROM alerts WHERE site=?", (site,))
+    db.set_state(conn, f"on_since:{site}", {})
+    nilm.clear(conn, site)
+    db.set_state(conn, f"teach:{site}", None)
+    db.set_state(conn, f"chat_ctx:{site}", None)
+    db.set_state(conn, f"meter_room:{site}", None)
     _close_pending(conn, site, CANCELLED)
     restore_normal(conn, site)
     for d in config.load_sites()[site]["devices"]:
@@ -370,6 +417,9 @@ def set_scenario(conn, site: str, name: str) -> None:
         db.audit(conn, site, "MANUAL", "human", "manual_switch", f"شبكنا السيارة على {evd['name']} (محاكاة).")
     if name == "bedroom_empty_window" and demo:
         db.set_device(conn, site, demo["device"], is_on=1, agent_off=AGENT_OFF_NONE)
+    if name == "overload":   # the big loads come on together (current near the limit)
+        for dev_id in config.load_sites()[site].get("overload_devices", []):
+            db.set_device(conn, site, dev_id, is_on=1, agent_off=AGENT_OFF_NONE)
     if get_phase(conn, site) not in ("pending", "executing"):
         set_phase(conn, site, "normal")
     text = SCENARIOS[name]
@@ -387,6 +437,8 @@ SCENARIOS = {
     "sensor_fault": "عطل حسّاسات: المحاكي بيوقف يبعت قراءات شوي.",
     "unknown_load": "حمل غريب: جهاز مش مسجّل (≈ 700 واط) انشغل بالبيت.",
     "ev_arrives": "السيارة الكهربائية وصلت والبطارية ٣٠٪، وصاحب البيت شبكها عالشاحن.",
+    "overload": "حمل زايد: السخّان والغسالة اشتغلوا مع المكيّفات، التيار قرّب من حد القاطع (محاكى).",
+    "stranger_device": "جهاز غريب ≈ 60 واط انشبك بالمطبخ، ما إله بصمة محفوظة.",
 }
 
 
@@ -403,7 +455,9 @@ def start_learning(conn, site: str, kind: str) -> dict:
         "status": "measuring",
         "started_ts": time.time(),
         "before_w": db.avg_power(conn, site, 3) or 0.0,
+        "before_q": db.avg_pq(conn, site, time.time() - 3, time.time())[1],
         "learned_w": None,
+        "learned_pf": None,
     }
     db.set_state(conn, f"learn:{site}", session)
     return session
@@ -414,8 +468,13 @@ def finish_learning_if_ready(conn, site: str) -> None:
     s = db.get_state(conn, f"learn:{site}")
     if not s or s["status"] != "measuring" or time.time() - s["started_ts"] < 3:
         return
+    now = time.time()
     after = db.avg_power(conn, site, 1.5) or 0.0
     s["learned_w"] = round(max(0.0, after - s["before_w"]))
+    # Power factor of the step: tells a resistive load from a motor (backend/nilm.py).
+    after_q = db.avg_pq(conn, site, now - 1.5, now)[1]
+    if s.get("before_q") is not None and after_q is not None:
+        s["learned_pf"] = nilm.step_pf(s["learned_w"], after_q - s["before_q"])
     s["status"] = "done"
     db.set_state(conn, f"learn:{site}", s)
 
@@ -431,15 +490,16 @@ def add_device(conn, site: str, room: str, name: str, kind: str, allow: bool) ->
     allow = bool(allow) and tier == "T1" and not sensitive
     conn.execute(
         "INSERT INTO devices (site, id, name, room, kind, rated_w, tier, sensitive, allow, is_on, normal_on, "
-        "setpoint, signature_w, signature_measured, added) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "setpoint, signature_w, signature_measured, signature_pf, added) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (site, s["device_id"], name.strip() or kind, room, kind, s["learned_w"], tier, int(sensitive),
-         int(allow), 1, 1, 24 if kind == "ac" else None, s["learned_w"], 1, 1),
+         int(allow), 1, 1, 24 if kind == "ac" else None, s["learned_w"], 1, s.get("learned_pf"), 1),
     )
     db.set_state(conn, f"learn:{site}", None)
     access = "T2 محمي" if tier == "T2" else ("T1 بالقائمة المسموحة" if allow else "تحكم يدوي فقط")
     room_name = db.one(conn.execute("SELECT name FROM rooms WHERE site=? AND id=?", (site, room)))["name"]
     db.audit(conn, site, "T0", "human", "device_added",
-             f"جهاز جديد: {name} ({room_name}) · بصمة ≈ {s['learned_w']} واط · {access}")
+             f"جهاز جديد: {name} ({room_name}) · بصمة ≈ {s['learned_w']} واط"
+             + (f" · PF {s['learned_pf']:.2f}" if s.get("learned_pf") is not None else "") + f" · {access}")
     return db.device(conn, site, s["device_id"])
 
 

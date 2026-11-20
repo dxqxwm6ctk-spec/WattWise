@@ -8,9 +8,10 @@ const scale = SITE_SCALE[WW.site] || SITE_SCALE.home;
 const ui = {
   confirmId: null, goalText: 'خلّي فاتورة هالشهر تحت 30 دينار بدون ما تزعّج حدا بالبيت',
   cmd: { text: '', res: null, busy: false, msg: '' }, listening: false,
-  sched: { dev: null, on: '', off: '', msg: '' },
   heater: { hint: '', res: null, busy: false, msg: '' },
   why: { res: null, busy: false }, rep: { text: '', busy: false },
+  bill: { status: null, busy: false, res: null, msg: '', manual: false, kwh: '', days: '', amount: '' },
+  teach: { room: null, text: '', busy: false, lastMsg: 0 },
 };
 let st = null;
 const lbl = (key, fallback) => (st && st.labels && st.labels[key]) || fallback;
@@ -42,9 +43,12 @@ function toolbar() {
       <option value="sensor_fault">عطل حسّاسات</option>
       <option value="unknown_load">حمل غريب (جهاز مش مسجّل)</option>
       <option value="ev_arrives">السيارة الكهربائية وصلت وعم تشحن</option>
+      <option value="overload">حمل زايد (تيار قريب من الحد)</option>
+      <option value="stranger_device">جهاز غريب ٦٠ واط بالمطبخ (بدون بصمة)</option>
       <option value="normal">رجّع طبيعي</option>
     </select>` : '';
   return `${other}${scen}
+    <a class="tb ghost" href="stage.html?site=${WW.site}">شاشة العرض للحكّام</a>
     <a class="tb ghost" href="/api/sites/${WW.site}/report" target="_blank" rel="noopener">تقرير التوفير</a>
     <button class="tb ghost" data-act="reset">إعادة الضبط</button>
     <button class="tb stop" data-act="estop">إيقاف طوارئ</button>`;
@@ -70,11 +74,12 @@ function hero() {
         ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<span style="height:48px;display:grid;place-items:center;font-family:var(--mono);font-size:26px;font-weight:500;color:${i === 5 ? '#FF8A70' : '#ECEBE4'}">${n}</span>`).join('')}
       </div>
     </div>`).join('');
-  const v = st.meter.voltage_v, a = st.meter.current_a, f = st.meter.freq_hz;
+  const v = st.meter.voltage_v, a = st.meter.current_a, pf = st.meter.pf;
   const mini = [
     { label: 'الجهد', v: fmt(v, 1) + ' V', pct: v ? (v - 200) / 50 * 100 : 0 },
     { label: 'التيار', v: fmt(a, 2) + ' A', pct: a ? Math.min(100, a / 20 * 100) : 0 },
-    { label: 'التردد', v: fmt(f, 2) + ' Hz', pct: f ? 50 : 0 },
+    // Power factor of the whole circuit: the jump in it tells a lamp from a fan (NILM).
+    { label: 'معامل القدرة PF', v: fmt(pf, 2), pct: pf ? pf * 100 : 0 },
   ].map(m => `
     <div style="padding:10px;border-radius:12px;background:#181A15;display:flex;flex-direction:column;gap:6px">
       <span style="font-size:11px;color:#8E8C82">${m.label}</span>
@@ -274,9 +279,10 @@ function devicesGrid() {
           </button>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <span style="font-family:var(--mono);font-size:13px;color:${on ? '#ECEBE4' : '#5E5C55'}" dir="ltr">${d.est_w} W${d.signature_measured ? '' : ' *'}</span>
+          <span style="font-family:var(--mono);font-size:13px;color:${on ? '#ECEBE4' : '#5E5C55'}" dir="ltr">${d.est_w} W${d.signature_measured ? '' : ' *'}${d.signature_pf != null ? ` · PF ${Number(d.signature_pf).toFixed(2)}` : ''}</span>
           ${ac}
         </div>
+        ${d.plug ? `<span style="font-size:11px;color:${d.plug.online ? '#9CC85A' : '#E8553F'}">🔌 ${d.plug.simulated && d.plug.model ? esc(d.plug.model) : esc(d.plug.brand_name) + (d.plug.model ? ' · ' + esc(d.plug.model) : '')} · ${d.plug.online ? (d.plug.meters ? 'القراءة من المقبس نفسه' : 'تشغيل وإطفاء بس') : 'المقبس مش متصل'}</span>` : ''}
         <span style="font-size:11px;color:#6F6D64">${note}</span>
       </div>`;
   }).join('');
@@ -285,7 +291,8 @@ function devicesGrid() {
       <div class="label">DEVICES · تحكّم يدوي بكل جهاز</div>
       <div style="display:flex;align-items:center;gap:12px">
         <span style="font-size:12px;color:#8E8C82">${onCount} شغّال من ${st.devices.length}</span>
-        <button class="btn-lime" data-act="open-wiz" style="height:34px;font-size:13px">+ ضيف جهاز</button>
+        <button class="btn-lime" data-act="open-plug" style="height:34px;font-size:13px">🔌 + مقبس ذكي</button>
+        <button class="tb ghost" data-act="open-wiz" style="height:34px;font-size:13px">+ جهاز بالعدّاد</button>
       </div>
     </div>
     ${learning}${confirm}${commandBar()}
@@ -347,7 +354,6 @@ async function parseCommand() {
 
 // Timers and daily schedules (on/off only), and the smart water-heater schedule.
 const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (متوقّع مش مقاس)` : '';
-const minLabel = n => n === 30 ? '30 دقيقة' : n === 60 ? 'ساعة' : 'ساعتين';
 
 function heaterPanel() {
   const h = ui.heater, hr = h.res;
@@ -372,57 +378,82 @@ function heaterPanel() {
     </div>`;
 }
 
-function schedForm(a) {
-  const chips = a.devices.map(d => `<button class="chip${ui.sched.dev === d.id ? ' sel' : ''}" data-act="sched-dev" data-id="${esc(d.id)}">${esc(d.name)}</button>`).join('');
-  const btns = isFor => [30, 60, 120].map(n => `<button class="btn-ghost btn-sm" data-act="timer" data-min="${n}"${isFor ? ' data-for="1"' : ''}>${minLabel(n)}</button>`).join('');
-  return `<div class="panel">
-      <span class="panel-title">جدول أو مؤقّت لأي جهاز</span>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#8E8C82">يشتغل الساعة
-          <input class="field" type="time" id="sched-on" value="${esc(ui.sched.on)}"></label>
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#8E8C82">يطفي الساعة
-          <input class="field" type="time" id="sched-off" value="${esc(ui.sched.off)}"></label>
-        <button class="btn-lime" style="height:40px;font-size:13px" data-act="sched-add">ضيف الجدول</button>
+// Rooms and devices of Home / Building / Lab, with detailed schedules (js/schedule.js).
+function schedSection() {
+  const heater = WWSched.state.site === WW.site ? heaterPanel() : '';
+  return `
+    <div class="head">
+      <div class="label">SCHEDULES · جدولة الأجهزة</div>
+      <div style="font-size:11px;color:#6F6D64">تشغيل وإطفاء بس · بتشتغل بالسيرفر · بتراجعها وبتأكّدها قبل الحفظ · الحارس بيفحص كل مرة${st.source === 'simulator' ? ' · ساعة المحاكي ×60' : ''}</div>
+    </div>
+    ${WWSched.render({ theme: 'dark', layout: 'side' })}
+    ${heater ? `<div style="display:flex;flex-wrap:wrap;gap:12px">${heater}</div>` : ''}`;
+}
+
+// Teach mode: the AI learns the room's appliances from the meter and asks the user.
+function teachSection() {
+  const t = st.teach || { messages: [], fingerprints: [], unknown: [] };
+  const s = t.session;
+  if (!ui.teach.room || !st.rooms.some(r => r.id === ui.teach.room)) ui.teach.room = st.rooms[0] && st.rooms[0].id;
+  const room = s ? s.room : ui.teach.room;
+  const chips = st.rooms.map(r => `<button class="chip ${r.id === room ? 'sel' : ''}" data-act="teach-room" data-id="${esc(r.id)}"${s ? ' disabled' : ''}>${esc(r.name)}</button>`).join('');
+  const status = !s ? 'جاهز. اختار الغرفة واكبس «علّمني».'
+    : s.status === 'listening' ? `عم بسمع للعدّاد على قاطع ${esc(s.room_name)}… (${s.candidates} جهاز لحد هلأ)`
+      : s.status === 'asking' ? 'بستنّى تأكّد أو تصحّح.' : 'بستنّى موافقتك على الحفظ.';
+  const buttons = !s
+    ? `<button class="btn-lime" style="height:36px;font-size:13px" data-act="teach-start">علّمني أجهزة هالغرفة</button>`
+    : `${s.status === 'listening' ? '<button class="btn-lime" style="height:36px;font-size:13px" data-act="teach-done">خلصت</button>' : ''}
+       <button class="btn-ghost" data-act="teach-cancel">وقّف بدون حفظ</button>`;
+  const msgs = t.messages.map(m => `
+    <div style="align-self:${m.role === 'ai' ? 'flex-start' : 'flex-end'};max-width:88%;white-space:pre-wrap;font-size:13.5px;line-height:1.6;padding:9px 12px;border-radius:12px;
+      background:${m.role === 'ai' ? '#1E201B' : '#2E3A1C'};color:${m.role === 'ai' ? '#ECEBE4' : '#E6F5C8'}">${esc(m.text)}</div>`).join('')
+    || '<div style="font-size:12.5px;color:#6F6D64">لسّا ما في محادثة.</div>';
+  const quick = t.waiting_for === 'teach_confirm' ? ['صح'] : ['teach_save', 'label_save'].includes(t.waiting_for) ? ['احفظ', 'لا'] : t.waiting_for === 'label' ? ['تجاهل'] : [];
+  const fps = t.fingerprints.map(f => `
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+      <span style="width:7px;height:7px;border-radius:50%;background:${f.is_on ? '#B8F04A' : '#4A4C44'};flex:none"></span>
+      <span>${esc(f.name)}</span><span style="color:#8E8C82;font-size:12px">${esc(f.room_name)}</span>
+      <span class="mono" style="margin-inline-start:auto;font-size:11.5px;color:#A9A79D" dir="ltr">${fmt(f.watts, 0)}W${f.pf != null ? ' · pf ' + fmt(f.pf, 2) : ''}</span>
+      <button class="btn-ghost btn-sm" data-act="fp-del" data-id="${f.id}" title="احذف البصمة">×</button>
+    </div>`).join('') || '<div style="font-size:12.5px;color:#6F6D64">ما في بصمات محفوظة. البصمة بتنحفظ بس إذا وافقت.</div>';
+  const unk = t.unknown.length ? `<span style="font-size:12px;padding:3px 10px;border-radius:10px;background:#1E1A10;color:#F2B544">⚠️ ${t.unknown.length} جهاز مجهول</span>` : '';
+  return `
+    <div class="head">
+      <div class="label">TEACH · علّم الـAI أجهزة الغرفة</div>
+      <div style="display:flex;gap:8px;align-items:center">${unk}<span style="font-size:11px;color:#6F6D64">بصمة كل جهاز = قفزة الواط + معامل القدرة (pf) · ما بينحفظ إشي بدون موافقتك</span></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">
+      <div class="panel" style="flex:1 1 260px">
+        <span class="panel-title">١ · وين العدّاد؟</span>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
+        <div style="font-size:12.5px;color:#A9A79D;line-height:1.6">${status}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">${buttons}</div>
+        <span class="panel-title" style="margin-top:6px">البصمات المحفوظة</span>
+        <div style="display:flex;flex-direction:column;gap:8px">${fps}</div>
       </div>
-      ${ui.sched.msg ? `<span style="font-size:12px;color:#F2B544">${esc(ui.sched.msg)}</span>` : ''}
-      <div style="display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px solid #23251F">
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12px;color:#8E8C82;min-width:84px">طفّيه بعد</span>${btns(false)}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12px;color:#8E8C82;min-width:84px">شغّله لمدة</span>${btns(true)}</div>
+      <div class="panel" style="flex:2 1 380px">
+        <span class="panel-title">٢ · المحادثة مع الـAI</span>
+        <div id="teach-chat" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto;padding:4px">${msgs}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${quick.map(q => `<button class="chip" data-act="teach-quick" data-text="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+        <div style="display:flex;gap:8px">
+          <input class="field grow" id="teach-text" placeholder="جاوب الـAI… مثلًا: الأول لابتوب، الثاني ضو المكتب" value="${esc(ui.teach.text)}">
+          <button class="btn-lime" data-act="teach-send">${ui.teach.busy ? '…' : 'ابعث'}</button>
+        </div>
       </div>
     </div>`;
 }
 
-function schedSection() {
-  const a = st.automation || { schedules: [], timers: [], devices: [] };
-  if (!a.devices.some(d => d.id === ui.sched.dev) && a.devices.length) {
-    ui.sched.dev = (a.devices.find(d => d.id === 'heater') || a.devices[0]).id;
-  }
-  const rows = a.schedules.map(r => `
-    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:#181A15;border:1px solid #23251F">
-      <div style="flex:1 1 240px;display:flex;flex-direction:column;gap:2px;min-width:0">
-        <span style="font-size:14px;font-weight:600">${esc(r.device_name)}${r.source === 'suggested' ? ' <span style="font-size:11px;color:#B8F04A">· مقترح ومعتمد</span>' : ''}</span>
-        <span class="mono" style="font-size:12.5px;color:#D9D7CF">${[r.on_time && 'تشغيل ' + r.on_time, r.off_time && 'إطفاء ' + r.off_time].filter(Boolean).join(' ← ')}</span>
-        <span style="font-size:11.5px;color:#8E8C82">${estText(r.estimate)}</span>
-      </div>
-      <span style="font-size:12px;color:#8E8C82">${r.enabled ? 'شغّال' : 'موقوف'}</span>
-      <button class="switch" style="background:${r.enabled ? '#3D5418' : '#2A2C25'}" data-act="sched-toggle" data-id="${r.id}" data-on="${r.enabled ? 1 : 0}" aria-label="${esc(r.device_name)}"><i style="${r.enabled ? 'left' : 'right'}:4px;background:${r.enabled ? '#B8F04A' : '#6F6D64'}"></i></button>
-      <button class="btn-ghost btn-sm" style="border-color:#4A2620;color:#E8553F" data-act="sched-del" data-id="${r.id}">حذف</button>
-    </div>`).join('');
-  const timers = a.timers.map(x => `
-    <div style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:#1E1A10;border:1px solid #5A4518">
-      <span class="mono" style="font-size:11px;color:#F2B544">TIMER</span>
-      <span style="flex:1;font-size:13.5px;color:#ECEBE4">${esc(x.text)}</span>
-      <button class="btn-ghost btn-sm" style="border-color:#5A4518;color:#F2B544" data-act="timer-del" data-id="${x.id}">إلغاء</button>
-    </div>`).join('');
-  const empty = !rows && !timers ? '<span style="font-size:12.5px;color:#6F6D64">ما في جداول لسا. جرّب «اقترحلي جدول للسخّان» أو قول للوكيل: سخّان الماء يشتغل من 6 لل 7.</span>' : '';
-  return `
-    <div class="head">
-      <div class="label">SCHEDULES · الجدولة والمؤقّتات</div>
-      <div style="font-size:11px;color:#6F6D64">تشغيل وإطفاء بس · بتشتغل بالسيرفر · الحارس بيفحص كل مرة${st.source === 'simulator' ? ' · ساعة المحاكي ×60' : ''}</div>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">${heaterPanel()}${schedForm(a)}</div>
-    <div style="display:flex;flex-direction:column;gap:8px">${empty}${rows}${timers}</div>`;
+async function teachSay(text) {
+  text = (text || '').trim();
+  if (!text || ui.teach.busy) return;
+  ui.teach.busy = true; renderAll();
+  try {
+    await WW.post('/teach/say', { text });
+    ui.teach.text = '';
+    const el = $('teach-text'); if (el) el.value = '';
+  } catch (e) { toast(e.message); }
+  ui.teach.busy = false;
+  refresh();
 }
 
 // "Why is my bill like this?" and the weekly report. Numbers come from the code.
@@ -450,6 +481,7 @@ function analystSection() {
           <button class="btn-lime" style="height:36px;font-size:13px" data-act="why">${ui.why.busy ? 'عم نحلّل…' : w ? 'حلّل من جديد' : 'ليش الفاتورة هيك؟'}</button>
         </div>${why}
       </div>
+      <div class="panel">${billPanel()}</div>
       <div class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <span class="panel-title">التقرير الأسبوعي</span>
@@ -457,6 +489,52 @@ function analystSection() {
         </div>${report}
       </div>
     </div>`;
+}
+
+// Bill photo: Claude reads it (when there is a key), the code checks it. Or type 3 numbers by hand.
+function billPanel() {
+  const b = ui.bill, r = b.res, noPhoto = b.status && !b.status.photo;
+  const inp = 'height:38px;border-radius:10px;border:1px solid #3A3C33;background:#0F100D;color:#ECEBE4;padding:0 10px;font-family:inherit;font-size:14px;min-width:0;flex:1 1 90px';
+  const bn = r && r.bill;
+  const nums = !bn ? '' : [
+    bn.kwh != null && `${fmt(bn.kwh, 0)} ك.و.س`, bn.days && `${bn.days} يوم`,
+    bn.amount_jod != null && `${fmt(bn.amount_jod, 2)} دينار`,
+    bn.period_from && bn.period_to && `${bn.period_from} ← ${bn.period_to}`,
+  ].filter(Boolean).map(x => `<span class="mono" style="padding:4px 10px;border-radius:999px;background:#1E201B;font-size:12px;color:#D9D7CF">${esc(x)}</span>`).join('');
+  const result = !r ? '' : `<div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${nums}</div>
+      ${r.explanation.map(x => `<div style="font-size:13.5px;line-height:1.65;color:#ECEBE4">${esc(x)}</div>`).join('')}
+      ${r.checks.map(x => `<div class="sub-box"><span style="font-size:12.5px;line-height:1.55;color:#D9D7CF">${esc(x)}</span></div>`).join('')}
+      ${r.ideas.map(x => `<div style="font-size:13px;line-height:1.6;color:#C8E68A">• ${esc(x)}</div>`).join('')}
+      <div style="font-size:11.5px;color:#A9A79D">${esc(r.note)}</div></div>`;
+  const manual = !(b.manual || noPhoto) ? '' : `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <input id="bill-kwh" inputmode="decimal" value="${esc(b.kwh)}" placeholder="ك.و.س" aria-label="الاستهلاك بالكيلوواط ساعة" style="${inp}">
+      <input id="bill-days" inputmode="numeric" value="${esc(b.days)}" placeholder="عدد الأيام" aria-label="عدد أيام الفاتورة" style="${inp}">
+      <input id="bill-amount" inputmode="decimal" value="${esc(b.amount)}" placeholder="المبلغ (دينار)" aria-label="مبلغ الفاتورة بالدينار" style="${inp}">
+      <button class="btn-lime" style="height:38px;font-size:13px" data-act="bill-manual">حلّل الأرقام</button></div>`;
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="panel-title">حلّل صورة الفاتورة</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <label class="btn-lime" style="height:36px;font-size:13px;display:inline-flex;align-items:center;cursor:pointer;${noPhoto ? 'opacity:.5;pointer-events:none' : ''}">
+          ${b.busy ? 'عم نقرأ…' : '📷 ارفع صورة'}<input id="bill-file" type="file" accept="image/*" hidden></label>
+        <button class="btn-ghost" style="height:36px" data-act="bill-toggle-manual">اكتب الأرقام بإيدك</button>
+      </div>
+    </div>
+    ${noPhoto ? `<div style="font-size:12px;line-height:1.55;color:#F2B544">${esc(b.status.reason_ar)}</div>` : ''}
+    ${b.msg ? `<div style="font-size:12.5px;line-height:1.55;color:#F2B544">${esc(b.msg)}</div>` : ''}
+    ${manual}${result}
+    <div style="font-size:11px;color:#6F6D64">الصورة بتنقرأ مرة وحدة وما بتنحفظ. بنحتفظ بس بالأرقام (ك.و.س، الأيام، المبلغ).</div>`;
+}
+
+async function billSend(promise) {
+  ui.bill.busy = true; ui.bill.msg = ''; renderAll();
+  try {
+    const r = await promise;
+    if (r.needs_manual) { ui.bill.manual = true; ui.bill.msg = r.message; }
+    else ui.bill.res = r;
+  } catch (e) { ui.bill.msg = e.message; }
+  ui.bill.busy = false; renderAll();
 }
 
 // AI layer 2: expected load for this hour and the next 5, plus our measured accuracy.
@@ -528,6 +606,52 @@ function bill() {
     <div class="note">${esc(b.source || '')} المعروض قيمة الطاقة بس، بدون الدعم النقدي أو أي رسوم ثانية.${st.source === 'simulator' ? ' الاستهلاك هون من المحاكي (بيانات تركيبية).' : ''}${s.co2_kg === null ? ' معامل CO₂ لسا مش مُعبّى.' : ''}</div>`;
 }
 
+// Warnings from the agent (the same ones the phone app shows as notifications).
+function alertsSection() {
+  const al = st.alerts || { items: [] };
+  const col = l => ({ danger: '#E8553F', warn: '#F2B544' }[l] || '#8FC7FF');
+  const rows = al.items.map(a => {
+    const off = !a.active || a.user_state;
+    const status = !a.active ? 'انتهى' : a.user_state === 'acted' ? 'انبعت طلب موافقة' : a.user_state === 'dismissed' ? 'تجاهلته' : '';
+    return `<div style="display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #1E201B;opacity:${off ? 0.55 : 1}">
+      <span style="font-family:var(--mono);font-size:12px;color:#6F6D64" dir="ltr">${esc(a.clock)}</span>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:14px;font-weight:600;color:${col(a.level)}">${esc(a.title)}</span>
+        <span style="font-size:13px;line-height:1.55;color:#D9D7CF">${esc(a.body)}</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${status ? `<span class="muted" style="font-size:11.5px">${status}</span>` : ''}
+        ${a.can_act ? `<button class="btn-lime" style="height:34px" data-act="alert-act" data-id="${a.id}">طفّيه؟</button>` : ''}
+        ${a.active && !a.user_state ? `<button class="tb ghost" style="height:34px" data-act="alert-dismiss" data-id="${a.id}">تجاهل</button>` : ''}
+      </div>
+    </div>`;
+  }).join('') || '<div class="muted">ما في تنبيهات. كل إشي ضمن الطبيعي.</div>';
+  const perm = ('Notification' in window) && Notification.permission === 'default'
+    ? '<button class="tb ghost" style="height:32px" data-act="alert-perm">فعّل إشعارات المتصفح</button>' : '';
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <div class="label">ALERTS · تنبيهات الوكيل</div>
+      <div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:#6F6D64">تنبيه بس (T0). «طفّيه؟» بيبعت طلب موافقة، ما بيطفي لحاله.</span>${perm}</div>
+    </div>${rows}`;
+}
+
+// New warnings: a toast on the page, and a browser notification when allowed
+// (browsers allow it on localhost or https; the phone app uses its own notifications).
+let lastAlertId = null;
+function notifyNewAlerts() {
+  const al = st.alerts;
+  if (!al) return;
+  if (lastAlertId === null) { lastAlertId = al.last_id; return; }   // not for old ones on page load
+  const fresh = al.items.filter(a => a.id > lastAlertId && a.active).reverse();
+  lastAlertId = Math.max(lastAlertId, al.last_id);
+  for (const a of fresh) {
+    toast(`${a.title} · ${a.body}`);
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try { new Notification('WattWise · ' + a.title, { body: a.body, tag: 'ww-alert-' + a.id, icon: 'icon.svg' }); } catch (e) { /* not supported here */ }
+    }
+  }
+}
+
 function auditLog() {
   const color = t => ({ T1: '#F2B544', STOP: '#E8553F', OK: '#B8F04A', MANUAL: '#8FC7FF', SCHED: '#8FC7FF', T2: '#E8553F' }[t] || '#8E8C82');
   const tierLabel = t => t === 'MANUAL' ? 'يدوي' : t === 'SCHED' ? 'جدول' : t;
@@ -591,9 +715,14 @@ function renderAll() {
   WW.render($('goal'), goal());
   WW.render($('rooms'), roomsMap());
   WW.render($('devices'), devicesGrid());
+  WW.render($('teach'), teachSection());
+  const last = (st.teach && st.teach.messages.length) ? st.teach.messages[st.teach.messages.length - 1].id : 0;
+  if (last !== ui.teach.lastMsg) { ui.teach.lastMsg = last; const c = $('teach-chat'); if (c) c.scrollTop = c.scrollHeight; }
   WW.render($('bill'), bill());
   WW.render($('sched'), schedSection());
   WW.render($('analyst'), analystSection());
+  WW.render($('alerts'), alertsSection());
+  notifyNewAlerts();
   WW.render($('log'), auditLog());
   $('meter-kw').textContent = powerStr(st.meter.power_w);
   $('meter-unit').textContent = scale.unit;
@@ -606,6 +735,7 @@ function renderAll() {
 async function refresh() {
   try {
     st = await WW.getState();
+    WWSched.sync(st);
     renderAll();
   } catch (e) {
     console.error(e);
@@ -619,6 +749,7 @@ async function act(fn) {
 
 WW.onAction({
   onError: e => toast(e.message),
+  ...WWSched.actions,
   scenario: d => act(() => WW.post('/scenario', { name: d.name })),
   reset: () => act(() => WW.post('/reset')),
   estop: () => act(() => WW.post('/estop')),
@@ -627,6 +758,13 @@ WW.onAction({
     ui.goalText = text;
     return WW.post('/goal', { text });   // the server reads the bill target from the words
   }),
+  'teach-room': d => { ui.teach.room = d.id; renderAll(); },
+  'teach-start': () => act(() => WW.post('/teach/start', { room: ui.teach.room })),
+  'teach-done': () => act(() => WW.post('/teach/done')),
+  'teach-cancel': () => act(() => WW.post('/teach/cancel')),
+  'teach-send': () => teachSay(ui.teach.text),
+  'teach-quick': d => teachSay(d.text),
+  'fp-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/fingerprints/${d.id}`)),
   'cmd-parse': () => parseCommand(),
   'cmd-mic': () => listen(),
   'cmd-cancel': () => { ui.cmd.res = null; renderAll(); },
@@ -634,17 +772,6 @@ WW.onAction({
     const r = await WW.post('/command/run', { text: ui.cmd.text });
     ui.cmd = { text: '', res: null, busy: false, msg: r.done.length ? 'تم: ' + r.done.join('، ') : 'ما تنفّذ إشي.' };
   }),
-  'sched-dev': d => { ui.sched.dev = d.id; ui.sched.msg = ''; renderAll(); },
-  'sched-add': () => act(async () => {
-    try {
-      await WW.post('/schedules', { device_id: ui.sched.dev, on_time: ui.sched.on || null, off_time: ui.sched.off || null });
-      ui.sched.on = ''; ui.sched.off = ''; ui.sched.msg = 'انضاف الجدول ✓';
-    } catch (e) { ui.sched.msg = e.message; }
-  }),
-  'sched-toggle': d => act(() => WW.post(`/schedules/${d.id}/enabled`, { enabled: d.on !== '1' })),
-  'sched-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/schedules/${d.id}`)),
-  timer: d => act(() => WW.post('/timers', { device_id: ui.sched.dev, minutes: Number(d.min), turn_on: false, run_now: d.for === '1' })),
-  'timer-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/timers/${d.id}`)),
   'heater-suggest': async () => {
     ui.heater.busy = true; ui.heater.msg = ''; renderAll();
     try { ui.heater.res = await WW.post('/heater/suggest', { hint: ui.heater.hint }); } catch (e) { toast(e.message); }
@@ -661,6 +788,11 @@ WW.onAction({
     ui.why.busy = true; renderAll();
     try { ui.why.res = await WW.api('GET', `/api/sites/${WW.site}/why`); } catch (e) { toast(e.message); }
     ui.why.busy = false; renderAll();
+  },
+  'bill-toggle-manual': () => { ui.bill.manual = !ui.bill.manual; renderAll(); },
+  'bill-manual': () => {
+    if (!(Number(ui.bill.kwh) > 0)) { ui.bill.msg = 'اكتب الكيلوواط ساعة (ك.و.س) من الفاتورة.'; renderAll(); return; }
+    return billSend(WW.billManual(ui.bill));
   },
   report: async () => {
     ui.rep.busy = true; renderAll();
@@ -682,14 +814,26 @@ WW.onAction({
     return act(() => WW.post(`/devices/${d.id}/setpoint`, { value: dev.setpoint + Number(d.delta) }));
   },
   tariff: d => act(() => WW.post('/tariff', { type: d.type })),
+  'alert-act': d => act(async () => { await WW.post(`/alerts/${d.id}/act`); toast('انبعت طلب الموافقة للتلفون. ما بنطفي إشي قبل موافقتك.'); }),
+  'alert-dismiss': d => act(() => WW.post(`/alerts/${d.id}/dismiss`)),
+  'alert-perm': () => Notification.requestPermission().then(renderAll),
   'open-wiz': () => {
     const f = openPhone();
     const send = () => f.contentWindow && f.contentWindow.postMessage({ type: 'open-wizard' }, location.origin);
     if (f.dataset.loaded) send(); else f.addEventListener('load', send, { once: true });
   },
+  'open-plug': () => {   // the "add smart plug" wizard lives in the phone app (js/plugs.js)
+    const f = $('phone-frame');
+    if (f.contentWindow) f.contentWindow.postMessage({ type: 'open-plug' }, location.origin);
+  },
 });
 
 document.addEventListener('change', ev => {
+  if (ev.target.id === 'bill-file' && ev.target.files[0]) {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    billSend(WW.billPhoto(file));
+  }
   if (ev.target.id === 'scenario-pick' && ev.target.value) {
     const name = ev.target.value;
     ev.target.value = '';
@@ -701,12 +845,15 @@ document.addEventListener('input', ev => {
   const id = ev.target.id, v = ev.target.value;
   if (id === 'goal-text') ui.goalText = v;
   if (id === 'cmd-text') ui.cmd.text = v;
+  if (id === 'teach-text') ui.teach.text = v;
   if (id === 'heater-hint') ui.heater.hint = v;
-  if (id === 'sched-on') ui.sched.on = v;
-  if (id === 'sched-off') ui.sched.off = v;
+  if (id === 'bill-kwh') ui.bill.kwh = v;
+  if (id === 'bill-days') ui.bill.days = v;
+  if (id === 'bill-amount') ui.bill.amount = v;
 });
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target.id === 'cmd-text') parseCommand();
+  if (ev.key === 'Enter' && ev.target.id === 'teach-text') teachSay(ui.teach.text);
   if (ev.key === 'Enter' && ev.target.id === 'goal-text') document.querySelector('[data-act="set-goal"]').click();
 });
 
@@ -726,5 +873,7 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape') $('phone-d
 $('house-link').href = 'house.html?site=' + encodeURIComponent(WW.site);
 // Show the address that is inside the QR code (for typing it by hand if needed).
 fetch('/api/connect').then(r => r.json()).then(d => { $('connect-url').textContent = d.url; }).catch(() => {});
+WW.billStatus().then(x => { ui.bill.status = x; }).catch(() => {});
+WWSched.init({ rerender: () => st && renderAll(), refresh, toast });
 refresh();
 setInterval(refresh, 1000);

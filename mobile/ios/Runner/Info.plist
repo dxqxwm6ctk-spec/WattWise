@@ -12,7 +12,13 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>WattWise connects to the WattWise server on your local Wi-Fi.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>The camera is used only to scan the QR code on the WattWise dashboard.</string>
+	<string>The camera is used to scan the QR code on the WattWise dashboard and to take a photo of your electricity bill.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The microphone is used only when you press the mic button to say a command. You still approve before anything runs.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition turns your spoken command into text. You still approve before anything runs.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a photo of your electricity bill so WattWise can read it. The photo is not saved.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

@@ -22,9 +22,9 @@ const ui = {
   tab: 'home', wiz: null, confirmId: null,
   goalText: 'خلّي فاتورة هالشهر تحت 30 دينار بدون ما تزعّج حدا بالبيت',
   cmd: { text: '', res: null, busy: false, msg: '' }, listening: false,
-  sched: { dev: null, on: '', off: '', msg: '' },
   heater: { hint: '', res: null, busy: false, msg: '' },
   why: { res: null, busy: false }, rep: { text: '', busy: false },
+  bill: { status: null, busy: false, res: null, msg: '', manual: false, kwh: '', days: '', amount: '' },
 };
 let st = null;
 
@@ -63,6 +63,8 @@ function statusCard() {
 function anomalyCard() {
   const a = st.anomaly;
   if (!a || !a.open) return '';
+  // Already shown as a warning card (alertCards) unless the human dismissed it.
+  if (((st.alerts || {}).items || []).some(x => x.active && ['unknown_device', 'anomaly'].includes(x.kind))) return '';
   const msg = a.kind === 'extra'
     ? `في جهاز عم يسحب ≈ ${a.residual_w} واط وما بنعرفه. شيكي إذا في إشي شغّال ومش لازم.`
     : `الاستهلاك أقل من المتوقع بـ≈ ${-a.residual_w} واط. ممكن جهاز فاصل أو معطّل.`;
@@ -71,6 +73,23 @@ function anomalyCard() {
       <span style="font-size:14px;font-weight:700;color:#8A5A00">استهلاك غريب</span>
       <span style="font-size:14px;line-height:1.7;color:#4A4840">${msg}</span>
     </div>`;
+}
+
+// Agent warnings that are still true (high use, near the next tier, danger...).
+function alertCards() {
+  const items = ((st.alerts || {}).items || []).filter(a => a.active && !a.user_state);
+  return items.map(a => {
+    const c = a.level === 'danger' ? ['#FBE3DD', '#D9432E', '#7A2A1C'] : ['#FFF4D9', '#E8B23A', '#8A5A00'];
+    return `
+    <div style="border-radius:20px;background:${c[0]};border:1.5px solid ${c[1]};padding:14px 16px;display:flex;flex-direction:column;gap:6px">
+      <span style="font-size:14px;font-weight:700;color:${c[2]}">${esc(a.title)}</span>
+      <span style="font-size:14px;line-height:1.7;color:#4A4840">${esc(a.body)}</span>
+      <div style="display:flex;gap:8px">
+        ${a.can_act ? `<button data-act="alert-act" data-id="${a.id}" class="btn-dark" style="height:42px;flex:1.4;font-size:15px">طفّيه؟</button>` : ''}
+        <button data-act="alert-dismiss" data-id="${a.id}" style="height:42px;flex:1;border-radius:14px;border:1.5px solid ${c[1]};background:transparent;font-size:14px;cursor:pointer">تمام</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function approvalCard() {
@@ -163,6 +182,7 @@ function homeTab() {
         </div>
       </div>
       ${st.pending ? approvalCard() : statusCard()}
+      ${alertCards()}
       ${anomalyCard()}
     </div>`;
 }
@@ -237,6 +257,7 @@ function wizard() {
 }
 
 function devicesTab() {
+  if (ui.plugWiz) return plugWizard();   // js/plugs.js
   if (ui.wiz) return wizard();
   const onCount = st.devices.filter(d => d.is_on).length;
   const confirmDev = st.devices.find(d => d.id === ui.confirmId);
@@ -253,12 +274,13 @@ function devicesTab() {
             <span style="position:absolute;top:4px;${on ? 'left' : 'right'}:4px;width:24px;height:24px;border-radius:50%;background:${locked ? '#D9432E' : on ? '#B8F04A' : '#FFFFFF'};box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span>
           </button>
         </div>
-
+        ${plugLine(d)}
       </div>`;
   }).join('');
   return `
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button data-act="open-wiz" style="height:52px;border-radius:18px;border:1.5px dashed #B9B6AA;background:transparent;color:#1A1B16;font-size:15px;font-weight:600;cursor:pointer">+ ضيفي جهاز جديد</button>
+      <button data-act="open-plug" style="height:52px;border-radius:18px;border:none;background:#1A1B16;color:#F3F1EA;font-size:15px;font-weight:700;cursor:pointer">🔌 + ضيفي مقبس ذكي (Wi-Fi)</button>
+      <button data-act="open-wiz" style="height:52px;border-radius:18px;border:1.5px dashed #B9B6AA;background:transparent;color:#1A1B16;font-size:15px;font-weight:600;cursor:pointer">+ ضيفي جهاز بالعدّاد الرئيسي</button>
       ${st.agent.safe_mode ? `<div style="border-radius:18px;background:#FFF4D9;border:1.5px solid #E8B23A;padding:14px 16px;font-size:13.5px;line-height:1.6;color:#6B4A00">الراوتر مطفي، بالحقيقة التطبيق رح ينقطع هون. WattWise بوضع آمن وما رح ينفّذ إشي.</div>` : ''}
       ${confirmDev ? `
       <div style="border-radius:20px;background:#FFF4D9;border:1.5px solid #E8B23A;padding:16px;display:flex;flex-direction:column;gap:10px">
@@ -324,7 +346,6 @@ function billTab() {
 const micOk = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 const field = 'height:48px;border-radius:16px;border:1.5px solid #E2DFD4;background:#FFFFFF;padding:0 14px;font-size:15px;font-family:inherit;color:#1A1B16;outline:none;min-width:0';
 const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (متوقّع مش مقاس)` : '';
-const minLabel = n => n === 30 ? '30 دقيقة' : n === 60 ? 'ساعة' : 'ساعتين';
 
 // Typed or spoken order: the server understands it, the Policy Guard checks it, you confirm.
 function commandCard() {
@@ -349,10 +370,6 @@ function commandCard() {
 }
 
 function schedTab() {
-  const a = st.automation || { schedules: [], timers: [], devices: [] };
-  if (!a.devices.some(d => d.id === ui.sched.dev) && a.devices.length) {
-    ui.sched.dev = (a.devices.find(d => d.id === 'heater') || a.devices[0]).id;
-  }
   const h = ui.heater, hr = h.res;
   const hasHeater = st.devices.some(d => d.kind === 'heater' && d.tier === 'T1' && !d.sensitive);
   const heater = !hasHeater ? '' : `<div style="border-radius:22px;background:#E6F5C8;padding:18px;display:flex;flex-direction:column;gap:10px">
@@ -372,40 +389,11 @@ function schedTab() {
         </div></div>` : ''}
       ${h.msg ? `<span style="font-size:13.5px;line-height:1.6;color:#4A6418;font-weight:600">${esc(h.msg)}</span>` : ''}
     </div>`;
-  const chips = a.devices.map(d => {
-    const sel = ui.sched.dev === d.id;
-    return `<button data-act="sched-dev" data-id="${esc(d.id)}" style="height:36px;white-space:nowrap;padding:0 12px;border-radius:18px;border:1.5px solid ${sel ? '#1A1B16' : '#E2DFD4'};background:${sel ? '#1A1B16' : '#FFFFFF'};color:${sel ? '#F3F1EA' : '#1A1B16'};font-size:13px;font-weight:600;cursor:pointer">${esc(d.name)}</button>`;
-  }).join('');
-  const btns = isFor => [30, 60, 120].map(n => `<button data-act="timer" data-min="${n}"${isFor ? ' data-for="1"' : ''} class="btn-line" style="height:38px;padding:0 12px;border-radius:12px;font-size:13px">${minLabel(n)}</button>`).join('');
-  const form = `<div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:12px">
-      <span class="sub">جدول أو مؤقّت لجهاز</span>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#77756C">يشتغل الساعة<input type="time" id="sched-on" value="${esc(ui.sched.on)}" style="${field};height:46px;padding:0 10px"></label>
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#77756C">يطفي الساعة<input type="time" id="sched-off" value="${esc(ui.sched.off)}" style="${field};height:46px;padding:0 10px"></label>
-      </div>
-      <button data-act="sched-add" class="btn-dark" style="height:48px;border-radius:16px;font-size:15px">ضيف الجدول</button>
-      ${ui.sched.msg ? `<span style="font-size:12.5px;color:#8A5A00">${esc(ui.sched.msg)}</span>` : ''}
-      <div style="display:flex;flex-direction:column;gap:8px;padding-top:6px;border-top:1px solid #EFECE3">
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12.5px;color:#77756C;min-width:78px">طفّيه بعد</span>${btns(false)}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:12.5px;color:#77756C;min-width:78px">شغّله لمدة</span>${btns(true)}</div>
-      </div></div>`;
-  const timers = a.timers.map(x => `<div style="display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:18px;background:#FFF4D9;border:1.5px solid #E8B23A">
-      <span style="flex:1;font-size:14px">${esc(x.text)}</span>
-      <button data-act="timer-del" data-id="${x.id}" class="btn-line" style="height:36px;padding:0 12px;border-radius:12px;font-size:13px;border-color:#D9C38A">إلغاء</button></div>`).join('');
-  const rows = a.schedules.map(r => `<div style="border-radius:18px;background:#FFFFFF;padding:12px 14px;display:flex;align-items:center;gap:10px">
-      <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
-        <span style="font-size:15px;font-weight:600">${esc(r.device_name)}</span>
-        <span class="mono" style="font-size:13px">${[r.on_time && 'تشغيل ' + r.on_time, r.off_time && 'إطفاء ' + r.off_time].filter(Boolean).join(' ← ')}</span>
-        <span style="font-size:11.5px;color:#77756C">${estText(r.estimate)}</span>
-      </div>
-      <button data-act="sched-toggle" data-id="${r.id}" data-on="${r.enabled ? 1 : 0}" aria-label="${esc(r.device_name)}" style="width:52px;height:32px;border-radius:16px;border:none;background:${r.enabled ? '#1A1B16' : '#D8D5CA'};position:relative;cursor:pointer;flex:none;padding:0"><span style="position:absolute;top:4px;${r.enabled ? 'left' : 'right'}:4px;width:24px;height:24px;border-radius:50%;background:${r.enabled ? '#B8F04A' : '#FFFFFF'};box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span></button>
-      <button data-act="sched-del" data-id="${r.id}" style="height:36px;padding:0 10px;border-radius:12px;border:1.5px solid #F0C2B8;background:transparent;color:#A23A26;font-size:13px;font-weight:600;cursor:pointer">حذف</button></div>`).join('');
+  // Home / Building / Lab, devices grouped by room, detailed schedules (js/schedule.js).
+  const showHeater = WWSched.state.site === WW.site && !WWSched.state.dev;
   return `<div style="display:flex;flex-direction:column;gap:12px">
-      ${heater}${form}
-      ${timers ? '<span class="sub">مؤقّتات شغّالة</span>' + timers : ''}
-      <span class="sub" style="padding-top:4px">جداولك</span>
-      ${rows || '<span class="sub" style="line-height:1.6">ما في جداول لسا.</span>'}
+      ${WWSched.render({ theme: 'light', layout: 'drill' })}
+      ${showHeater ? heater : ''}
     </div>`;
 }
 
@@ -437,11 +425,57 @@ function billExtras() {
         <span style="font-size:13.5px;line-height:1.6;color:#4A6418">${esc(w.action)}</span>
         <span style="font-size:11.5px;color:#77756C">${esc(w.note)}</span></div>` : ''}
     </div>
+    ${billCard()}
     <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
       <button data-act="report" class="btn-line" style="height:50px;border-radius:16px;border-color:#1A1B16;font-size:15px;font-weight:700">${rep.busy ? 'عم نجهّز…' : rep.text ? 'جهّز تقرير جديد' : 'جهّز التقرير الأسبوعي'}</button>
       ${rep.text ? `<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.75;padding:12px;border-radius:12px;background:#F3F1EA;max-height:220px;overflow:auto">${esc(rep.text)}</div>
         <a href="/api/sites/${WW.site}/weekly.txt" download class="btn-dark" style="height:46px;border-radius:14px;font-size:14px;display:grid;place-items:center;text-decoration:none">نزّل الملف</a>` : ''}
     </div>`;
+}
+
+// Bill photo from the camera or the gallery. Claude reads it when there is a key; otherwise type 3 numbers.
+function billCard() {
+  const b = ui.bill, r = b.res, noPhoto = b.status && !b.status.photo;
+  const bn = r && r.bill;
+  const nums = !bn ? '' : [
+    bn.kwh != null && `${fmt(bn.kwh, 0)} ك.و.س`, bn.days && `${bn.days} يوم`,
+    bn.amount_jod != null && `${fmt(bn.amount_jod, 2)} دينار`,
+  ].filter(Boolean).map(x => `<span style="padding:4px 10px;border-radius:999px;background:#F3F1EA;font-size:12.5px;font-weight:600">${esc(x)}</span>`).join('');
+  const pick = (id, label, cap) => `<label class="btn-line" style="flex:1;height:48px;border-radius:16px;border-color:#1A1B16;font-size:14px;display:grid;place-items:center;cursor:pointer;${noPhoto || b.busy ? 'opacity:.45;pointer-events:none' : ''}">
+      ${label}<input id="${id}" type="file" accept="image/*" ${cap ? 'capture="environment"' : ''} hidden></label>`;
+  const manual = !(b.manual || noPhoto) ? '' : `<div style="display:flex;flex-direction:column;gap:8px">
+      <input id="bill-kwh" inputmode="decimal" value="${esc(b.kwh)}" placeholder="الاستهلاك (ك.و.س)" aria-label="الاستهلاك بالكيلوواط ساعة" style="${field}">
+      <div style="display:flex;gap:8px">
+        <input id="bill-days" inputmode="numeric" value="${esc(b.days)}" placeholder="عدد الأيام" aria-label="عدد أيام الفاتورة" style="${field};flex:1">
+        <input id="bill-amount" inputmode="decimal" value="${esc(b.amount)}" placeholder="المبلغ (دينار)" aria-label="مبلغ الفاتورة بالدينار" style="${field};flex:1">
+      </div>
+      <button data-act="bill-manual" class="btn-dark" style="height:48px;border-radius:16px;font-size:15px">حلّل الأرقام</button></div>`;
+  const result = !r ? '' : `<div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${nums}</div>
+      ${r.explanation.map(x => `<span style="font-size:14px;line-height:1.65">${esc(x)}</span>`).join('')}
+      ${r.checks.map(x => `<div style="padding:10px 12px;border-radius:12px;background:#F3F1EA;font-size:12.5px;line-height:1.55;color:#5E5C55">${esc(x)}</div>`).join('')}
+      ${r.ideas.map(x => `<span style="font-size:13.5px;line-height:1.6;color:#4A6418">• ${esc(x)}</span>`).join('')}
+      <span style="font-size:11.5px;color:#77756C">${esc(r.note)}</span></div>`;
+  return `
+    <div style="border-radius:22px;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;gap:10px">
+      <span class="sub">حلّل فاتورتك من صورة</span>
+      <div style="display:flex;gap:8px">${pick('bill-cam', b.busy ? 'عم نقرأ…' : '📷 صوّر الفاتورة', true)}${pick('bill-gal', 'من المعرض', false)}</div>
+      ${noPhoto ? `<span style="font-size:12.5px;line-height:1.55;color:#8A5A00">${esc(b.status.reason_ar)}</span>`
+        : `<button data-act="bill-toggle-manual" style="background:none;border:none;color:#5E5C55;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit">أو اكتب الأرقام بإيدك</button>`}
+      ${b.msg ? `<span style="font-size:12.5px;line-height:1.55;color:#8A5A00">${esc(b.msg)}</span>` : ''}
+      ${manual}${result}
+      <span style="font-size:11px;color:#77756C">الصورة بتنقرأ مرة وحدة وما بتنحفظ. بنحتفظ بس بالأرقام.</span>
+    </div>`;
+}
+
+async function billSend(promise) {
+  ui.bill.busy = true; ui.bill.msg = ''; renderAll();
+  try {
+    const r = await promise;
+    if (r.needs_manual) { ui.bill.manual = true; ui.bill.msg = r.message; }
+    else ui.bill.res = r;
+  } catch (e) { ui.bill.msg = e.message; }
+  ui.bill.busy = false; renderAll();
 }
 
 let recog = null;
@@ -475,17 +509,6 @@ const newHandlers = {
     const r = await WW.post('/command/run', { text: ui.cmd.text });
     ui.cmd = { text: '', res: null, busy: false, msg: r.done.length ? 'تم: ' + r.done.join('، ') : 'ما تنفّذ إشي.' };
   }),
-  'sched-dev': d => { ui.sched.dev = d.id; ui.sched.msg = ''; renderAll(); },
-  'sched-add': () => act(async () => {
-    try {
-      await WW.post('/schedules', { device_id: ui.sched.dev, on_time: ui.sched.on || null, off_time: ui.sched.off || null });
-      ui.sched.on = ''; ui.sched.off = ''; ui.sched.msg = 'انضاف الجدول ✓';
-    } catch (e) { ui.sched.msg = e.message; }
-  }),
-  'sched-toggle': d => act(() => WW.post(`/schedules/${d.id}/enabled`, { enabled: d.on !== '1' })),
-  'sched-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/schedules/${d.id}`)),
-  timer: d => act(() => WW.post('/timers', { device_id: ui.sched.dev, minutes: Number(d.min), turn_on: false, run_now: d.for === '1' })),
-  'timer-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/timers/${d.id}`)),
   'heater-suggest': async () => {
     ui.heater.busy = true; ui.heater.msg = ''; renderAll();
     try { ui.heater.res = await WW.post('/heater/suggest', { hint: ui.heater.hint }); } catch (e) { showError(e.message); }
@@ -503,6 +526,11 @@ const newHandlers = {
     try { ui.why.res = await WW.api('GET', `/api/sites/${WW.site}/why`); } catch (e) { showError(e.message); }
     ui.why.busy = false; renderAll();
   },
+  'bill-toggle-manual': () => { ui.bill.manual = !ui.bill.manual; renderAll(); },
+  'bill-manual': () => {
+    if (!(Number(ui.bill.kwh) > 0)) { ui.bill.msg = 'اكتب الكيلوواط ساعة (ك.و.س) من الفاتورة.'; renderAll(); return; }
+    return billSend(WW.billManual(ui.bill));
+  },
   report: async () => {
     ui.rep.busy = true; renderAll();
     try { ui.rep.text = await (await fetch(`/api/sites/${WW.site}/weekly.txt`)).text(); } catch (e) { showError(e.message); }
@@ -515,8 +543,16 @@ document.addEventListener('input', ev => {
   if (id === 'goal-text') ui.goalText = v;
   if (id === 'cmd-text') ui.cmd.text = v;
   if (id === 'heater-hint') ui.heater.hint = v;
-  if (id === 'sched-on') ui.sched.on = v;
-  if (id === 'sched-off') ui.sched.off = v;
+  if (id === 'bill-kwh') ui.bill.kwh = v;
+  if (id === 'bill-days') ui.bill.days = v;
+  if (id === 'bill-amount') ui.bill.amount = v;
+});
+document.addEventListener('change', ev => {
+  if ((ev.target.id === 'bill-cam' || ev.target.id === 'bill-gal') && ev.target.files[0]) {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    billSend(WW.billPhoto(file));
+  }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.id === 'cmd-text') parseCommand(); });
 
@@ -559,8 +595,20 @@ function renderAll() {
     `<button class="tab" data-act="tab" data-k="${k}" style="color:${ui.tab === k ? '#1A1B16' : '#9A988E'}"><i style="background:${ui.tab === k ? '#1A1B16' : 'transparent'}"></i>${label}</button>`).join(''));
 }
 
+let lastPendingId = null;
 async function refresh() {
-  try { st = await WW.getState(); renderAll(); } catch (e) { console.error(e); }
+  try {
+    st = await WW.getState();
+    WWSched.sync(st);
+    // A new approval card: bring it to the front and buzz the phone (judge's phone in the demo).
+    const pid = st.pending ? st.pending.id : null;
+    if (pid && pid !== lastPendingId && !ui.wiz) {
+      ui.tab = 'home';
+      if (navigator.vibrate) { try { navigator.vibrate([250, 120, 250]); } catch (e) { /* not allowed yet */ } }
+    }
+    lastPendingId = pid;
+    renderAll();
+  } catch (e) { console.error(e); }
 }
 async function act(fn) {
   try { await fn(); } catch (e) { showError(e.message); }
@@ -569,6 +617,7 @@ async function act(fn) {
 
 function openWizard() {
   ui.tab = 'devices';
+  ui.plugWiz = null;
   ui.wiz = { step: 0, type: null, room: null, name: '', allow: true };
   if (st) renderAll();
 }
@@ -580,8 +629,11 @@ function closeWizard() {
 WW.onAction({
   onError: e => showError(e.message),
   ...newHandlers,
+  ...WWSched.actions,
   tab: d => { ui.tab = d.k; renderAll(); },
   approve: d => act(() => WW.post(`/approvals/${d.id}/approve`)),
+  'alert-act': d => act(() => WW.post(`/alerts/${d.id}/act`)),
+  'alert-dismiss': d => act(() => WW.post(`/alerts/${d.id}/dismiss`)),
   reject: d => act(() => WW.post(`/approvals/${d.id}/reject`)),
   estop: () => act(() => WW.post('/estop')),
   reset: () => act(() => WW.post('/reset')),
@@ -621,5 +673,7 @@ window.addEventListener('message', ev => {
   if (ev.origin === location.origin && ev.data && ev.data.type === 'open-wizard') openWizard();
 });
 
+WW.billStatus().then(x => { ui.bill.status = x; }).catch(() => {});
+WWSched.init({ rerender: () => st && renderAll(), refresh, toast: showError });
 refresh();
 setInterval(refresh, 1000);

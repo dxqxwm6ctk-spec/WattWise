@@ -15,7 +15,7 @@ LLM is missing, late, broken or over budget.
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 
-from backend import actions, billing, config, db, ev, forecast, llm, policy, schedules, weather
+from backend import actions, alerts, billing, config, connectivity, db, ev, forecast, goal, llm, nilm, policy, schedules, weather
 
 # Remembers what the agent is currently looking at, per site: {"device_id", "since"}
 _analyzing: dict[str, dict] = {}
@@ -67,8 +67,9 @@ def detect_waste(conn, site: str, now: float) -> list[dict]:
         room = db.latest_room(conn, site, d["room"])
         found.append({"device": d, "room": room, "empty_s": empty_s,
                       "window_open": bool(room and room["window_open"])})
-    # Biggest waste first.
-    return sorted(found, key=lambda w: -w["device"]["signature_w"])
+    # Devices the goal named come first (backend/goal.py), then the biggest waste.
+    plan = db.get_state(conn, f"plan:{site}", None)
+    return sorted(found, key=lambda w: (goal.focus_rank(plan, w["device"]), -w["device"]["signature_w"]))
 
 
 def recently_asked(conn, site: str, device_id: str, now: float) -> bool:
@@ -127,10 +128,13 @@ def tick(conn, site: str, now: float | None = None) -> None:
             db.audit(conn, site, "STOP", "system", "fail_safe",
                      "انقطعت القراءات ← وضع آمن: رجّعنا الأجهزة لوضعها الطبيعي وما في إجراء تلقائي.")
             actions.set_phase(conn, site, "offline")
+            alerts.raise_alert(conn, site, "offline", "offline", alerts.DANGER, "انقطعت القراءات",
+                               "ما وصلنا إشي من العدّاد. رجّعنا الأجهزة لوضعها الطبيعي.", now=now)
         return
     if was_fault:
         db.set_state(conn, f"fault:{site}", False)
         db.audit(conn, site, "T0", "system", "recovered", "رجعت القراءات. الوكيل رجع يراقب.")
+        alerts.resolve(conn, site, "offline", now)
         if actions.get_phase(conn, site) == "offline" and not actions.flag(conn, "safe_mode", site):
             actions.set_phase(conn, site, "normal")
 
@@ -141,6 +145,9 @@ def tick(conn, site: str, now: float | None = None) -> None:
     _verify(conn, site, now)
     forecast.track(conn, site)
     ev.track(conn, site, now)   # EV charging sessions: recognise, measure, notify
+
+    # Warnings for the phone (tier 0: messages only, they also run during an emergency stop).
+    alerts.check(conn, site, now)
 
     if estop or actions.flag(conn, "safe_mode", site):
         _analyzing.pop(site, None)
@@ -187,7 +194,8 @@ def tick(conn, site: str, now: float | None = None) -> None:
     # Ask the Policy Guard before even asking the human (and before the LLM sees it).
     allowed = []
     for w in candidates:
-        decision = policy.check_switch(w["device"], False, policy.AGENT, w["room"], estop=estop)
+        decision = policy.check_switch(w["device"], False, policy.AGENT, w["room"], estop=estop,
+                                       plug=db.plug(conn, site, w["device"]["id"]))
         if decision.allowed:
             allowed.append(w)
         elif w is waste:
@@ -332,7 +340,10 @@ def _llm_plan(conn, site: str, now: float) -> None:
     _plan_jobs.pop(site, None)
     answer = _finish(conn, site, job, "خطة")
     if answer and job["goal_id"] == goal["id"]:
-        db.set_state(conn, f"plan:{site}", {"goal_id": goal["id"], "by": "llm", **answer})
+        # Keep the rule-based reading of the goal (focus rooms/kinds) next to the LLM's own plan.
+        current = db.get_state(conn, f"plan:{site}", None) or {}
+        db.set_state(conn, f"plan:{site}", {"goal_id": goal["id"], "by": "llm", **answer,
+                                             "intent": current.get("intent"), "focus": current.get("focus")})
         db.audit(conn, site, "T0", "llm", "plan", "النموذج قسّم الهدف لخطة: " + " · ".join(answer["steps"]),
                  {"steps": answer["steps"], "summary": answer["summary"]})
 
@@ -344,19 +355,32 @@ def _verify(conn, site: str, now: float) -> None:
         if now - a["decided_ts"] < config.VERIFY_AFTER_S:
             continue
         d = db.device(conn, site, a["device_id"])
-        after = db.avg_power(conn, site, 1.5) or 0.0
+        plug = db.plug(conn, site, a["device_id"])
+        if plug and plug["meters"] and plug["online"] and (plug["last_seen_ts"] or 0) <= a["decided_ts"]:
+            continue   # wait for a fresh reading from the device's own smart plug
+        after = actions.power_now(conn, site, a["device_id"], 1.5)
+        if after is None:
+            continue   # no fresh reading yet: an empty window would look like a huge drop
         drop = (a["power_before"] or 0.0) - after
         conn.execute("UPDATE approvals SET power_after=?, verified_ts=? WHERE id=?", (after, now, a["id"]))
         if d and not a["turn_on"] and d["agent_off"] == actions.AGENT_OFF_UNVERIFIED:
             if drop > 0.5 * d["signature_w"] or (drop > 5 and not d["signature_measured"]):
-                # NILM-lite: the measured step becomes the device's signature.
+                # NILM-lite: the measured step (watts + power factor) becomes the device's signature.
+                pf = _step_pf(conn, site, a, now, drop)
+                same_type = nilm.pf_matches(d["signature_pf"], pf)
                 db.set_device(conn, site, d["id"], signature_w=round(drop), signature_measured=1,
+                              signature_pf=pf if pf is not None else d["signature_pf"],
                               agent_off=actions.AGENT_OFF_VERIFIED)
+                pf_text = ""
+                if pf is not None:
+                    pf_text = f" · PF {pf:.2f}، {nilm.load_type_ar(pf)}"
+                    if same_type is False:
+                        pf_text += f" (كان {d['signature_pf']:.2f}، يمكن الجهاز تغيّر)"
                 db.audit(conn, site, "OK", "agent", "verified",
-                         f"العدّاد أكّد انخفاض ≈ {round(drop)} واط يطابق بصمة {d['name']}. "
+                         f"العدّاد أكّد انخفاض ≈ {round(drop)} واط يطابق بصمة {d['name']}{pf_text}. "
                          + ("هاد تأجيل للشحن مش توفير، فما بنحسبه بالتوفير." if d["kind"] == "ev"
                             else "بدأ حساب التوفير المُقاس."),
-                         {"before_w": round(a["power_before"] or 0), "after_w": round(after)})
+                         {"before_w": round(a["power_before"] or 0), "after_w": round(after), "step_pf": pf})
                 actions.set_phase(conn, site, "verified")
             else:
                 db.audit(conn, site, "T1", "agent", "verify_failed",
@@ -366,13 +390,38 @@ def _verify(conn, site: str, now: float) -> None:
                 actions.set_phase(conn, site, "normal")
 
 
+def _step_pf(conn, site: str, approval: dict, now: float, drop_w: float) -> float | None:
+    """Power factor of the switched device: reactive power before the switch minus after it."""
+    t = approval["decided_ts"]
+    _, q_before = db.avg_pq(conn, site, t - 3, t)
+    _, q_after = db.avg_pq(conn, site, now - 1.5, now)
+    if q_before is None or q_after is None:
+        return None
+    return nilm.step_pf(drop_w, q_before - q_after)
+
+
 def _room_name(conn, site: str, room_id: str) -> str:
     r = db.one(conn.execute("SELECT name FROM rooms WHERE site=? AND id=?", (site, room_id)))
     return r["name"] if r else room_id
 
 
+def note_internet_changes(conn) -> None:
+    """Write 'internet lost / back' into every site's audit log (the judges see it live)."""
+    for ch in connectivity.pop_changes():
+        sim = " (محاكاة للتجربة)" if ch["forced"] else ""
+        for site in config.load_sites():
+            if ch["online"]:
+                db.audit(conn, site, "T0", "system", "internet_back",
+                         f"رجع الإنترنت{sim}. الطقس والنموذج رجعوا متاحين، وما ضاع إشي من القياس.")
+            else:
+                db.audit(conn, site, "T0", "system", "internet_lost",
+                         f"انقطع الإنترنت{sim} ← WattWise مكمّل محليًا: قياس، كشف هدر، موافقة، إطفاء، تحقق.")
+
+
 def tick_all() -> None:
+    connectivity.check_in_background()
     weather.refresh_in_background()
     with db.connect() as conn:
+        note_internet_changes(conn)
         for site in config.load_sites():
             tick(conn, site)

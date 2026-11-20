@@ -6,7 +6,7 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Read CLAUDE.md, create this file
 - [x] Repo skeleton (backend, simulator, firmware, frontend, docs, tests)
 - [x] Backend runs (`uvicorn backend.main:app`), `/api/health` answers
-- [ ] Ask the organizers (ieeerasjadara@gmail.com) to confirm AI coding assistants are allowed
+- [ ] Ask the organizers (ieeerasjadara@gmail.com) to confirm AI coding assistants are allowed (draft ready: `docs/outreach/organizers_email_ai_tools.md`, team sends it)
 
 ## Phase A: software, no hardware
 - [x] SQLite schema (rooms, devices, meter/room readings, approvals, audit log, goals)
@@ -18,12 +18,15 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Rule-based planner (waste = load on in an empty room), with Arabic explanation and numbers
 - [x] Goal input: the agent splits it into 7 steps and shows their live status
 - [x] Verification with the meter after each action; measured step becomes the load signature (NILM-lite)
+- [x] Teach mode: the AI learns a room's appliances from watt steps + power factor, asks in Arabic chat, saves fingerprints only after the user's yes (rules + optional LLM reading of replies); recognises them afterwards (`backend/nilm.py`, `backend/teach.py`)
+- [x] Unknown-device alert (no saved fingerprint) with a question to label it; fridge cycling and relay switches are not flagged; simulator: PZEM on one room's breaker, synthetic unlabeled devices, "stranger device" scenario
 - [x] Measured savings (kWh, JOD) from verified actions only; baseline line = actual + verified held-off loads
 - [x] Add-device flow: measure a new device's signature on the main meter
 - [x] Dashboard (plain HTML/JS + Chart.js) implementing the "WattWise Home" design
 - [x] Web approval page (PWA, works offline on the local network) as backup for the Flutter app
-- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands (78 passing)
+- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands, offline mode, savings counter, warnings, smart plugs, teach mode, EV charging, schedules (171 passing)
 - [x] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API (tested as a web build against the simulator)
+- [x] Flutter app: live animated device cards (fan spins, lamp glows, heater waves), "running now" strip, counting watts (tested as a web build against the simulator)
 - [ ] Run the Flutter app on a real Android phone on the local Wi-Fi
 - [x] LLM planner + explainer with tool use, spending cap, provider abstraction, rule-based fallback (tested with a fake provider; 38 tests passing)
 - [ ] Try the LLM planner with a real API key (team puts the key in `.env`)
@@ -33,25 +36,44 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [ ] Lab-mode page polish (the design's "WattWise.dc.html")
 - [x] Simulator: 10-room office building as a third site (`--site building`), config only, same agent code
 - [x] New design: goal in plain words -> plan with T0/T1 tags, approval card shows the gentler alternative
+- [x] Rule-based goal reading (`backend/goal.py`): percent, bill, rooms, device kinds, period, comfort; the plan differs per goal and the named rooms/kinds are handled first; "15%" no longer read as 15 JD
+- [x] Power factor in the load signature (`backend/nilm.py`): meter `pf`, step PF learned at verification and in add-device, (P, Q) matching; simulator sends a synthetic PF; dashboard shows PF
 - [x] Typed/spoken commands (rule-based Arabic parsing), each action checked by the Policy Guard, runs only after confirm (mic via the browser in the web pages)
 - [x] Timers and daily on/off schedules run in the backend, checked when saved and again when they fire; smart water-heater schedule suggestion (max 3 h window)
 - [x] "Why is my bill like this?" analysis and a weekly text report to download
 - [x] Same features in the phone web page and the Flutter app (new Schedules tab); AC set temperature removed from the UI (on/off only)
+- [x] Schedule screen split into Home / Building / Lab, devices grouped by room, per-device control, weekday schedules, review-and-confirm before saving (web dashboard + phone page verified; Flutter checked by the CI build)
 - [x] Interactive 3D house page (`house.html`, three.js bundled offline): realistic rooms, furniture, lighting and day/night, animated devices, energy flow, click-to-zoom, approval card, NILM step recognition, guided "how it works" tour that drives the real system; phone mockup on the dashboard moved behind a "معاينة الموبايل" button
 - [x] Home EV charger (simulated 7.4 kW): session recognised by its meter step, measured kWh, start/end notifications, smart-charging proposal (evening peak, approval, resume timer), excluded from savings
 - [ ] Show the interactive house inside the Flutter app (WebView or native)
+- [x] Judge screen `stage.html`: goal by voice/typing, live plan steps, QR that opens the approval page on the judge's phone (phone buzzes and jumps to the card), live savings counter
+- [x] Offline mode: internet check every 10 s, red banner with what keeps working locally, LLM and weather step aside, rehearsal switch labelled "simulated"; full flow verified with the internet blocked
+- [x] Goal in percent ("وفّر ٢٠٪") becomes a bill target from this month's projection (was misread as 20 JD)
+- [x] Savings counter: today's measured JOD / kWh / kg CO2 + "if 1000 Jordanian homes" projection, clearly labelled (12 new tests)
+- [x] Agent warnings (tier 0): danger near the current limit (10 A PZEM/relay in the lab, simulated 25 A breaker in the house), high power, 80 % / 95 % of the cheaper tariff tier with the expected crossing day, device left on too long, unknown device (from anomaly detection), readings lost. Shown on the dashboard (+ browser notification on localhost) and as local notifications in the Flutter app; "طفّيه؟" only creates an approval request. Tests in `tests/test_alerts.py`
+- [ ] Try the Flutter notifications on a real Android phone and on the sideloaded iPhone build
+- [x] WiFi smart plugs added by the user (no electrician): drivers for Shelly, TP-Link Tapo/Kasa, Tuya/Smart Life, Sonoff (Tasmota or DIY) and a simulated plug; LAN scan; 3-step "add smart plug" wizard in the phone web page (dashboard opens it); per-plug watts feed the load signature and verification; Policy Guard blocks offline plugs and loads above the plug rating; high-power / heater warning (contactor stays recommended) + tests
+- [ ] Smart plug wizard in the Flutter app: written (`add_plug_wizard.dart`), not compiled here yet (`flutter analyze`)
+- [ ] Try one real smart plug (Shelly or Tuya) on the local Wi-Fi
 - [ ] Voice input inside the Flutter app (needs a speech package; the web pages already have the mic)
+
+## Bill photo analysis
+- [x] Bill photo -> Claude vision reads kWh, period, tiers, amount (structured JSON); code checks it against the tariff and the meter; photo never stored (tests with a fake model)
+- [x] Manual entry fallback (kWh, days, JOD) when there is no key, no internet, or the budget is spent
+- [x] Web dashboard + phone page (upload/camera) and Flutter app (camera/gallery, `image_picker`)
+- [x] "ليش الفاتورة هيك؟" compares with the last bill
+- [ ] Try it with a real key on a real (anonymized) bill photo
 
 ## Data to fill (team)
 - [ ] Verify tariff tiers in `config/tariff.json` against a real, anonymized bill
-- [ ] Official CO2 grid emission factor for Jordan, with source
+- [x] CO2 grid emission factor for Jordan: 0.516 kg/kWh, IFI dataset v2.0 (UNFCCC), in `config/tariff.json`
 - [ ] One week of real measurements for the problem statement
 
 ## Phase B: hardware at low voltage (when the kit arrives)
 - [ ] Blink LED, then PIR, DHT11, LDR, buttons, buzzer, LCD
 - [ ] Relay test with NO mains attached (check active-LOW)
 - [ ] PZEM-004T at low voltage in the lab only if safe
-- [ ] Final firmware: POST readings, poll commands
+- [ ] Final firmware: POST readings, poll commands (written in `firmware/wattwise`, plus test sketches 01-09 and `docs/wiring.md`; compiled by CI only, not yet on a board)
 
 ## Phase C: mains (electrician only)
 - [ ] Electrician wires the 220 V side in a closed box with the RCBO

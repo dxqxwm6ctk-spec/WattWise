@@ -7,5 +7,8 @@ scikit-learn>=1.4
 qrcode>=7.4
 # optional LLM planner (the app runs without it, on the rule-based planner)
 anthropic>=2.11
+# optional WiFi smart plug drivers (Shelly, Tasmota, Sonoff DIY and the simulated plugs need nothing extra)
+python-kasa>=0.7      # TP-Link Tapo / Kasa
+tinytuya>=1.13        # Tuya / Smart Life
 pytest>=8
 httpx>=0.27

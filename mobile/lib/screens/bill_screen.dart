@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../api.dart';
 import '../theme.dart';
 import '../widgets/assistant_widgets.dart';
+import '../widgets/bill_photo_card.dart';
 
 const tips = [
   'السخّان: شغّليه قبل الحمّام بساعة بدل ما يضل شغّال طول اليوم.',
@@ -30,6 +31,8 @@ class BillScreen extends StatelessWidget {
       GoalCard(st: st, api: api, run: run),
       const SizedBox(height: 12),
       WhyCard(api: api),
+      const SizedBox(height: 12),
+      BillPhotoCard(api: api),
       const SizedBox(height: 12),
       ReportCard(api: api),
       const SizedBox(height: 12),

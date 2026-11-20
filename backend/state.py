@@ -4,7 +4,8 @@ import calendar
 import json
 import time
 
-from backend import actions, anomaly, billing, config, db, ev, forecast, llm, mv, schedules, weather
+from backend import (actions, alerts, anomaly, billing, config, connectivity, db, ev, forecast, impact, llm,
+                     mv, nilm, schedules, smartplugs, teach, weather)
 
 CATEGORY = {"ac": "المكيّفات", "fan": "المكيّفات", "fridge": "الثلاجة", "heater": "سخّان الماء", "ev": "شحن السيارة",
             "light": "الإنارة"}
@@ -41,15 +42,20 @@ def build(conn, site: str) -> dict:
     room_rows = db.rooms(conn, site)
     room_names = {r["id"]: r["name"] for r in room_rows}
 
+    plug_rows = smartplugs.by_device(conn, site)
     devices = []
     for d in devs:
+        pr = plug_rows.get(d["id"])
+        live = pr["power_w"] if pr and pr["meters"] and pr["online"] and pr["power_w"] is not None else None
         devices.append({
             "id": d["id"], "name": d["name"], "room": d["room"], "room_name": room_names.get(d["room"], d["room"]),
             "kind": d["kind"], "tier": "T2" if d["tier"] == "T2" or d["kind"] in config.FORBIDDEN_KINDS else "T1",
             "sensitive": bool(d["sensitive"]), "allow": bool(d["allow"]), "is_on": bool(d["is_on"]),
-            "setpoint": d["setpoint"], "est_w": round(d["signature_w"]) if d["is_on"] else 0,
+            "setpoint": d["setpoint"], "est_w": (round(live) if live is not None else round(d["signature_w"])) if d["is_on"] else 0,
             "signature_w": round(d["signature_w"]), "signature_measured": bool(d["signature_measured"]),
+            "signature_pf": d["signature_pf"], "load_type": nilm.load_type_ar(d["signature_pf"]),
             "added": bool(d["added"]), "agent_off": d["agent_off"],
+            "plug": smartplugs.public(plug_rows.get(d["id"])),
         })
 
     pending = actions.pending_approval(conn, site)
@@ -84,7 +90,6 @@ def build(conn, site: str) -> dict:
     tinfo = billing.tier_info(kwh_now, projected_kwh, tariff, ttype)
     price = billing.marginal_price(kwh_now, tariff, ttype)
     bill_now = billing.bill_for(kwh_now, tariff, ttype)
-    co2 = tariff.get("co2_kg_per_kwh")
 
     # Where does the money go? From NILM-lite attribution of measured energy.
     by_cat: dict[str, float] = {}
@@ -102,8 +107,8 @@ def build(conn, site: str) -> dict:
     pending_out = None
     if pending:
         pending_out = {
-            "id": pending["id"], "device_id": pending["device_id"],
-            "title": pending["title"], "reason": pending["reason"],
+            "id": pending["id"], "title": pending["title"], "reason": pending["reason"],
+            "device_id": pending["device_id"], "turn_on": bool(pending["turn_on"]),
             "details": json.loads(pending["details"] or "{}"),
             "expires_in_s": max(0, round(pending["expires_ts"] - now)),
             "timeout_s": config.APPROVAL_TIMEOUT_S,
@@ -123,7 +128,7 @@ def build(conn, site: str) -> dict:
         "demo_label": (site_cfg.get("demo_waste") or {}).get("label"),
         "clock": time.strftime("%H:%M", t),
         "online": bool(meter) and now - meter.get("ts", 0) <= config.STALE_READING_S,
-        "meter": {k: meter.get(k) for k in ("power_w", "voltage_v", "current_a", "freq_hz", "energy_kwh")},
+        "meter": {k: meter.get(k) for k in ("power_w", "voltage_v", "current_a", "freq_hz", "energy_kwh", "pf")},
         "history": _history(conn, site),
         "rooms": rooms,
         "devices": devices,
@@ -136,6 +141,7 @@ def build(conn, site: str) -> dict:
         },
         "plan": _plan(conn, site, goal),
         "anomaly": anomaly.status(conn, site),
+        "alerts": alerts.listing(conn, site),
         "forecast": forecast.cached(conn, site),
         "mv": {k: v for k, v in mv.cached(conn, site).items() if k != "series"},
         "weather": weather.cached(),
@@ -156,16 +162,18 @@ def build(conn, site: str) -> dict:
             "proj_pos": round(min(99, projected_kwh / tinfo["display_max_kwh"] * 100), 1),
             "source": tariff.get("price_source"),
         },
-        "savings": {
-            "kwh": round(saved_wh / 1000, 3),
-            "jod": round(saved_wh / 1000 * price, 3),
-            "co2_kg": None if co2 is None else round(saved_wh / 1000 * co2, 2),
-            "co2_source": tariff.get("co2_source"),
-        },
+        "savings": impact.savings(
+            saved_wh,
+            impact.today_wh(db.get_state(conn, f"saved_day:{site}", None), meter.get("meter_ts") or now),
+            sum(d["signature_w"] for d in devs if d["agent_off"] == actions.AGENT_OFF_VERIFIED),
+            price, tariff),
+        "internet": connectivity.status(conn, site, now),
         "breakdown": breakdown,
         "log": log,
         "learn": db.get_state(conn, f"learn:{site}"),
         "comfort": {"min_c": config.COMFORT_MIN_TEMP_C, "max_c": config.COMFORT_MAX_TEMP_C},
         "automation": schedules.listing(conn, site),
         "ev": ev.status(conn, site),
+        # Teach mode chat, saved device fingerprints and unknown-device alerts.
+        "teach": teach.state(conn, site),
     }

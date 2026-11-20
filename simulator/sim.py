@@ -33,6 +33,19 @@ UNKNOWN_LOAD_W = 700
 NEW_DEVICE_W = {"ac": 1100, "light": 30, "heater": 1800, "tv": 110, "washer": 600, "pc": 180,
                 "router": 12, "fridge": 150, "medical": 80, "other": 75}
 
+# Demo "stranger_device" scenario: a small device with no saved fingerprint (unknown-device alert).
+STRANGER_W, STRANGER_PF = 60, 0.7
+
+# Teach mode: the simulator plays the user switching the room's devices on one by one.
+TEACH_FIRST_S, TEACH_GAP_S = 6, 7
+
+
+# Synthetic power factor per kind (typical textbook values, NOT measured). A real
+# PZEM-004T reports the PF of the whole circuit; the backend works out each
+# device's PF from the jump when it switches (backend/nilm.py).
+KIND_PF = {"light": 0.95, "heater": 1.0, "fan": 0.80, "ac": 0.85, "tv": 0.90, "pc": 0.95, "washer": 0.70,
+           "fridge": 0.80, "router": 0.55, "other": 0.90, "fire_alarm": 0.60, "medical": 0.90,
+           "ev": 0.99}
 
 
 def http_json(method: str, url: str, body: dict | None = None) -> dict:
@@ -55,6 +68,17 @@ class House:
         self.on = {k: d.get("on", True) for k, d in self.devices.items()}
         self.setpoint = {k: d["setpoint"] for k, d in self.devices.items() if "setpoint" in d}
         self.extra_w: dict[str, float] = {}      # devices added from the app: id -> true watts
+        self.extra_kind: dict[str, str] = {}     # and their kind (for the synthetic PF)
+        self.plug_w: dict[str, float] = {}       # simulated WiFi smart plugs: id -> watts drawn now
+        # Devices that exist in the house but the backend does not know (sites.json "sim.unlabeled").
+        # They start off; in teach mode the "user" switches them on one by one.
+        self.hidden = {r["id"]: r["sim"].get("unlabeled", []) for r in cfg["rooms"] if "sim" in r}
+        self.hidden_on: set[tuple[str, int]] = set()
+        room_ids = [r["id"] for r in cfg["rooms"]]
+        self.stranger_room = next((r for r in ("kitchen", "kitchenette") if r in room_ids), room_ids[0])
+        self.meter_room = None                   # teach mode: the PZEM is on this room's breaker
+        self.teach_started = None
+        self.teach_plan: list[tuple[float, str, int, bool]] = []   # (real time, room, index, on)
         self.speed = speed
         self.clock = datetime.now().replace(hour=19, minute=30, second=0, microsecond=0).timestamp()
         self.energy_kwh = start_kwh
@@ -74,18 +98,40 @@ class House:
         if learning and learning["device_id"] not in self.extra_w:
             base = NEW_DEVICE_W.get(learning["kind"], 75)
             self.extra_w[learning["device_id"]] = round(base * random.uniform(0.9, 1.1))
+            self.extra_kind[learning["device_id"]] = learning["kind"]
         # A device being learned is switched on by the user, before it exists in the backend.
         self.learning_id = learning["device_id"] if learning else None
         # Drop loads from a cancelled "add device" flow.
         for dev_id in list(self.extra_w):
             if dev_id not in cmd["relays"] and dev_id != self.learning_id:
                 del self.extra_w[dev_id]
+        # Simulated smart plugs: the backend tells us what each one really draws.
+        self.plug_w = cmd.get("plug_loads") or {}
+        self._teach(cmd.get("room_meter"))
         if cmd["scenario"] != self.scenario:
             self.scenario = cmd["scenario"]
             if self.scenario == "sensor_fault":
                 self.fault_until = time.time() + 25
             if self.scenario == "ev_arrives":   # the car comes home with a low battery
                 self.ev_soc = float(self.ev_cfg.get("sim", {}).get("arrive_soc", 30))
+
+    def _teach(self, rm: dict | None) -> None:
+        """Teach mode: move the meter to the room's breaker and switch its unknown devices on one by one."""
+        now = time.time()
+        if not rm:
+            self.meter_room, self.teach_started, self.teach_plan = None, None, []
+            return
+        self.meter_room = rm["room"]
+        if rm["started_ts"] and rm["started_ts"] != self.teach_started:
+            self.teach_started = rm["started_ts"]
+            items = list(range(len(self.hidden.get(rm["room"], []))))
+            self.teach_plan = [(now + 2, rm["room"], i, False) for i in items]
+            self.teach_plan += [(now + TEACH_FIRST_S + TEACH_GAP_S * k, rm["room"], i, True) for k, i in enumerate(items)]
+        if not rm.get("guided"):
+            self.teach_plan = []
+        while self.teach_plan and self.teach_plan[0][0] <= now:
+            _, room, i, on = self.teach_plan.pop(0)
+            (self.hidden_on.add if on else self.hidden_on.discard)((room, i))
 
     # --- physics (simple on purpose) ---
     def device_w(self, dev_id: str) -> float:
@@ -97,7 +143,8 @@ class House:
             return 0.0
         minute = self.clock / 60
         if d["kind"] == "fridge":
-            return d["rated_w"] * (0.6 + 0.4 * math.sin(minute / 3))
+            # The compressor cycles: on 15 minutes, off 10 (clean steps on the meter).
+            return d["rated_w"] if minute % 25 < 15 else 0.0
         if d["kind"] == "ac":
             return d["rated_w"] * (1 + (24 - self.setpoint.get(dev_id, 24)) * 0.06)
         if d["kind"] == "ev":
@@ -137,13 +184,36 @@ class House:
             t += 1.5
         return round(t + random.uniform(-0.15, 0.15), 1)
 
+    def loads(self, room: str | None = None) -> list[tuple[float, float]]:
+        """(watts, pf) of everything drawing power, in one room or the whole house."""
+        out = []
+        for k, d in self.devices.items():
+            if room is None or d["room"] == room:
+                out.append((self.device_w(k), KIND_PF.get(d["kind"], 0.9)))
+        if room is None:
+            out += [(self.device_w(k), KIND_PF.get(self.extra_kind.get(k, "other"), 0.9))
+                    for k in self.extra_w if k not in self.plug_w]
+            out += [(w, 0.9) for w in self.plug_w.values()]   # simulated WiFi smart plugs
+        for r, items in self.hidden.items():
+            if room is None or r == room:
+                out += [(it["w"], it["pf"]) for i, it in enumerate(items) if (r, i) in self.hidden_on]
+        if self.scenario == "stranger_device" and room in (None, self.stranger_room):
+            out.append((STRANGER_W, STRANGER_PF))
+        if self.scenario == "unknown_load" and room is None:   # a load the backend does not know about
+            out.append((UNKNOWN_LOAD_W, 0.95))
+        return out
+
+    @staticmethod
+    def total(loads: list[tuple[float, float]], noise_w: float) -> tuple[float, float | None]:
+        """Total watts (with meter noise) and the power factor of the sum."""
+        p = sum(w for w, _ in loads)
+        q = sum(w * math.tan(math.acos(pf)) for w, pf in loads if w > 0)
+        pf = round(p / math.hypot(p, q), 2) if p > 1 else None
+        return max(0.0, p + random.uniform(-noise_w, noise_w)), pf
+
     def reading(self) -> dict:
         self.step_ev()
-        all_ids = list(self.devices) + list(self.extra_w)
-        power = sum(self.device_w(k) for k in all_ids) + random.uniform(-20, 20)
-        if self.scenario == "unknown_load":   # a load the backend does not know about
-            power += UNKNOWN_LOAD_W
-        power = max(0.0, power)
+        power, pf = self.total(self.loads(), 20)
         minute = self.clock / 60
         volt = 229.4 + math.sin(minute) * 0.8
         self.energy_kwh += power / 1000 * (self.speed / 3600)
@@ -155,9 +225,11 @@ class House:
                 "power_w": round(power, 1),
                 "energy_kwh": round(self.energy_kwh, 3),
                 "voltage_v": round(volt, 1),
-                "current_a": round(power / volt / 0.94, 2),
+                "current_a": round(power / volt / (pf or 0.94), 2),
                 "freq_hz": round(50 + math.sin(minute * 1.7) * 0.03, 2),
+                "pf": pf,
             },
+            "circuit": self.circuit(),
             "rooms": [
                 {"room_id": r, "temp_c": self.temperature(r), "humidity": 40,
                  "light": 300 + (900 if any(self.on.get(k) for k, d in self.devices.items()
@@ -167,6 +239,14 @@ class House:
             ],
             **({"ev": {"soc_pct": round(self.ev_soc, 1), "plugged": True}} if self.ev_cfg else {}),
         }
+
+
+    def circuit(self) -> dict | None:
+        """Teach mode: what a PZEM on this room's breaker reads (much less noise than the whole house)."""
+        if not self.meter_room:
+            return None
+        p, pf = self.total(self.loads(self.meter_room), 0.3)
+        return {"room_id": self.meter_room, "power_w": round(p, 1), "pf": pf}
 
 
 def main() -> None:

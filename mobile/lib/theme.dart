@@ -47,19 +47,21 @@ class WWBox extends StatelessWidget {
 
 /// On/off switch styled like the design (knob on the left when on, as in RTL).
 class WWToggle extends StatelessWidget {
-  const WWToggle({super.key, required this.on, required this.onTap, this.locked = false});
+  const WWToggle({super.key, required this.on, required this.onTap, this.locked = false, this.onDark = false});
   final bool on;
   final bool locked;
+  final bool onDark; // sits on a dark card, so the "on" track needs to be lighter
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final track = locked ? const Color(0xFFF0C2B8) : on ? WW.ink : const Color(0xFFD8D5CA);
+    final track = locked ? const Color(0xFFF0C2B8) : on ? (onDark ? const Color(0xFF4F5F2C) : WW.ink) : const Color(0xFFD8D5CA);
     final knob = locked ? WW.red : on ? WW.lime : Colors.white;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
         width: 52,
         height: 32,
         padding: const EdgeInsets.all(4),

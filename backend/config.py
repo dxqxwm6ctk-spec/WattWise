@@ -70,8 +70,15 @@ ASK_COOLDOWN_S = _env_float("ASK_COOLDOWN_S", 120)
 # If a site sends nothing for this long, treat it as a sensor/connection fault.
 STALE_READING_S = _env_float("STALE_READING_S", 15)
 
+# A warning that cleared can come back only after this long (no notification spam).
+ALERT_COOLDOWN_S = _env_float("ALERT_COOLDOWN_S", 300)
+
 # How often the agent loop runs.
 AGENT_INTERVAL_S = _env_float("AGENT_INTERVAL_S", 1)
+
+# --- WiFi smart plugs (backend/smartplugs.py) ---
+# How often each plug is pushed its wanted state and read back.
+PLUG_POLL_S = _env_float("PLUG_POLL_S", 2)
 
 # --- Weather tool (Open-Meteo, free, no key). Default: Irbid. ---
 WEATHER_ENABLED = os.environ.get("WEATHER_ENABLED", "1") != "0"
@@ -92,6 +99,10 @@ LLM_PRICE_OUT_PER_MTOK = _env_float("LLM_PRICE_OUT_PER_MTOK", 20)
 # If the LLM does not answer within this time, the rule-based explanation is used.
 LLM_TIMEOUT_S = _env_float("LLM_TIMEOUT_S", 30)
 LLM_MAX_TOOL_ROUNDS = 6
+# Reading a photo of a bill takes longer than a small decision.
+LLM_VISION_TIMEOUT_S = _env_float("LLM_VISION_TIMEOUT_S", 60)
+# Largest photo we accept (bytes, after decoding). The apps shrink photos before sending.
+BILL_PHOTO_MAX_BYTES = int(_env_float("BILL_PHOTO_MAX_BYTES", 3_500_000))
 
 
 def load_sites() -> dict:

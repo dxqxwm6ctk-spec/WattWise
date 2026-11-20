@@ -22,6 +22,14 @@ class WattWiseApi {
 
   Uri _uri(String path) => Uri.parse('$baseUrl/api/sites/$site$path');
 
+  /// The same server, another site (home / building / lab). Used by the schedule tab.
+  WattWiseApi forSite(String other) => other == site ? this : WattWiseApi(baseUrl: baseUrl, site: other);
+
+  Future<Map<String, dynamic>> schedules() async {
+    final res = await http.get(_uri('/schedules')).timeout(const Duration(seconds: 4));
+    return _decode(res);
+  }
+
   Future<Map<String, dynamic>> getState() async {
     final res = await http.get(_uri('/state')).timeout(const Duration(seconds: 4));
     return _decode(res);
@@ -52,12 +60,46 @@ class WattWiseApi {
   Future<void> addDevice({required String kind, required String room, required String name, required bool allow}) =>
       post('/devices', {'kind': kind, 'room': room, 'name': name, 'allow': allow});
 
+  // --- warnings: "طفّيه؟" only creates an approval request, it switches nothing ---
+  Future<void> alertAct(int id) => post('/alerts/$id/act');
+  Future<void> alertDismiss(int id) => post('/alerts/$id/dismiss');
+  // --- WiFi smart plugs (Shelly, TP-Link Tapo/Kasa, Tuya, Sonoff/Tasmota, simulated) ---
+  Future<Map<String, dynamic>> plugBrands() async {
+    final res = await http.get(Uri.parse('$baseUrl/api/plugs/brands')).timeout(const Duration(seconds: 4));
+    return _decode(res);
+  }
+
+  /// Looks for plugs on the local Wi-Fi. Takes a few seconds.
+  Future<List<dynamic>> scanPlugs() async {
+    final res = await http.get(_uri('/plugs/scan')).timeout(const Duration(seconds: 20));
+    return (_decode(res)['plugs'] as List?) ?? [];
+  }
+
+  Future<Map<String, dynamic>> checkPlug(Map<String, dynamic> target, String kind) async {
+    final res = await http
+        .post(_uri('/plugs/check'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({...target, 'kind': kind}))
+        .timeout(const Duration(seconds: 15));
+    return _decode(res);
+  }
+
+  Future<void> addPlug(Map<String, dynamic> body) async {
+    final res = await http
+        .post(_uri('/plugs'), headers: {'Content-Type': 'application/json'}, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 15));
+    _decode(res);
+  }
+
+  Future<void> removePlug(String deviceId) => delete('/plugs/$deviceId');
+
   // --- goal, commands, schedules, analysis (new design) ---
   Future<void> setGoal(String text) => post('/goal', {'text': text});
   Future<Map<String, dynamic>> parseCommand(String text) => post('/command/parse', {'text': text});
   Future<Map<String, dynamic>> runCommand(String text) => post('/command/run', {'text': text});
-  Future<void> addSchedule(String deviceId, String? on, String? off) =>
-      post('/schedules', {'device_id': deviceId, 'on_time': on, 'off_time': off});
+  Future<void> addSchedule(String deviceId, String? on, String? off, {List<int>? days}) =>
+      post('/schedules', {'device_id': deviceId, 'on_time': on, 'off_time': off, 'days': days});
+  /// The review step: the Policy Guard checks the schedule and we get an estimate. Nothing is saved.
+  Future<Map<String, dynamic>> previewSchedule(String deviceId, String? on, String? off, List<int> days) =>
+      post('/schedules', {'device_id': deviceId, 'on_time': on, 'off_time': off, 'days': days, 'preview': true});
   Future<void> setScheduleEnabled(int id, bool enabled) => post('/schedules/$id/enabled', {'enabled': enabled});
   Future<void> deleteSchedule(int id) => delete('/schedules/$id');
   Future<void> addTimer(String deviceId, int minutes, {bool runNow = false}) =>
@@ -73,6 +115,23 @@ class WattWiseApi {
     final res = await http.get(_uri('/why')).timeout(const Duration(seconds: 6));
     return _decode(res);
   }
+
+  // --- bill photo (Claude reads it on the server) or bill numbers typed by hand ---
+  Future<Map<String, dynamic>> billStatus() async {
+    final res = await http.get(Uri.parse('$baseUrl/api/bill/status')).timeout(const Duration(seconds: 4));
+    return _decode(res);
+  }
+
+  Future<Map<String, dynamic>> billPhoto(String imageB64) async {
+    // Reading a photo can take up to a minute, so this one waits longer.
+    final res = await http
+        .post(_uri('/bill/photo'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'image_b64': imageB64}))
+        .timeout(const Duration(seconds: 75));
+    return _decode(res);
+  }
+
+  Future<Map<String, dynamic>> billManual(double kwh, double? days, double? amountJod) =>
+      post('/bill/manual', {'kwh': kwh, 'days': days, 'amount_jod': amountJod});
 
   Future<String> weeklyReport() async {
     final res = await http.get(_uri('/weekly.txt')).timeout(const Duration(seconds: 6));

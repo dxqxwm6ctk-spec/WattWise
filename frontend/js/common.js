@@ -105,5 +105,30 @@ const WW = (() => {
     });
   }
 
-  return { site, api, getState, post, render, esc, fmt, gauge, odometer, goalSteps, agentLabel, onAction };
+  // ---------- bill photo ----------
+  // Shrink the photo in the browser (max 1600 px, JPEG) so it uploads fast on a hotspot.
+  // Works for any image the browser can open (also iPhone photos). Nothing is kept on the phone.
+  function shrinkPhoto(file, maxSide = 1600) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('ما قدرنا نفتح الصورة.')); };
+      img.src = url;
+    });
+  }
+  const billStatus = () => api('GET', '/api/bill/status');
+  const billPhoto = async file => post('/bill/photo', { image_b64: await shrinkPhoto(file) });
+  const billManual = m => post('/bill/manual', {
+    kwh: Number(m.kwh), days: m.days ? Number(m.days) : null, amount_jod: m.amount ? Number(m.amount) : null });
+
+  return { site, api, getState, post, render, esc, fmt, gauge, odometer, goalSteps, agentLabel, onAction,
+           billStatus, billPhoto, billManual };
 })();

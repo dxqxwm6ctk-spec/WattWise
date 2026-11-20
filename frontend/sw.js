@@ -1,7 +1,7 @@
 // Minimal service worker so the phone page can be installed (PWA).
 // It caches the page shell only. Live data always comes from the backend.
-const CACHE = 'wattwise-v3';
-const SHELL = ['app.html', 'css/app.css?v=3', 'css/fonts.css', 'js/common.js?v=3', 'js/app.js?v=3', 'icon.svg', 'manifest.webmanifest'];
+const CACHE = 'wattwise-v5';
+const SHELL = ['app.html', 'css/app.css?v=3', 'css/fonts.css', 'js/common.js?v=3', 'js/app.js?v=4', 'js/schedule.js?v=1', 'css/schedule.css?v=1', 'js/plugs.js?v=1', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))));
 self.addEventListener('activate', e => e.waitUntil(
