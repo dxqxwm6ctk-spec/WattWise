@@ -6,6 +6,9 @@
 | Office building readings (10 rooms, 27 devices) | `simulator/sim.py --site building`, **synthetic** | in use |
 | Starting meter value of the simulated house (286 kWh) | synthetic, chosen for the demo | in use |
 | Lab room readings | ESP32 + PZEM-004T + PIR/DHT11/LDR | Phase B |
+| Unlabeled devices for teach mode (`config/sites.json`, `sim.unlabeled`: watts and power factor) and the "stranger device" (60 W, pf 0.7) | `simulator/sim.py`, **synthetic**; the backend does not know them and must find them on the meter | in use |
+| Device guess table (watts and power-factor ranges per appliance type, `backend/nilm.py`) | typical values from appliance nameplates and common measurements; only a guess that the user confirms or corrects | in use |
+| Saved device fingerprints (name, room, watts, pf) | entered by the user in the chat, saved only after an explicit "yes"; no personal data | in use |
 | Door / window contact | **simulated** (a push button on the device, a flag in the simulator) | in use |
 | Device nameplate watts (`config/sites.json`, `rated_w`) | typical values, used only as a first guess; replaced by the measured step on the meter | in use |
 | Household tariff tiers (`config/tariff.json`) | taken from the design, which cites the EMRC 2025 household tariff | **to verify against a real anonymized bill** |

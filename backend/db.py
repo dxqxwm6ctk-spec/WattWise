@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS meter_readings (
     energy_kwh  REAL,
     voltage_v   REAL,
     current_a   REAL,
-    freq_hz     REAL
+    freq_hz     REAL,
+    pf          REAL                       -- power factor (PZEM-004T v3 reports it)
 );
 CREATE INDEX IF NOT EXISTS idx_meter_site_ts ON meter_readings(site, ts);
 
@@ -134,6 +135,28 @@ CREATE TABLE IF NOT EXISTS timers (
     minutes     INTEGER NOT NULL,
     created_ts  REAL    NOT NULL
 );
+-- Device fingerprints the user confirmed in teach mode (saved only with the user's "yes").
+CREATE TABLE IF NOT EXISTS fingerprints (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    site        TEXT    NOT NULL,
+    room        TEXT    NOT NULL,
+    name        TEXT    NOT NULL,          -- the user's words, e.g. "لابتوب"
+    kind        TEXT    NOT NULL,
+    watts       REAL    NOT NULL,          -- step size on the meter
+    pf          REAL,                      -- power factor of the step (NULL if the meter has none)
+    samples     INTEGER NOT NULL DEFAULT 1,
+    created_ts  REAL    NOT NULL,
+    source      TEXT    NOT NULL           -- teach / unknown
+);
+-- The conversation with the AI about the room's devices.
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    site        TEXT    NOT NULL,
+    ts          REAL    NOT NULL,
+    role        TEXT    NOT NULL,          -- ai / user
+    text        TEXT    NOT NULL,
+    data        TEXT
+);
 CREATE TABLE IF NOT EXISTS system_state (
     key         TEXT PRIMARY KEY,
     value       TEXT NOT NULL
@@ -158,6 +181,10 @@ def init_db() -> None:
     config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as conn:
         conn.executescript(SCHEMA)
+        # Older databases: add columns that came later.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(meter_readings)")}
+        if "pf" not in cols:
+            conn.execute("ALTER TABLE meter_readings ADD COLUMN pf REAL")
         for site_id, site in config.load_sites().items():
             for room in site["rooms"]:
                 conn.execute("INSERT OR IGNORE INTO rooms (site, id, name) VALUES (?,?,?)",

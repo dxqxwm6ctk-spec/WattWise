@@ -18,11 +18,13 @@ Tick only what is verified working. Deadlines: Phase 1 proposal 30.11, prototype
 - [x] Rule-based planner (waste = load on in an empty room), with Arabic explanation and numbers
 - [x] Goal input: the agent splits it into 7 steps and shows their live status
 - [x] Verification with the meter after each action; measured step becomes the load signature (NILM-lite)
+- [x] Teach mode: the AI learns a room's appliances from watt steps + power factor, asks in Arabic chat, saves fingerprints only after the user's yes (rules + optional LLM reading of replies); recognises them afterwards (`backend/nilm.py`, `backend/teach.py`)
+- [x] Unknown-device alert (no saved fingerprint) with a question to label it; fridge cycling and relay switches are not flagged; simulator: PZEM on one room's breaker, synthetic unlabeled devices, "stranger device" scenario
 - [x] Measured savings (kWh, JOD) from verified actions only; baseline line = actual + verified held-off loads
 - [x] Add-device flow: measure a new device's signature on the main meter
 - [x] Dashboard (plain HTML/JS + Chart.js) implementing the "WattWise Home" design
 - [x] Web approval page (PWA, works offline on the local network) as backup for the Flutter app
-- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands (78 passing)
+- [x] Tests: Policy Guard, bill math, end-to-end agent flow, LLM layer, anomaly detection, forecast, 10-room building, M&V and report, schedules and commands, teach mode and unknown devices (99 passing)
 - [x] Flutter phone app with the 4 screens from the design (home, devices, bill, safety), same API (tested as a web build against the simulator)
 - [ ] Run the Flutter app on a real Android phone on the local Wi-Fi
 - [x] LLM planner + explainer with tool use, spending cap, provider abstraction, rule-based fallback (tested with a fake provider; 38 tests passing)

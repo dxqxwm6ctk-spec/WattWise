@@ -7,7 +7,7 @@ every change goes through the same Policy Guard checks and the same audit log.
 import json
 import time
 
-from backend import anomaly, config, db, policy
+from backend import anomaly, config, db, nilm, policy
 
 # Approval statuses
 PENDING, APPROVED, REJECTED, EXPIRED, BLOCKED, CANCELLED = (
@@ -116,9 +116,10 @@ def ingest(conn, payload: dict) -> None:
     power = float(meter["power_w"])
     conn.execute(
         "INSERT INTO meter_readings (site, ts, meter_ts, source, power_w, baseline_w, energy_kwh, "
-        "voltage_v, current_a, freq_hz) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "voltage_v, current_a, freq_hz, pf) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (site, now, meter_ts, payload.get("source", "device"), power, power + held_off_w,
-         meter.get("energy_kwh"), meter.get("voltage_v"), meter.get("current_a"), meter.get("freq_hz")),
+         meter.get("energy_kwh"), meter.get("voltage_v"), meter.get("current_a"), meter.get("freq_hz"),
+         meter.get("pf")),
     )
     for r in payload.get("rooms", []):
         conn.execute(
@@ -133,6 +134,8 @@ def ingest(conn, payload: dict) -> None:
     rooms = payload.get("rooms", [])
     anomaly.observe(conn, site, power, meter_ts, occupied=any(r.get("occupied") for r in rooms),
                     learning=db.get_state(conn, f"learn:{site}", None) is not None)
+    # Steps on the meter: recognise saved device fingerprints, flag unknown devices, teach mode.
+    nilm.observe(conn, site, payload, now)
 
     # The physical emergency-stop button on the ESP32.
     if payload.get("estop_pressed") and not flag(conn, "estop", site):
@@ -152,7 +155,14 @@ def commands_for(conn, site: str) -> dict:
         "scenario": db.get_state(conn, f"scenario:{site}", "normal"),
         # While the user adds a device in the app (simulator plugs in a matching load).
         "learning": _learning(conn, site),
+        # Teach mode: the PZEM is on this room's breaker (simulator sends that circuit too).
+        "room_meter": _room_meter(conn, site),
     }
+
+
+def _room_meter(conn, site: str) -> dict | None:
+    from backend import teach   # teach imports actions
+    return teach.room_meter(conn, site)
 
 
 def _learning(conn, site: str) -> dict | None:
@@ -335,6 +345,10 @@ def reset_demo(conn, site: str) -> None:
     conn.execute("DELETE FROM schedules WHERE site=?", (site,))
     conn.execute("DELETE FROM timers WHERE site=?", (site,))
     anomaly.clear(conn, site)
+    nilm.clear(conn, site)
+    db.set_state(conn, f"teach:{site}", None)
+    db.set_state(conn, f"chat_ctx:{site}", None)
+    db.set_state(conn, f"meter_room:{site}", None)
     _close_pending(conn, site, CANCELLED)
     restore_normal(conn, site)
     for d in config.load_sites()[site]["devices"]:
@@ -374,6 +388,7 @@ SCENARIOS = {
     "holiday": "عطلة: البيت كله فاضي والأجهزة ضلّت شغّالة.",
     "sensor_fault": "عطل حسّاسات: المحاكي بيوقف يبعت قراءات شوي.",
     "unknown_load": "حمل غريب: جهاز مش مسجّل (≈ 700 واط) انشغل بالبيت.",
+    "stranger_device": "جهاز غريب ≈ 60 واط انشبك بالمطبخ، ما إله بصمة محفوظة.",
 }
 
 

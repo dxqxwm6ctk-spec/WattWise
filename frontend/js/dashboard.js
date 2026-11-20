@@ -11,6 +11,7 @@ const ui = {
   sched: { dev: null, on: '', off: '', msg: '' },
   heater: { hint: '', res: null, busy: false, msg: '' },
   why: { res: null, busy: false }, rep: { text: '', busy: false },
+  teach: { room: null, text: '', busy: false, lastMsg: 0 },
 };
 let st = null;
 const lbl = (key, fallback) => (st && st.labels && st.labels[key]) || fallback;
@@ -41,6 +42,7 @@ function toolbar() {
       <option value="holiday">عطلة (البيت فاضي)</option>
       <option value="sensor_fault">عطل حسّاسات</option>
       <option value="unknown_load">حمل غريب (جهاز مش مسجّل)</option>
+      <option value="stranger_device">جهاز غريب ٦٠ واط بالمطبخ (بدون بصمة)</option>
       <option value="normal">رجّع طبيعي</option>
     </select>` : '';
   return `${other}${scen}
@@ -424,6 +426,72 @@ function schedSection() {
     <div style="display:flex;flex-direction:column;gap:8px">${empty}${rows}${timers}</div>`;
 }
 
+// Teach mode: the AI learns the room's appliances from the meter and asks the user.
+function teachSection() {
+  const t = st.teach || { messages: [], fingerprints: [], unknown: [] };
+  const s = t.session;
+  if (!ui.teach.room || !st.rooms.some(r => r.id === ui.teach.room)) ui.teach.room = st.rooms[0] && st.rooms[0].id;
+  const room = s ? s.room : ui.teach.room;
+  const chips = st.rooms.map(r => `<button class="chip ${r.id === room ? 'sel' : ''}" data-act="teach-room" data-id="${esc(r.id)}"${s ? ' disabled' : ''}>${esc(r.name)}</button>`).join('');
+  const status = !s ? 'جاهز. اختار الغرفة واكبس «علّمني».'
+    : s.status === 'listening' ? `عم بسمع للعدّاد على قاطع ${esc(s.room_name)}… (${s.candidates} جهاز لحد هلأ)`
+      : s.status === 'asking' ? 'بستنّى تأكّد أو تصحّح.' : 'بستنّى موافقتك على الحفظ.';
+  const buttons = !s
+    ? `<button class="btn-lime" style="height:36px;font-size:13px" data-act="teach-start">علّمني أجهزة هالغرفة</button>`
+    : `${s.status === 'listening' ? '<button class="btn-lime" style="height:36px;font-size:13px" data-act="teach-done">خلصت</button>' : ''}
+       <button class="btn-ghost" data-act="teach-cancel">وقّف بدون حفظ</button>`;
+  const msgs = t.messages.map(m => `
+    <div style="align-self:${m.role === 'ai' ? 'flex-start' : 'flex-end'};max-width:88%;white-space:pre-wrap;font-size:13.5px;line-height:1.6;padding:9px 12px;border-radius:12px;
+      background:${m.role === 'ai' ? '#1E201B' : '#2E3A1C'};color:${m.role === 'ai' ? '#ECEBE4' : '#E6F5C8'}">${esc(m.text)}</div>`).join('')
+    || '<div style="font-size:12.5px;color:#6F6D64">لسّا ما في محادثة.</div>';
+  const quick = t.waiting_for === 'teach_confirm' ? ['صح'] : ['teach_save', 'label_save'].includes(t.waiting_for) ? ['احفظ', 'لا'] : t.waiting_for === 'label' ? ['تجاهل'] : [];
+  const fps = t.fingerprints.map(f => `
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+      <span style="width:7px;height:7px;border-radius:50%;background:${f.is_on ? '#B8F04A' : '#4A4C44'};flex:none"></span>
+      <span>${esc(f.name)}</span><span style="color:#8E8C82;font-size:12px">${esc(f.room_name)}</span>
+      <span class="mono" style="margin-inline-start:auto;font-size:11.5px;color:#A9A79D" dir="ltr">${fmt(f.watts, 0)}W${f.pf != null ? ' · pf ' + fmt(f.pf, 2) : ''}</span>
+      <button class="btn-ghost btn-sm" data-act="fp-del" data-id="${f.id}" title="احذف البصمة">×</button>
+    </div>`).join('') || '<div style="font-size:12.5px;color:#6F6D64">ما في بصمات محفوظة. البصمة بتنحفظ بس إذا وافقت.</div>';
+  const unk = t.unknown.length ? `<span style="font-size:12px;padding:3px 10px;border-radius:10px;background:#1E1A10;color:#F2B544">⚠️ ${t.unknown.length} جهاز مجهول</span>` : '';
+  return `
+    <div class="head">
+      <div class="label">TEACH · علّم الـAI أجهزة الغرفة</div>
+      <div style="display:flex;gap:8px;align-items:center">${unk}<span style="font-size:11px;color:#6F6D64">بصمة كل جهاز = قفزة الواط + معامل القدرة (pf) · ما بينحفظ إشي بدون موافقتك</span></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">
+      <div class="panel" style="flex:1 1 260px">
+        <span class="panel-title">١ · وين العدّاد؟</span>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
+        <div style="font-size:12.5px;color:#A9A79D;line-height:1.6">${status}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">${buttons}</div>
+        <span class="panel-title" style="margin-top:6px">البصمات المحفوظة</span>
+        <div style="display:flex;flex-direction:column;gap:8px">${fps}</div>
+      </div>
+      <div class="panel" style="flex:2 1 380px">
+        <span class="panel-title">٢ · المحادثة مع الـAI</span>
+        <div id="teach-chat" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto;padding:4px">${msgs}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${quick.map(q => `<button class="chip" data-act="teach-quick" data-text="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+        <div style="display:flex;gap:8px">
+          <input class="field grow" id="teach-text" placeholder="جاوب الـAI… مثلًا: الأول لابتوب، الثاني ضو المكتب" value="${esc(ui.teach.text)}">
+          <button class="btn-lime" data-act="teach-send">${ui.teach.busy ? '…' : 'ابعث'}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function teachSay(text) {
+  text = (text || '').trim();
+  if (!text || ui.teach.busy) return;
+  ui.teach.busy = true; renderAll();
+  try {
+    await WW.post('/teach/say', { text });
+    ui.teach.text = '';
+    const el = $('teach-text'); if (el) el.value = '';
+  } catch (e) { toast(e.message); }
+  ui.teach.busy = false;
+  refresh();
+}
+
 // "Why is my bill like this?" and the weekly report. Numbers come from the code.
 function analystSection() {
   const w = ui.why.res, rep = ui.rep;
@@ -590,6 +658,9 @@ function renderAll() {
   WW.render($('goal'), goal());
   WW.render($('rooms'), roomsMap());
   WW.render($('devices'), devicesGrid());
+  WW.render($('teach'), teachSection());
+  const last = (st.teach && st.teach.messages.length) ? st.teach.messages[st.teach.messages.length - 1].id : 0;
+  if (last !== ui.teach.lastMsg) { ui.teach.lastMsg = last; const c = $('teach-chat'); if (c) c.scrollTop = c.scrollHeight; }
   WW.render($('bill'), bill());
   WW.render($('sched'), schedSection());
   WW.render($('analyst'), analystSection());
@@ -626,6 +697,13 @@ WW.onAction({
     ui.goalText = text;
     return WW.post('/goal', { text });   // the server reads the bill target from the words
   }),
+  'teach-room': d => { ui.teach.room = d.id; renderAll(); },
+  'teach-start': () => act(() => WW.post('/teach/start', { room: ui.teach.room })),
+  'teach-done': () => act(() => WW.post('/teach/done')),
+  'teach-cancel': () => act(() => WW.post('/teach/cancel')),
+  'teach-send': () => teachSay(ui.teach.text),
+  'teach-quick': d => teachSay(d.text),
+  'fp-del': d => act(() => WW.api('DELETE', `/api/sites/${WW.site}/fingerprints/${d.id}`)),
   'cmd-parse': () => parseCommand(),
   'cmd-mic': () => listen(),
   'cmd-cancel': () => { ui.cmd.res = null; renderAll(); },
@@ -699,12 +777,14 @@ document.addEventListener('input', ev => {
   const id = ev.target.id, v = ev.target.value;
   if (id === 'goal-text') ui.goalText = v;
   if (id === 'cmd-text') ui.cmd.text = v;
+  if (id === 'teach-text') ui.teach.text = v;
   if (id === 'heater-hint') ui.heater.hint = v;
   if (id === 'sched-on') ui.sched.on = v;
   if (id === 'sched-off') ui.sched.off = v;
 });
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target.id === 'cmd-text') parseCommand();
+  if (ev.key === 'Enter' && ev.target.id === 'teach-text') teachSay(ui.teach.text);
   if (ev.key === 'Enter' && ev.target.id === 'goal-text') document.querySelector('[data-act="set-goal"]').click();
 });
 
