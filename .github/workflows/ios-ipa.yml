@@ -1,0 +1,64 @@
+# Builds the WattWise phone app for iPhone WITHOUT code signing and
+# uploads it as an .ipa file. Download it from the Actions tab and load it
+# with Sideloadly, which signs it with your own Apple ID.
+name: iOS IPA (unsigned, for Sideloadly)
+
+on:
+  workflow_dispatch:
+    inputs:
+      server:
+        description: "Server address baked into the app (leave as is for Railway)"
+        required: false
+        default: "https://wattwise-production-f321c49b.up.railway.app"
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/ios-ipa.yml"
+
+env:
+  DEFAULT_SERVER: "https://wattwise-production-f321c49b.up.railway.app"
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show versions
+        run: |
+          flutter --version
+          xcodebuild -version
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Build iOS app (no signing)
+        run: |
+          SERVER="${{ github.event.inputs.server }}"
+          if [ -z "$SERVER" ]; then SERVER="$DEFAULT_SERVER"; fi
+          echo "Server baked into the app: $SERVER"
+          flutter build ios --release --no-codesign --dart-define=WATTWISE_SERVER="$SERVER"
+
+      - name: Package Runner.app into an .ipa
+        run: |
+          rm -rf Payload WattWise.ipa
+          mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry WattWise.ipa Payload
+          ls -lh WattWise.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WattWise-ios-unsigned-ipa
+          path: mobile/WattWise.ipa
+          retention-days: 30
