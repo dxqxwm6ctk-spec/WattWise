@@ -17,6 +17,7 @@ import 'screens/home_screen.dart';
 import 'screens/safety_screen.dart';
 import 'screens/schedule_screen.dart';
 import 'screens/scan_screen.dart';
+import 'splash.dart';
 import 'theme.dart';
 
 void main() => runApp(const WattWiseApp());
@@ -63,11 +64,19 @@ class _RootPageState extends State<RootPage> {
   String? connectionError;
   int tab = 0;
   Timer? timer;
-  bool searching = false;
+
+  // The splash stays at least this long, so it never just flickers.
+  bool splashMinDone = false;
+  // Failed tries before the first screen; after a few, we ask where the server is.
+  int failedTries = 0;
+  bool askedAfterFailures = false;
 
   @override
   void initState() {
     super.initState();
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => splashMinDone = true);
+    });
     _loadServer();
   }
 
@@ -91,13 +100,11 @@ class _RootPageState extends State<RootPage> {
     await _searchAndConnect();
   }
 
-  /// Looks for the laptop on the Wi-Fi. If it is not found, asks the user.
+  /// Looks for the laptop on the Wi-Fi (silently, behind the splash). If it is not found, asks the user.
   Future<void> _searchAndConnect() async {
     if (!mounted) return;
-    setState(() => searching = true);
     final url = await findServer();
     if (!mounted) return;
-    setState(() => searching = false);
     if (url == null) {
       _askServer(notFound: true);
       return;
@@ -167,7 +174,11 @@ class _RootPageState extends State<RootPage> {
         ],
       ),
     );
-    if (choice == null || choice.isEmpty) return;
+    if (choice == null || choice.isEmpty) {
+      // Still on the splash with no server: ask again, otherwise there is nothing to tap.
+      if (st == null && api == null) return _askServer(notFound: notFound);
+      return;
+    }
     if (choice == _choiceSearch) return _searchAndConnect();
     if (choice == _choiceScan) return _scanQr();
     await _save(choice);
@@ -179,9 +190,15 @@ class _RootPageState extends State<RootPage> {
     if (a == null) return;
     try {
       final s = await a.getState();
-      if (mounted) setState(() { st = s; connectionError = null; });
+      if (mounted) setState(() { st = s; connectionError = null; failedTries = 0; });
     } catch (e) {
       if (mounted) setState(() => connectionError = 'ما قدرنا نوصل للسيرفر (${a.baseUrl}).');
+      // Still on the splash and the server keeps failing: ask once, quietly retrying meanwhile.
+      failedTries++;
+      if (st == null && failedTries >= 8 && !askedAfterFailures) {
+        askedAfterFailures = true;
+        _askServer();
+      }
     }
   }
 
@@ -205,51 +222,35 @@ class _RootPageState extends State<RootPage> {
   @override
   Widget build(BuildContext context) {
     final s = st, a = api;
-    Widget body;
-    if (a == null) {
-      body = Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          if (searching) const CircularProgressIndicator(),
-          const SizedBox(height: 16),
-          Text(searching ? 'عم ندوّر على اللابتوب على الـ Wi-Fi…' : 'بانتظار عنوان السيرفر…'),
-          if (!searching) ...[
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: _askServer, child: const Text('وين السيرفر؟')),
-          ],
-        ]),
-      );
-    } else if (s == null) {
-      body = Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text(connectionError ?? 'عم نتصل…', textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            if (connectionError != null) OutlinedButton(onPressed: _askServer, child: const Text('غيّر العنوان')),
-          ]),
-        ),
-      );
-    } else {
-      final screens = [
-        HomeScreen(st: s, api: a, run: run, onApprove: a.approve, onReject: a.reject),
-        DevicesScreen(st: s, api: a, run: run),
-        ScheduleScreen(st: s, api: a, run: run),
-        BillScreen(st: s, api: a, run: run),
-        SafetyScreen(st: s, api: a, run: run, onChangeServer: _askServer),
-      ];
-      body = ListView(padding: const EdgeInsets.fromLTRB(20, 14, 20, 16), children: [
-        _Header(siteName: '${s['site_name']}'),
-        if (connectionError != null) ...[
-          const SizedBox(height: 10),
-          WWBox(color: const Color(0xFFFBE3DD), padding: 12, child: Text(connectionError!, style: const TextStyle(color: Color(0xFF7A2A1C)))),
-        ],
-        const SizedBox(height: 14),
-        screens[tab],
-      ]);
-    }
+    // Until the first state arrives, only the splash shows. The search and connection run
+    // silently behind it, and the app fades in as soon as the server answers.
+    final Widget page = (s == null || a == null || !splashMinDone)
+        ? const SplashView(key: ValueKey('splash'))
+        : _app(s, a);
+    return AnimatedSwitcher(duration: const Duration(milliseconds: 450), child: page);
+  }
+
+  Widget _app(Map<String, dynamic> s, WattWiseApi a) {
+    final screens = [
+      HomeScreen(st: s, api: a, run: run, onApprove: a.approve, onReject: a.reject),
+      DevicesScreen(st: s, api: a, run: run),
+      ScheduleScreen(st: s, api: a, run: run),
+      BillScreen(st: s, api: a, run: run),
+      SafetyScreen(st: s, api: a, run: run, onChangeServer: _askServer),
+    ];
+    final body = ListView(padding: const EdgeInsets.fromLTRB(20, 14, 20, 16), children: [
+      _Header(siteName: '${s['site_name']}'),
+      if (connectionError != null) ...[
+        const SizedBox(height: 10),
+        WWBox(color: const Color(0xFFFBE3DD), padding: 12, child: Text(connectionError!, style: const TextStyle(color: Color(0xFF7A2A1C)))),
+      ],
+      const SizedBox(height: 14),
+      screens[tab],
+    ]);
     return Scaffold(
+      key: const ValueKey('app'),
       body: SafeArea(bottom: false, child: body),
-      bottomNavigationBar: st == null ? null : _TabBar(index: tab, onTap: (i) => setState(() => tab = i)),
+      bottomNavigationBar: _TabBar(index: tab, onTap: (i) => setState(() => tab = i)),
     );
   }
 }
@@ -272,7 +273,8 @@ class _Header extends StatelessWidget {
           height: 40,
           decoration: BoxDecoration(color: WW.ink, borderRadius: BorderRadius.circular(12)),
           alignment: Alignment.center,
-          child: Text('W/', style: WW.mono.copyWith(color: WW.lime, fontWeight: FontWeight.w700, fontSize: 14)),
+          // Same mark as the app icon.
+          child: CustomPaint(size: const Size(38, 38), painter: WattWiseMarkPainter()),
         ),
       ]);
 }
