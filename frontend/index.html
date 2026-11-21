@@ -23,7 +23,7 @@
     </div>
     <div class="top-links">
       <a class="tb house-link" href="house.html" id="house-link">🏠 البيت التفاعلي</a>
-      <button class="tb ghost" type="button" id="phone-open" aria-haspopup="dialog">📱 معاينة الموبايل</button>
+      <button class="tb ghost" type="button" id="phone-open" aria-haspopup="dialog">📱 معاينة الهاتف</button>
     </div>
     <div class="toolbar" id="toolbar"></div>
   </header>
@@ -50,10 +50,10 @@
             <canvas id="chart" data-keep></canvas>
             <div class="legend">
               <span><i class="sw sw-line"></i>الفعلي</span>
-              <span><i class="sw sw-dash"></i>خط الأساس (بدون الوكيل)</span>
+              <span><i class="sw sw-dash"></i>خط الأساس (دون الوكيل)</span>
             </div>
           </div>
-          <div class="note">كل حمل بيتعرّف من بصمته على العدّاد الرئيسي (NILM-lite). خط الأساس = الاستهلاك الفعلي + الأحمال اللي الوكيل طفاها وتأكّد منها العدّاد.</div>
+          <div class="note">يُعرف كل حمل من بصمته على العدّاد الرئيسي (NILM-lite). خط الأساس = الاستهلاك الفعلي + الأحمال التي أطفأها الوكيل وأكّدها العدّاد.</div>
         </section>
 
         <section class="card rise grow1" style="animation-delay:.40s" id="bill"></section>
@@ -69,8 +69,8 @@
 <!-- Phone preview: hidden until needed (backup if the real phone fails in the demo). -->
 <div class="drawer" id="phone-drawer" hidden>
   <div class="drawer-back" data-close></div>
-  <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="معاينة تطبيق الموبايل">
-    <button class="drawer-x" type="button" data-close aria-label="سكّر">✕</button>
+  <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="معاينة تطبيق الهاتف">
+    <button class="drawer-x" type="button" data-close aria-label="إغلاق">✕</button>
     <div class="phone">
       <div class="phone-screen">
         <div class="phone-status" dir="ltr">
@@ -81,12 +81,12 @@
         <iframe id="phone-frame" title="تطبيق صاحب البيت"></iframe>
       </div>
     </div>
-    <div class="aside-note">معاينة تطبيق صاحب البيت (نسخة الويب الاحتياطية). التطبيق الأساسي بـ Flutter بنفس الشاشات.</div>
+    <div class="aside-note">معاينة تطبيق صاحب البيت (نسخة الويب الاحتياطية). التطبيق الأساسي مبني بـ Flutter بالشاشات نفسها.</div>
     <div class="connect-card">
-      <div class="connect-title">وصّل تطبيق التلفون</div>
-      <img class="connect-qr" src="api/connect/qr.svg" alt="QR فيه عنوان السيرفر" loading="lazy">
+      <div class="connect-title">ربط تطبيق الهاتف</div>
+      <img class="connect-qr" src="api/connect/qr.svg" alt="رمز QR يحمل عنوان الخادم" loading="lazy">
       <div class="mono connect-url" dir="ltr" id="connect-url"></div>
-      <div class="aside-note">التطبيق بيلاقي اللابتوب لحاله على نفس الـ Wi-Fi. إذا ما لقاه، امسح هاد الـ QR من التطبيق.</div>
+      <div class="aside-note">يجد التطبيق اللابتوب تلقائيًا على شبكة الـ Wi-Fi نفسها. إن لم يجده، امسح رمز الـ QR هذا من التطبيق.</div>
     </div>
   </div>
 </div>

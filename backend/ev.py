@@ -139,15 +139,15 @@ def track(conn, site: str, now: float) -> None:
             mins = minutes_to_target(site, soc, step)
             need = needed_kwh(site, soc)
             price = _price(conn, site)
-            parts = [f"العدّاد شاف درجة +{step / 1000:.1f} kW بتطابق بصمة الشاحن ({sig / 1000:.1f} kW)."]
+            parts = [f"رصد العدّاد درجة +{step / 1000:.1f} kW تطابق بصمة الشاحن ({sig / 1000:.1f} kW)."]
             if soc is not None:
                 parts.append(f"البطارية {soc:.0f}٪.")
             if mins is not None and need is not None:
-                parts.append(f"لحد {ev_config(site).get('target_soc', 80)}٪ بدها تقريبًا {_fmt_h(mins)} "
+                parts.append(f"للوصول إلى {ev_config(site).get('target_soc', 80)}٪ تحتاج نحو {_fmt_h(mins)} "
                              f"و {need:.1f} kWh ≈ {need * price:.2f} دينار.")
             left = _kwh_left_in_tier(conn, site)
             if need is not None and left is not None and need > left:
-                parts.append(f"انتبه: باقي {left:.0f} kWh بس على الشريحة الحالية، والشحن رح يدخلك الشريحة الأغلى.")
+                parts.append(f"تنبيه: بقي {left:.0f} kWh فقط على الشريحة الحالية، وسيُدخلك الشحن إلى الشريحة الأغلى.")
             _notify(conn, site, f"ev_start:{int(ts)}", "🔌 بدأ شحن السيارة.", " ".join(parts), d["id"])
         return
 
@@ -164,14 +164,14 @@ def track(conn, site: str, now: float) -> None:
         price = _price(conn, site)
         minutes = (ts - sess["start_ts"]) / 60
         if not d["is_on"] and d["agent_off"]:
-            why = "وقّفنا الشحن مؤقتًا بموافقتك، وبيكمّل لحاله بالليل"
+            why = "أوقفنا الشحن مؤقتًا بموافقتك، وسيُستأنف تلقائيًا ليلًا"
         else:
-            why = "انطفى الشاحن" if not d["is_on"] else "البطارية تعبّت والسحب نزل لصفر تقريبًا"
-        body = (f"{why}. سحبت {sess['kwh']:.1f} kWh (مقاسة بالعدّاد) ≈ {sess['kwh'] * price:.2f} دينار "
+            why = "انطفأ الشاحن" if not d["is_on"] else "امتلأت البطارية وانخفض السحب إلى الصفر تقريبًا"
+        body = (f"{why}. استهلكت {sess['kwh']:.1f} kWh (مقاسة بالعدّاد) ≈ {sess['kwh'] * price:.2f} دينار "
                 f"خلال {_fmt_h(minutes)}.")
         if soc is not None:
             body += f" البطارية الآن {soc:.0f}٪."
-        title = "⏸ وقّفنا شحن السيارة مؤقتًا." if not d["is_on"] and d["agent_off"] else "✅ خلص شحن السيارة."
+        title = "⏸ أوقفنا شحن السيارة مؤقتًا." if not d["is_on"] and d["agent_off"] else "✅ اكتمل شحن السيارة."
         _notify(conn, site, f"ev_end:{int(ts)}", title, body, d["id"])
         db.set_state(conn, f"ev_last:{site}", {**sess, "end_ts": ts, "end_soc": soc,
                                                "jod": round(sess["kwh"] * price, 3)})
@@ -232,25 +232,25 @@ def maybe_propose(conn, site: str, now: float) -> bool:
     cfg = ev_config(site)
     night_price = cfg.get("night_price_jod_per_kwh")
     need = needed_kwh(site, car.get("soc_pct")) or 0
-    money = (f"وبتوفّر ≈ {need * (_price(conn, site) - night_price):.2f} دينار حسب تعرفة الليل."
+    money = (f"وتوفّر ≈ {need * (_price(conn, site) - night_price):.2f} دينار حسب تعرفة الليل."
              if night_price is not None else
-             "التعرفة عنا بالشرائح ومش بالساعة، فالكلفة نفسها، بس بنخفّف ذروة المسا وبنبعد عن فصل القاطع.")
-    title = f"نأجّل شحن السيارة لـ {plan['resume_at']}؟"
+             "التعرفة لدينا بالشرائح لا بالساعة، فالكلفة نفسها، لكننا نخفّف ذروة المساء ونتجنّب فصل القاطع.")
+    title = f"تأجيل شحن السيارة إلى {plan['resume_at']}؟"
     near = "فوق" if house_w >= limit_w else "قريب من"
-    reason = (f"البيت عم يسحب {house_w / 1000:.1f} kW هلأ، {near} حد القاطع الرئيسي ({limit_w / 1000:.1f} kW)، والسيارة لحالها {d['signature_w'] / 1000:.1f} kW. "
-              + (f"البطارية وصلت الهدف ({cfg.get('target_soc', 80)}٪) أصلًا، فمنقدر نوقّف هلأ ونكمّل الساعة {plan['resume_at']} بدون أي مشكلة. "
+    reason = (f"يستهلك البيت الآن {house_w / 1000:.1f} kW، {near} حد القاطع الرئيسي ({limit_w / 1000:.1f} kW)، والسيارة وحدها {d['signature_w'] / 1000:.1f} kW. "
+              + (f"البطارية بلغت الهدف ({cfg.get('target_soc', 80)}٪) أصلًا، فيمكننا الإيقاف الآن والاستئناف الساعة {plan['resume_at']} دون أي مشكلة. "
                  if plan["need_min"] <= 0 else
-                 f"إذا وقّفنا الشحن وكمّلنا الساعة {plan['resume_at']}، بتحتاج {_fmt_h(plan['need_min'])} "
-                 f"وبتكون جاهزة {cfg.get('target_soc', 80)}٪ قبل الساعة {plan['ready_by']}. ")
+                 f"إذا أوقفنا الشحن واستأنفناه الساعة {plan['resume_at']}، فستحتاج {_fmt_h(plan['need_min'])} "
+                 f"وتكون جاهزة بنسبة {cfg.get('target_soc', 80)}٪ قبل الساعة {plan['ready_by']}. ")
               + money)
     details = {"ev": True, "device": d["name"], "signature_w": round(d["signature_w"]),
                "resume_in_min": plan["resume_in_min"], "resume_at": plan["resume_at"],
                "ready_by": plan["ready_by"], "need_min": plan["need_min"],
                "house_w": round(house_w), "explained_by": "rules",
-               "alternative": "نخلّيها تشحن هلأ، وبنطفي أجهزة ثانية إذا قرّبنا من الحد."}
+               "alternative": "نتركها تشحن الآن، ونُطفئ أجهزة أخرى إذا اقتربنا من الحد."}
     actions.request_approval(conn, site, d, False, title, reason, details)
     db.audit(conn, site, "T1", "agent", "proposal",
-             f"اقتراح شحن ذكي: نوقّف الشاحن هلأ ونكمّل {plan['resume_at']}. بانتظار الموافقة.", details)
+             f"اقتراح شحن ذكي: إيقاف الشاحن الآن والاستئناف {plan['resume_at']}. بانتظار الموافقة.", details)
     return True
 
 
@@ -263,7 +263,7 @@ def after_approval(conn, site: str, approval: dict, details: dict) -> None:
         schedules.add_timer(conn, site, approval["device_id"], int(details["resume_in_min"]), True)
         db.set_state(conn, f"ev_resume:{site}", details.get("resume_at"))
     except actions.ActionError as exc:
-        db.audit(conn, site, "T0", "policy", "blocked", f"ما قدرنا نحط مؤقّت رجوع الشحن: {exc}")
+        db.audit(conn, site, "T0", "policy", "blocked", f"تعذّر ضبط مؤقّت استئناف الشحن: {exc}")
 
 
 # ---------------- what the pages show ----------------

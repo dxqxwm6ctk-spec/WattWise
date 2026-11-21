@@ -10,7 +10,7 @@ raises short Arabic warnings for the phone app and the dashboard:
   left_on                   a device has been on for too long (water heater, washer...)
   unknown_device / anomaly  reused from anomaly detection (backend/anomaly.py)
 
-A warning may carry an action ("طفّيه؟"). Pressing it does NOT switch anything:
+A warning may carry an action ("أطفئه؟"). Pressing it does NOT switch anything:
 it only creates a normal approval request, which then goes through the Policy
 Guard and the human's Approve / Reject like every other agent action.
 
@@ -121,13 +121,13 @@ def _current(conn, site, meter, found):
     if not limit or amps is None or amps < limit * CURRENT_WARN_FRAC:
         return []
     big = _biggest_switchable(conn, site)
-    hint = f" أكبر جهاز شغّال: {big['name']} (≈ {round(big['signature_w'])} واط)." if big else ""
+    hint = f" أكبر جهاز يعمل: {big['name']} (≈ {round(big['signature_w'])} واط)." if big else ""
     if amps >= limit * CURRENT_DANGER_FRAC:
-        return [{"key": "current", "kind": "overload", "level": DANGER, "title": "⚡ خطر: حمل زايد!",
-                 "body": f"التيار {amps:.1f} أمبير والحد {limit:g}. طفّي جهاز كبير هلأ.{hint}",
+        return [{"key": "current", "kind": "overload", "level": DANGER, "title": "⚡ خطر: حمل زائد!",
+                 "body": f"التيار {amps:.1f} أمبير والحد {limit:g}. أطفئ جهازًا كبيرًا الآن.{hint}",
                  "device_id": big and big["id"]}]
-    return [{"key": "current", "kind": "current_high", "level": DANGER, "title": "⚡ التيار قرّب من الحد",
-             "body": f"التيار {amps:.1f} أمبير من أصل {limit:g}. لا تشغّل جهاز كبير هلأ.{hint}",
+    return [{"key": "current", "kind": "current_high", "level": DANGER, "title": "⚡ التيار يقترب من الحد",
+             "body": f"التيار {amps:.1f} أمبير من أصل {limit:g}. لا تشغّل جهازًا كبيرًا الآن.{hint}",
              "device_id": big and big["id"]}]
 
 
@@ -143,9 +143,9 @@ def _high_power(conn, site, meter, found):
     if len(rows) < HIGH_POWER_READINGS or any(r["power_w"] < limit for r in rows):
         return []
     big = _biggest_switchable(conn, site)
-    hint = f" أكبر جهاز شغّال: {big['name']}." if big else ""
-    return [{"key": "high_power", "kind": "high_power", "level": WARN, "title": "استهلاك عالي هلأ",
-             "body": f"البيت عم يسحب ≈ {round(meter['power_w'])} واط.{hint}",
+    hint = f" أكبر جهاز يعمل: {big['name']}." if big else ""
+    return [{"key": "high_power", "kind": "high_power", "level": WARN, "title": "استهلاك مرتفع الآن",
+             "body": f"يستهلك البيت الآن ≈ {round(meter['power_w'])} واط.{hint}",
              "device_id": big and big["id"]}]
 
 
@@ -181,12 +181,12 @@ def _tier(conn, site, meter, found):
         if per_day > 0:
             days = left / per_day
             if days < 1:
-                when = " على هالمعدّل بتدخلها اليوم."
+                when = " بهذا المعدّل ستدخلها اليوم."
             else:
                 day = t.tm_mday + int(days)
                 month_days = calendar.monthrange(t.tm_year, t.tm_mon)[1]
-                when = (f" على هالمعدّل بتدخلها بعد ≈ {days:.0f} يوم (يوم {day} بالشهر)."
-                        if day <= month_days else " على هالمعدّل يمكن تخلص الشهر قبل ما توصلها.")
+                when = (f" بهذا المعدّل ستدخلها بعد ≈ {days:.0f} يوم (يوم {day} من الشهر)."
+                        if day <= month_days else " بهذا المعدّل قد ينتهي الشهر قبل أن تصلها.")
 
         # What to cut: the switchable device that used the most energy this month.
         top = None
@@ -194,15 +194,15 @@ def _tier(conn, site, meter, found):
             if d["allow"] and not d["sensitive"] and not policy.is_critical(d) and d["energy_wh"] > 0:
                 if top is None or d["energy_wh"] > top["energy_wh"]:
                     top = d
-        cut = f" أكثر جهاز صارف: {top['name']}، خفّف منه." if top else ""
+        cut = f" أكثر الأجهزة استهلاكًا: {top['name']}، فخفّف استخدامه." if top else ""
 
-        title = ("آخر تنبيه: الشريحة الأغلى على الباب" if last_call
-                 else f"وصلت {frac * 100:.0f}% من الشريحة الأولى" if i == 0
-                 else f"وصلت {frac * 100:.0f}% من الشريحة")
+        title = ("تنبيه أخير: الشريحة الأغلى قريبة جدًا" if last_call
+                 else f"بلغت {frac * 100:.0f}% من الشريحة الأولى" if i == 0
+                 else f"بلغت {frac * 100:.0f}% من الشريحة")
         ratio = nxt / now_fils
-        dearer = ("يعني كل ك.و.س بعدها بالضعف" if abs(ratio - 2) < 0.05
-                  else f"يعني كل ك.و.س بعدها أغلى بـ{(ratio - 1) * 100:.0f}%")
-        body = f"باقي {left:.0f} ك.و.س وبتدخل شريحة {nxt} فلس بدل {now_fils}، {dearer}.{when}{cut}"
+        dearer = ("أي أن كل ك.و.س بعدها بضعف السعر" if abs(ratio - 2) < 0.05
+                  else f"أي أن كل ك.و.س بعدها أغلى بـ{(ratio - 1) * 100:.0f}%")
+        body = f"بقي {left:.0f} ك.و.س على دخول شريحة {nxt} فلس بدل {now_fils}، {dearer}.{when}{cut}"
         step = "last" if last_call else "early"
         return [{"key": f"tier:{cap:g}:{step}", "kind": "tier_near", "level": DANGER if last_call else WARN,
                  "title": title, "body": body, "device_id": top and top["id"]}]
@@ -215,10 +215,10 @@ def _anomaly(conn, site, meter, found):
         return []
     key = f"anomaly:{round(st.get('since') or 0)}"
     if st.get("kind") == "extra":
-        return [{"key": key, "kind": "unknown_device", "level": WARN, "title": "جهاز مش معروف اشتغل؟",
-                 "body": f"العدّاد بيقرأ ≈ {st.get('residual_w')} واط زيادة عن الأجهزة اللي بنعرفها."}]
+        return [{"key": key, "kind": "unknown_device", "level": WARN, "title": "هل بدأ جهاز غير معروف بالعمل؟",
+                 "body": f"يقرأ العدّاد ≈ {st.get('residual_w')} واط زيادة عن الأجهزة المعروفة."}]
     return [{"key": key, "kind": "anomaly", "level": WARN, "title": "استهلاك أقل من المتوقع",
-             "body": f"ناقص ≈ {-(st.get('residual_w') or 0)} واط. ممكن جهاز فاصل أو معطّل."}]
+             "body": f"أقل بنحو {-(st.get('residual_w') or 0)} واط. ربما يوجد جهاز مفصول أو معطّل."}]
 
 
 def _left_on(conn, site, meter, found):
@@ -234,8 +234,8 @@ def _left_on(conn, site, meter, found):
         hours = (t - new_since[d["id"]]) / 3600
         if limit_h and hours >= limit_h:
             out.append({"key": f"left_on:{d['id']}", "kind": "left_on", "level": WARN,
-                        "title": f"{d['name']} شغّال من زمان",
-                        "body": f"صارله شغّال {hours:.1f} ساعة. نسيته؟",
+                        "title": f"{d['name']} يعمل منذ مدة طويلة",
+                        "body": f"يعمل منذ {hours:.1f} ساعة. هل نسيته؟",
                         "device_id": d["id"]})
     db.set_state(conn, f"on_since:{site}", new_since)
     return out
@@ -247,7 +247,7 @@ OWN_KEYS = {"current", "high_power", "tier", "anomaly", "left_on"}
 # ---------------- for the UI ----------------
 
 def _can_act(conn, site: str, a: dict) -> bool:
-    """Show the "طفّيه؟" button only if the agent would be allowed to propose it."""
+    """Show the "أطفئه؟" button only if the agent would be allowed to propose it."""
     if not a["device_id"] or not a["active"] or a["user_state"]:
         return False
     d = db.device(conn, site, a["device_id"])
@@ -277,7 +277,7 @@ def listing(conn, site: str, limit: int = 8) -> dict:
 def _get(conn, site: str, alert_id: int) -> dict:
     a = db.one(conn.execute("SELECT * FROM alerts WHERE id=? AND site=?", (alert_id, site)))
     if not a:
-        raise actions.ActionError("التنبيه مش موجود.")
+        raise actions.ActionError("التنبيه غير موجود.")
     return a
 
 
@@ -288,23 +288,23 @@ def dismiss(conn, site: str, alert_id: int) -> dict:
 
 
 def act(conn, site: str, alert_id: int) -> dict:
-    """"طفّيه؟" was pressed: create an approval request. Nothing is switched here."""
+    """"أطفئه؟" was pressed: create an approval request. Nothing is switched here."""
     a = _get(conn, site, alert_id)
     if not a["device_id"]:
-        raise actions.ActionError("هذا التنبيه ما إله جهاز نطفيه.")
+        raise actions.ActionError("لا يرتبط هذا التنبيه بجهاز يمكن إطفاؤه.")
     if actions.flag(conn, "estop", site):
-        raise actions.ActionError("الوكيل موقوف (طوارئ).")
+        raise actions.ActionError("الوكيل متوقف (طوارئ).")
     if actions.pending_approval(conn, site):
-        raise actions.ActionError("في طلب موافقة ثاني مستني ردّك. ردّ عليه أول.")
+        raise actions.ActionError("هناك طلب موافقة آخر بانتظار ردّك. ردّ عليه أولًا.")
     d = actions.require_device(conn, site, a["device_id"])
     if not d["is_on"]:
-        raise actions.ActionError(f"{d['name']} مطفي أصلاً.")
+        raise actions.ActionError(f"{d['name']} مطفأ بالفعل.")
     room = db.latest_room(conn, site, d["room"])
     decision = policy.check_switch(d, False, policy.AGENT, room,
                                    safe_mode=actions.flag(conn, "safe_mode", site))
     if not decision.allowed:
         db.audit(conn, site, "T0", "policy", "proposal_blocked",
-                 f"ما رح نقترح إطفاء {d['name']} من التنبيه: {decision.reason_ar}")
+                 f"لن نقترح إطفاء {d['name']} من التنبيه: {decision.reason_ar}")
         raise actions.ActionError(decision.reason_ar)
     price = billing.marginal_price((db.latest_meter(conn, site) or {}).get("energy_kwh") or 0.0,
                                    config.load_tariff(),
@@ -313,8 +313,8 @@ def act(conn, site: str, alert_id: int) -> dict:
                "signature_measured": bool(d["signature_measured"]),
                "saving_jod_per_hour": round(d["signature_w"] / 1000 * price, 3),
                "price_jod_per_kwh": price, "from_alert": a["id"], "explained_by": "rules",
-               "alternative": "بنخلّيه شغّال، والتنبيه بيضل ظاهر."}
-    approval_id = actions.request_approval(conn, site, d, False, f"نطفي {d['name']}؟",
+               "alternative": "نتركه يعمل، ويبقى التنبيه ظاهرًا."}
+    approval_id = actions.request_approval(conn, site, d, False, f"إطفاء {d['name']}؟",
                                            f"{a['title']}: {a['body']}", details)
     conn.execute("UPDATE alerts SET user_state='acted' WHERE id=?", (a["id"],))
     db.audit(conn, site, "T1", "human", "proposal",

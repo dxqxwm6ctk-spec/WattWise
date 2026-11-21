@@ -59,13 +59,13 @@ def pending_approval(conn, site: str) -> dict | None:
 
 def require_site(site: str) -> None:
     if site not in config.load_sites():
-        raise ActionError("هذا الموقع مش معروف.")
+        raise ActionError("هذا الموقع غير معروف.")
 
 
 def require_device(conn, site: str, device_id: str) -> dict:
     d = db.device(conn, site, device_id)
     if not d:
-        raise ActionError("هذا الجهاز مش موجود.")
+        raise ActionError("هذا الجهاز غير موجود.")
     return d
 
 
@@ -206,16 +206,16 @@ def set_goal(conn, site: str, text: str, bill_target_jd: float | None) -> dict:
     steps = goal_reader.plan_steps(intent)
     summary = goal_reader.summary(intent)
     if percent and bill_target_jd:
-        summary = (f"فهمت إنك بدك توفّر {percent:g}٪: الفاتورة المتوقعة هالشهر بتصير هدفها "
+        summary = (f"فهمت أنك تريد توفير {percent:g}٪: هدف فاتورة هذا الشهر "
                    f"{bill_target_jd:g} دينار بدل {projected_bill(conn, site):.1f}. "
-                   "هذا هدف، والتوفير الحقيقي بنحسبه بس من العدّاد.")
+                   "هذا هدف، أما التوفير الفعلي فنحسبه من العدّاد فقط.")
     db.set_state(conn, f"plan:{site}", {
         "goal_id": goal["id"], "by": "rules", "steps": steps, "summary": summary,
         "intent": intent,
         "focus": {"rooms": [r["id"] for r in intent["rooms"]], "kinds": intent["kinds"]},
     })
     db.audit(conn, site, "T0", "agent", "goal_received",
-             f"استلمت الهدف وقسّمته لـ{len(steps)} خطوات: " + " · ".join(steps),
+             f"استلمت الهدف وقسّمته إلى {len(steps)} خطوات: " + " · ".join(steps),
              {"goal": text, "steps": steps, "intent": intent})
     if get_phase(conn, site) not in ("stopped",):
         set_phase(conn, site, "normal")
@@ -229,7 +229,7 @@ def human_toggle(conn, site: str, device_id: str, turn_on: bool, confirmed: bool
     decision = policy.check_switch(d, turn_on, policy.HUMAN, None, plug=db.plug(conn, site, device_id))
     if not decision.allowed:
         db.audit(conn, site, "T2", "policy", "blocked",
-                 f"محاولة تحكم بـ{d['name']} ← مرفوضة بالكود. {decision.reason_ar}")
+                 f"محاولة تحكم بـ{d['name']} : مرفوضة برمجيًا. {decision.reason_ar}")
         raise ActionError(decision.reason_ar)
 
     if d["sensitive"] and not turn_on and not confirmed:
@@ -241,17 +241,17 @@ def human_toggle(conn, site: str, device_id: str, turn_on: bool, confirmed: bool
             db.set_state(conn, f"safe_mode:{site}", True)
             _close_pending(conn, site, EXPIRED)
             db.audit(conn, site, "MANUAL", "human", "manual_switch",
-                     f"إطفاء {d['name']} من المستخدم. الوكيل دخل الوضع الآمن: بدون موافقة ما في إجراء، والأجهزة بتضل متل ما هي.")
+                     f"أطفأ المستخدم {d['name']}. دخل الوكيل الوضع الآمن: لا إجراء دون موافقة، وتبقى الأجهزة كما هي.")
             set_phase(conn, site, "offline")
         else:
             db.set_state(conn, f"safe_mode:{site}", False)
             db.audit(conn, site, "MANUAL", "human", "manual_switch",
-                     f"تشغيل {d['name']} من المستخدم. رجع الاتصال وتطبيق الموافقة.")
+                     f"شغّل المستخدم {d['name']}. عاد الاتصال وتطبيق الموافقة.")
             if get_phase(conn, site) == "offline":
                 set_phase(conn, site, "normal")
     else:
         db.audit(conn, site, "MANUAL", "human", "manual_switch",
-                 f"{'تشغيل' if turn_on else 'إطفاء'} {d['name']} من المستخدم.")
+                 f"{'تشغيل' if turn_on else 'إطفاء'} {d['name']} يدويًا.")
     return db.device(conn, site, device_id)
 
 
@@ -283,12 +283,12 @@ def request_approval(conn, site: str, device: dict, turn_on: bool, title: str, r
 def _get_pending(conn, site: str, approval_id: int) -> dict:
     a = db.one(conn.execute("SELECT * FROM approvals WHERE id=? AND site=?", (approval_id, site)))
     if not a:
-        raise ActionError("طلب الموافقة مش موجود.")
+        raise ActionError("طلب الموافقة غير موجود.")
     if a["status"] != PENDING:
         raise ActionError("هذا الطلب انتهى.")
     if policy.approval_expired(a["created_ts"], time.time()):
         expire_approval(conn, a)
-        raise ActionError("انتهت المهلة، فما عملنا إشي.")
+        raise ActionError("انتهت المهلة، فلم نفعل شيئًا.")
     return a
 
 
@@ -304,7 +304,7 @@ def approve(conn, site: str, approval_id: int) -> dict:
     if not decision.allowed:
         conn.execute("UPDATE approvals SET status=?, decided_ts=? WHERE id=?", (BLOCKED, now, a["id"]))
         db.audit(conn, site, "T2", "policy", "blocked",
-                 f"وافقتي، بس حارس السياسات رفض التنفيذ: {decision.reason_ar}")
+                 f"تمت الموافقة، لكن حارس السياسات رفض التنفيذ: {decision.reason_ar}")
         set_phase(conn, site, "rejected")
         raise ActionError(decision.reason_ar)
 
@@ -337,14 +337,14 @@ def reject(conn, site: str, approval_id: int) -> dict:
     d = db.device(conn, site, a["device_id"])
     conn.execute("UPDATE approvals SET status=?, decided_ts=? WHERE id=?", (REJECTED, time.time(), a["id"]))
     db.audit(conn, site, "T1", "human", "rejected",
-             f"رفضتي ← لا إجراء. {d['name'] if d else 'الجهاز'} بقي متل ما هو.")
+             f"رُفض الطلب، فلا إجراء. بقي {d['name'] if d else 'الجهاز'} كما هو.")
     set_phase(conn, site, "rejected")
     return db.one(conn.execute("SELECT * FROM approvals WHERE id=?", (a["id"],)))
 
 
 def expire_approval(conn, a: dict) -> None:
     conn.execute("UPDATE approvals SET status=?, decided_ts=? WHERE id=?", (EXPIRED, time.time(), a["id"]))
-    db.audit(conn, a["site"], "T1", "policy", "expired", "انتهت المهلة بدون رد ← لا إجراء. السكوت مش موافقة.")
+    db.audit(conn, a["site"], "T1", "policy", "expired", "انتهت المهلة دون رد، فلا إجراء. عدم الرد لا يعني الموافقة.")
     set_phase(conn, a["site"], "expired")
 
 
@@ -402,19 +402,19 @@ def reset_demo(conn, site: str) -> None:
 def set_scenario(conn, site: str, name: str) -> None:
     """Simulator only: create a waste situation to demo the agent."""
     if config.load_sites()[site]["source"] != "simulator":
-        raise ActionError("السيناريوهات للمحاكي بس.")
+        raise ActionError("السيناريوهات متاحة للمحاكي فقط.")
     if flag(conn, "estop", site):
-        raise ActionError("الوكيل موقوف (طوارئ). اعمل إعادة ضبط أول.")
+        raise ActionError("الوكيل متوقف (طوارئ). أعد الضبط أولًا.")
     if name not in SCENARIOS:
-        raise ActionError("سيناريو مش معروف.")
+        raise ActionError("سيناريو غير معروف.")
     db.set_state(conn, f"scenario:{site}", name)
     demo = config.load_sites()[site].get("demo_waste")
     if name == "ev_arrives":
         evd = next((d for d in db.devices(conn, site) if d["kind"] == "ev"), None)
         if not evd:
-            raise ActionError("ما في شاحن سيارة بهالموقع.")
+            raise ActionError("لا يوجد شاحن سيارة في هذا الموقع.")
         db.set_device(conn, site, evd["id"], is_on=1, agent_off=AGENT_OFF_NONE)
-        db.audit(conn, site, "MANUAL", "human", "manual_switch", f"شبكنا السيارة على {evd['name']} (محاكاة).")
+        db.audit(conn, site, "MANUAL", "human", "manual_switch", f"وُصلت السيارة بـ{evd['name']} (محاكاة).")
     if name == "bedroom_empty_window" and demo:
         db.set_device(conn, site, demo["device"], is_on=1, agent_off=AGENT_OFF_NONE)
     if name == "overload":   # the big loads come on together (current near the limit)
@@ -425,20 +425,20 @@ def set_scenario(conn, site: str, name: str) -> None:
     text = SCENARIOS[name]
     if name == "bedroom_empty_window" and demo:
         room = db.one(conn.execute("SELECT name FROM rooms WHERE site=? AND id=?", (site, demo["room"])))
-        text = f"{room['name']}: الإشغال فاضي، وحسّاس الشباك (محاكى) مفتوح. المكيّف شغّال."
+        text = f"{room['name']}: الغرفة فارغة، وحسّاس الشباك (محاكى) مفتوح، والمكيّف يعمل."
     db.audit(conn, site, "T0", "system", "scenario", "محاكاة: " + text)
 
 
 SCENARIOS = {
-    "normal": "رجع البيت طبيعي.",
-    "bedroom_empty_window": "غرفة النوم الإشغال فاضي، وحسّاس الشباك (محاكى) مفتوح. المكيّف شغّال.",
+    "normal": "عاد البيت إلى وضعه الطبيعي.",
+    "bedroom_empty_window": "غرفة النوم فارغة، وحسّاس الشباك (محاكى) مفتوح، والمكيّف يعمل.",
     "heat_wave": "موجة حر: حرارة الغرف أعلى بـ5 درجات.",
-    "holiday": "عطلة: البيت كله فاضي والأجهزة ضلّت شغّالة.",
-    "sensor_fault": "عطل حسّاسات: المحاكي بيوقف يبعت قراءات شوي.",
-    "unknown_load": "حمل غريب: جهاز مش مسجّل (≈ 700 واط) انشغل بالبيت.",
-    "ev_arrives": "السيارة الكهربائية وصلت والبطارية ٣٠٪، وصاحب البيت شبكها عالشاحن.",
-    "overload": "حمل زايد: السخّان والغسالة اشتغلوا مع المكيّفات، التيار قرّب من حد القاطع (محاكى).",
-    "stranger_device": "جهاز غريب ≈ 60 واط انشبك بالمطبخ، ما إله بصمة محفوظة.",
+    "holiday": "عطلة: البيت كله فارغ والأجهزة ما زالت تعمل.",
+    "sensor_fault": "عطل في الحسّاسات: يتوقف المحاكي عن إرسال القراءات لفترة قصيرة.",
+    "unknown_load": "حمل غريب: جهاز غير مسجّل (≈ 700 واط) بدأ العمل في البيت.",
+    "ev_arrives": "وصلت السيارة الكهربائية ببطارية ٣٠٪، ووصلها صاحب البيت بالشاحن.",
+    "overload": "حمل زائد: السخّان والغسالة يعملان مع المكيّفات، والتيار يقترب من حد القاطع (محاكى).",
+    "stranger_device": "جهاز غريب ≈ 60 واط وُصل في المطبخ، وليست له بصمة محفوظة.",
 }
 
 
@@ -482,9 +482,9 @@ def finish_learning_if_ready(conn, site: str) -> None:
 def add_device(conn, site: str, room: str, name: str, kind: str, allow: bool) -> dict:
     s = db.get_state(conn, f"learn:{site}")
     if not s or s["status"] != "done" or s["kind"] != kind:
-        raise ActionError("لازم نقيس بصمة الجهاز أول.")
+        raise ActionError("يجب قياس بصمة الجهاز أولًا.")
     if not db.one(conn.execute("SELECT 1 AS x FROM rooms WHERE site=? AND id=?", (site, room))):
-        raise ActionError("الغرفة مش معروفة.")
+        raise ActionError("الغرفة غير معروفة.")
     tier = KIND_TIERS.get(kind, "T1")
     sensitive = kind == "router"
     allow = bool(allow) and tier == "T1" and not sensitive

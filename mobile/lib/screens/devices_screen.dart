@@ -11,14 +11,14 @@ import 'add_plug_wizard.dart';
 const deviceTypes = [
   (k: 'ac', label: 'مكيّف', locked: false),
   (k: 'light', label: 'إنارة', locked: false),
-  (k: 'heater', label: 'دفاية / سخّان', locked: false),
+  (k: 'heater', label: 'مدفأة / سخّان', locked: false),
   (k: 'tv', label: 'تلفزيون / شاشة', locked: false),
-  (k: 'washer', label: 'غسالة / جلاية', locked: false),
+  (k: 'washer', label: 'غسالة ملابس / صحون', locked: false),
   (k: 'pc', label: 'كمبيوتر', locked: false),
   (k: 'router', label: 'راوتر / إنترنت', locked: false),
   (k: 'fridge', label: 'ثلاجة / فريزر', locked: true),
   (k: 'medical', label: 'جهاز طبي', locked: true),
-  (k: 'other', label: 'إشي ثاني', locked: false),
+  (k: 'other', label: 'جهاز آخر', locked: false),
 ];
 
 class DevicesScreen extends StatefulWidget {
@@ -72,7 +72,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
         child: FilledButton(
           onPressed: () => setState(() => plugOpen = true),
           style: FilledButton.styleFrom(backgroundColor: WW.ink, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
-          child: const Text('🔌 + ضيفي مقبس ذكي (Wi-Fi)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          child: const Text('🔌 + إضافة مقبس ذكي (Wi-Fi)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         ),
       ),
       const SizedBox(height: 8),
@@ -85,7 +85,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
             side: const BorderSide(color: Color(0xFFB9B6AA), width: 1.5),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           ),
-          child: const Text('+ ضيفي جهاز بالعدّاد الرئيسي', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          child: const Text('+ إضافة جهاز عبر العدّاد الرئيسي', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         ),
       ),
       if (st['agent']['safe_mode'] == true) ...[
@@ -93,7 +93,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
         const WWBox(
           color: WW.pendingBg,
           border: WW.pendingBorder,
-          child: Text('الراوتر مطفي، بالحقيقة التطبيق رح ينقطع هون. WattWise بوضع آمن وما رح ينفّذ إشي.',
+          child: Text('الراوتر مطفأ، وفي الواقع سينقطع التطبيق هنا. WattWise في الوضع الآمن ولن ينفّذ شيئًا.',
               style: TextStyle(fontSize: 13.5, height: 1.6, color: Color(0xFF6B4A00))),
         ),
       ],
@@ -103,7 +103,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       Row(children: [
         _filterChip('الكل', !onlyRunning, () => setState(() => onlyRunning = false)),
         const SizedBox(width: 8),
-        _filterChip('الشغّالة بس', onlyRunning, () => setState(() => onlyRunning = true)),
+        _filterChip('العاملة فقط', onlyRunning, () => setState(() => onlyRunning = true)),
       ]),
       for (final d in shown) ...[
         const SizedBox(height: 8),
@@ -112,7 +112,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       if (shown.isEmpty)
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 24),
-          child: Text('ما في ولا جهاز شغّال هلأ.', textAlign: TextAlign.center, style: TextStyle(color: WW.sub)),
+          child: Text('لا يوجد جهاز يعمل الآن.', textAlign: TextAlign.center, style: TextStyle(color: WW.sub)),
         ),
     ]);
   }
@@ -155,11 +155,11 @@ class _DeviceTileState extends State<_DeviceTile> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
-          title: Text('نطفي ${d['name']}؟'),
-          content: const Text('رح ينقطع التطبيق ولا رح توصلك طلبات موافقة لحد ما ترجعي تشغّليه من الجهاز نفسه.'),
+          title: Text('إطفاء ${d['name']}؟'),
+          content: const Text('سينقطع التطبيق ولن تصلك طلبات موافقة حتى تعيد تشغيله من الجهاز نفسه.'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
-            FilledButton(onPressed: () => Navigator.pop(c, true), style: FilledButton.styleFrom(backgroundColor: WW.ink), child: const Text('إيه، طفّيه')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), style: FilledButton.styleFrom(backgroundColor: WW.ink), child: const Text('نعم، أطفئه')),
           ],
         ),
       );
@@ -173,11 +173,11 @@ class _DeviceTileState extends State<_DeviceTile> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text('نشيل ${d['name']}؟'),
-        content: const Text('رح ينشال الجهاز ومقبسه من WattWise. المقبس نفسه بيضل متل ما هو.'),
+        title: Text('إزالة ${d['name']}؟'),
+        content: const Text('سيُزال الجهاز ومقبسه من WattWise، ويبقى المقبس نفسه كما هو.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), style: FilledButton.styleFrom(backgroundColor: WW.ink), child: const Text('إيه، شيله')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), style: FilledButton.styleFrom(backgroundColor: WW.ink), child: const Text('نعم، أزله')),
         ],
       ),
     );
@@ -193,12 +193,12 @@ class _DeviceTileState extends State<_DeviceTile> {
     // While waiting for the server we show the device's known signature.
     final watts = optimistic == null ? (d['est_w'] as num) : (on ? d['signature_w'] as num : 0);
     final state = locked
-        ? 'محمي · دايمًا شغّال'
+        ? 'محمي · يعمل دائمًا'
         : on
             ? runningWord(kind)
             : d['agent_off'] != 0
-                ? 'طفّاه WattWise بموافقتك'
-                : 'مطفي';
+                ? 'أطفأه WattWise بموافقتك'
+                : 'مطفأ';
     const dur = Duration(milliseconds: 450);
 
     return AnimatedContainer(
@@ -271,7 +271,7 @@ class _DeviceTileState extends State<_DeviceTile> {
                       const LiveDot(color: Color(0xFFE8A21A), size: 6),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: Text('WattWise بدّه ${widget.pendingTurnOn ? 'يشغّله' : 'يطفيه'} · بانتظار موافقتك بصفحة البيت',
+                        child: Text('WattWise يريد ${widget.pendingTurnOn ? 'تشغيله' : 'إطفاءه'} · بانتظار موافقتك في صفحة البيت',
                             style: const TextStyle(fontSize: 12, color: WW.pendingText, fontWeight: FontWeight.w600)),
                       ),
                     ]),
@@ -304,7 +304,7 @@ class _AddDeviceWizardState extends State<AddDeviceWizard> {
   bool allow = true;
   final nameCtrl = TextEditingController();
 
-  static const titles = ['شو نوع الجهاز؟', 'وين حطّيتيه؟', 'خلّينا نتعرّف عليه', 'شو مسموح لـWattWise؟'];
+  static const titles = ['ما نوع الجهاز؟', 'أين يوجد؟', 'لنتعرّف عليه', 'ما المسموح لـWattWise؟'];
 
   Map<String, dynamic>? get learn => widget.st['learn'] as Map<String, dynamic>?;
   int get learnedW => learn != null && learn!['status'] == 'done' ? (learn!['learned_w'] as num).toInt() : 0;
@@ -362,7 +362,7 @@ class _AddDeviceWizardState extends State<AddDeviceWizard> {
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _grid([for (final r in widget.st['rooms'] as List) _chip('${r['name']}', room == r['id'], () => setState(() => room = r['id']))]),
           const SizedBox(height: 12),
-          const Text('سمّيه (اختياري)', style: TextStyle(fontSize: 13, color: WW.sub)),
+          const Text('الاسم (اختياري)', style: TextStyle(fontSize: 13, color: WW.sub)),
           const SizedBox(height: 6),
           TextField(
             controller: nameCtrl,
@@ -379,9 +379,9 @@ class _AddDeviceWizardState extends State<AddDeviceWizard> {
           const WWBox(
             radius: 20,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('١. تأكّدي إنو الجهاز موصول بمقبس ذكي (بيركّبه كهربائي).', style: TextStyle(fontSize: 14, height: 1.7)),
-              Text('٢. لما تكوني جاهزة، شغّلي الجهاز من زرّه واضغطي «شغّلته».', style: TextStyle(fontSize: 14, height: 1.7)),
-              Text('WattWise بيقيس قفزة الواط على العدّاد الرئيسي، هاي بصمة الجهاز.', style: TextStyle(fontSize: 13, height: 1.7, color: WW.sub)),
+              Text('١. تأكّد أن الجهاز موصول بمقبس ذكي (يركّبه كهربائي).', style: TextStyle(fontSize: 14, height: 1.7)),
+              Text('٢. عندما تكون جاهزًا، شغّل الجهاز من زرّه ثم اضغط «شغّلته».', style: TextStyle(fontSize: 14, height: 1.7)),
+              Text('يقيس WattWise قفزة الواط على العدّاد الرئيسي، وهذه هي بصمة الجهاز.', style: TextStyle(fontSize: 13, height: 1.7, color: WW.sub)),
             ]),
           ),
           const SizedBox(height: 12),
@@ -399,7 +399,7 @@ class _AddDeviceWizardState extends State<AddDeviceWizard> {
               height: 56,
               decoration: BoxDecoration(color: WW.greenBg, borderRadius: BorderRadius.circular(18)),
               alignment: Alignment.center,
-              child: const Text('عم نقيس…', style: TextStyle(fontSize: 15, color: WW.greenText, fontWeight: FontWeight.w600)),
+              child: const Text('جارٍ القياس…', style: TextStyle(fontSize: 15, color: WW.greenText, fontWeight: FontWeight.w600)),
             ),
           if (learnedW > 0)
             WWBox(
@@ -410,14 +410,14 @@ class _AddDeviceWizardState extends State<AddDeviceWizard> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('تعرّفنا عليه ✓', style: TextStyle(fontSize: 13, color: WW.greenText)),
                     Text('+$learnedW W', textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 26, fontWeight: FontWeight.w500)),
-                    Text('≈ ${WW.fmt(learnedW / 1000 * (widget.st['bill']['price_jod_per_kwh'] as num), 3)} دينار بالساعة',
+                    Text('≈ ${WW.fmt(learnedW / 1000 * (widget.st['bill']['price_jod_per_kwh'] as num), 3)} دينار في الساعة',
                         style: const TextStyle(fontSize: 12, color: WW.greenText)),
                   ]),
                 ),
                 OutlinedButton(
                   onPressed: () => widget.run(() => widget.api.startLearning(type!)),
                   style: OutlinedButton.styleFrom(foregroundColor: WW.ink, side: const BorderSide(color: Color(0xFFB8DB7A), width: 1.5)),
-                  child: const Text('قيس مرة ثانية'),
+                  child: const Text('أعد القياس'),
                 ),
               ]),
             ),
@@ -427,7 +427,7 @@ class _AddDeviceWizardState extends State<AddDeviceWizard> {
           return const WWBox(
             color: Color(0xFFFBE3DD),
             radius: 20,
-            child: Text('هاد جهاز حرج (T2). رح نراقب استهلاكه بس، وما حدا (ولا الوكيل ولا التطبيق) بيقدر يطفيه. محمي بالكود.',
+            child: Text('هذا جهاز حرج (T2). سنراقب استهلاكه فقط، ولا يمكن لأحد (لا الوكيل ولا التطبيق) إطفاؤه. محمي برمجيًا.',
                 style: TextStyle(fontSize: 14, height: 1.7, color: Color(0xFF7A2A1C))),
           );
         }
@@ -436,9 +436,9 @@ class _AddDeviceWizardState extends State<AddDeviceWizard> {
           child: Row(children: [
             const Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('الوكيل يقترح إطفاءه لما يلاقي هدر', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                Text('يقترح الوكيل إطفاءه عند وجود هدر', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 SizedBox(height: 4),
-                Text('دايمًا بيسألك قبل. إذا سكّرتيها، بيضل التحكم يدوي بس.', style: TextStyle(fontSize: 12.5, height: 1.6, color: WW.sub)),
+                Text('يسألك دائمًا قبل أي إجراء. إن عطّلت هذا الخيار، يبقى التحكم يدويًا فقط.', style: TextStyle(fontSize: 12.5, height: 1.6, color: WW.sub)),
               ]),
             ),
             WWToggle(on: allow, onTap: () => setState(() => allow = !allow)),
@@ -488,7 +488,7 @@ class _AddDeviceWizardState extends State<AddDeviceWizard> {
                 disabledBackgroundColor: const Color(0xFFD8D5CA),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               ),
-              child: Text(step == 3 ? 'ضيف الجهاز' : 'التالي', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              child: Text(step == 3 ? 'إضافة الجهاز' : 'التالي', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             ),
           ),
         ),

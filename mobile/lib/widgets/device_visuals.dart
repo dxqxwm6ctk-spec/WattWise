@@ -34,12 +34,12 @@ Color deviceAccent(String kind) => switch (kind) {
 
 /// Short Arabic label that matches the animation (shown under the name).
 String runningWord(String kind) => switch (kind) {
-      'fan' => 'عم تلفّ',
-      'ac' => 'عم يبرّد',
-      'light' || 'emergency_light' => 'ضاوية',
-      'heater' => 'عم يسخّن',
-      'washer' => 'عم تغسل',
-      _ => 'شغّال',
+      'fan' => 'تدور',
+      'ac' => 'يبرّد',
+      'light' || 'emergency_light' => 'مضاءة',
+      'heater' => 'يسخّن',
+      'washer' => 'تغسل',
+      _ => 'يعمل',
     };
 
 /// The animated picture of one device.
@@ -460,7 +460,7 @@ class RunningNowCard extends StatelessWidget {
         Row(children: [
           const LiveDot(),
           const SizedBox(width: 4),
-          const Text('شغّال هلأ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: WW.paper)),
+          const Text('يعمل الآن', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: WW.paper)),
           const SizedBox(width: 8),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
@@ -486,7 +486,7 @@ class RunningNowCard extends StatelessWidget {
           child: running.isEmpty
               ? const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
-                  child: Text('كل الأجهزة مطفية 🌙', style: TextStyle(fontSize: 13, color: Color(0xFFA9A79D))),
+                  child: Text('كل الأجهزة مطفأة 🌙', style: TextStyle(fontSize: 13, color: Color(0xFFA9A79D))),
                 )
               : SizedBox(
                   height: 92,

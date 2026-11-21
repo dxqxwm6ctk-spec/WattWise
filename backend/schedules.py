@@ -73,11 +73,11 @@ def normalize_days(days) -> str | None:
     try:
         picked = sorted({int(x) for x in days})
     except (TypeError, ValueError):
-        raise ActionError("الأيام مش مفهومة.")
+        raise ActionError("الأيام غير مفهومة.")
     if not picked:
-        raise ActionError("اختار يوم واحد على الأقل.")
+        raise ActionError("اختر يومًا واحدًا على الأقل.")
     if any(x < 0 or x > 6 for x in picked):
-        raise ActionError("الأيام مش مفهومة.")
+        raise ActionError("الأيام غير مفهومة.")
     return None if len(picked) == 7 else "".join(str(x) for x in picked)
 
 
@@ -132,7 +132,7 @@ def preview_schedule(conn, site: str, device_id: str, on_time: str | None, off_t
     decision = policy.check_schedule(d, on_time, off_time)
     if not decision.allowed:
         raise ActionError(decision.reason_ar)
-    when = " ← ".join(x for x in (on_time and f"يشتغل {on_time}", off_time and f"يطفي {off_time}") if x)
+    when = " ← ".join(x for x in (on_time and f"تشغيل {on_time}", off_time and f"إطفاء {off_time}") if x)
     return {"device_id": d["id"], "device_name": d["name"], "room_name": _room_name(conn, site, d["room"]),
             "on_time": on_time, "off_time": off_time, "days": days, "days_text": days_text(days),
             "text": f"{d['name']} ({_room_name(conn, site, d['room'])}): {when} · {days_text(days)}",
@@ -148,7 +148,7 @@ def add_schedule(conn, site: str, device_id: str, on_time: str | None, off_time:
     decision = policy.check_schedule(d, on_time, off_time)
     if not decision.allowed:
         if decision.code in ("heater_too_long", "critical_load", "sensitive_device"):
-            db.audit(conn, site, "T0", "policy", "blocked", f"{decision.reason_ar} ← الجدول ما انحفظ.")
+            db.audit(conn, site, "T0", "policy", "blocked", f"{decision.reason_ar} ، فلم يُحفظ الجدول.")
         raise ActionError(decision.reason_ar)
     cur = conn.execute(
         "INSERT INTO schedules (site, device_id, on_time, off_time, days, enabled, source, created_ts) "
@@ -167,7 +167,7 @@ def add_timer(conn, site: str, device_id: str, minutes: int, turn_on: bool, run_
     if not decision.allowed:
         raise ActionError(decision.reason_ar)
     if run_now:
-        _switch(conn, site, d, True, f"شغّلنا {d['name']} لمدة {fmt_minutes(minutes)} ← بينطفي لحاله بعدها.",
+        _switch(conn, site, d, True, f"شغّلنا {d['name']} لمدة {fmt_minutes(minutes)} ، وسينطفئ تلقائيًا بعدها.",
                 actor="human")
     due = site_now(conn, site) + minutes * 60
     cur = conn.execute(
@@ -256,7 +256,7 @@ def _switch(conn, site: str, d: dict, turn_on: bool, message: str, actor: str = 
                                        plug=db.plug(conn, site, d["id"]))
     if not decision.allowed:
         db.audit(conn, site, "T0", "policy", "schedule_blocked",
-                 f"{message} ← حارس السياسات رفض: {decision.reason_ar}")
+                 f"{message} ، لكن حارس السياسات رفض: {decision.reason_ar}")
         return False
     db.set_device(conn, site, d["id"], is_on=int(turn_on), agent_off=0)
     db.audit(conn, site, TIER, actor, "schedule_fired", message)
@@ -335,14 +335,14 @@ def suggest_heater(conn, site: str, hint: str) -> dict:
     heater = next((d for d in db.devices(conn, site) if d["kind"] == "heater"
                    and policy.check_timer(d, 1).allowed), None)
     if not heater:
-        raise ActionError("ما في سخّان ماء بهذا الموقع.")
+        raise ActionError("لا يوجد سخّان ماء في هذا الموقع.")
     times = sorted(set(shower_times(hint)))[:3]
     if times:
-        reply = "بنسخّن المي بالساعة اللي قبل كل حمّام بس، والباقي بيضل مطفي."
-        windows = [((t - 60) % 1440, t, "مي سخنة قبل الحمّام") for t in times]
+        reply = "نشغّل السخّان في الساعة التي تسبق كل استحمام فقط، ويبقى مطفأً بقية الوقت."
+        windows = [((t - 60) % 1440, t, "ماء ساخن قبل الاستحمام") for t in times]
     else:
-        reply = "ما ذكرت أوقات، فهاد جدول افتراضي: الصبح والمسا. عدّله بكيفك."
-        windows = [(330, 390, "مي سخنة قبل الحمّام الصبح"), (1200, 1260, "مي سخنة للمسا")]
+        reply = "لم تذكر أوقاتًا، فهذا جدول افتراضي: صباحًا ومساءً. عدّله كما تشاء."
+        windows = [(330, 390, "ماء ساخن قبل استحمام الصباح"), (1200, 1260, "ماء ساخن للمساء")]
     items, used = [], []
     for start, end, why in windows:
         if any(start < u_end and u_start < end for u_start, u_end in used):
@@ -363,9 +363,9 @@ def apply_heater(conn, site: str, device_id: str, windows: list[dict]) -> dict:
     """Save the heater windows the human confirmed (replaces the heater's old schedules)."""
     d = require_device(conn, site, device_id)
     if d["kind"] != "heater":
-        raise ActionError("هذا الجهاز مش سخّان.")
+        raise ActionError("هذا الجهاز ليس سخّانًا.")
     if not windows or len(windows) > 3:
-        raise ActionError("لازم من فترة لـ ٣ فترات.")
+        raise ActionError("يجب أن يكون العدد من فترة إلى ٣ فترات.")
     for w in windows:   # check all first, so we never save half of it
         decision = policy.check_schedule(d, normalize_time(w.get("on_time")), normalize_time(w.get("off_time")))
         if not decision.allowed:
@@ -377,5 +377,5 @@ def apply_heater(conn, site: str, device_id: str, windows: list[dict]) -> dict:
             "VALUES (?,?,?,?,1,'suggested',?)",
             (site, device_id, normalize_time(w["on_time"]), normalize_time(w["off_time"]), time.time()))
     spans = "، ".join(f"{normalize_time(w['on_time'])}–{normalize_time(w['off_time'])}" for w in windows)
-    db.audit(conn, site, TIER, "human", "heater_schedule", f"جدول السخّان الذكي: {spans}. أكّدته إنت.")
+    db.audit(conn, site, TIER, "human", "heater_schedule", f"جدول السخّان الذكي: {spans}. أكّده المستخدم.")
     return {"ok": True}

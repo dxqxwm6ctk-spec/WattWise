@@ -94,9 +94,9 @@ def test_teach_flow_saves_only_after_yes(conn):
     lab(conn, 154, 0.84)                 # + small LED (8 W)
     assert len(teach.session(conn, "lab")["candidates"]) == 2
     teach.finish(conn, "lab")
-    assert "صح هيك" in chat(conn)[-1]
+    assert "هل هذا صحيح" in chat(conn)[-1]
     teach.say(conn, "lab", "الأول لابتوب، الثاني ضو المكتب")
-    assert "بدّك أحفظ" in chat(conn)[-1]
+    assert "هل أحفظ" in chat(conn)[-1]
     assert nilm.fingerprints(conn, "lab") == []          # nothing saved before the yes
     teach.say(conn, "lab", "احفظ")
     names = {f["name"]: f for f in nilm.fingerprints(conn, "lab")}
@@ -208,7 +208,7 @@ def test_fridge_cycling_is_known_and_a_device_hidden_in_a_fridge_step_is_found(c
     kitchen(212)                          # fridge + a 60 W stranger in the same second
     u = nilm.status(conn, "home")["unknown"]
     assert len(u) == 1 and u[0]["watts"] == 60 and u[0]["room"] == "kitchen"
-    assert "بالمطبخ" in chat(conn, "home")[-1]
+    assert "في المطبخ" in chat(conn, "home")[-1]
 
 
 def test_noisy_main_meter_reports_only_big_unknown_devices(conn):
@@ -230,7 +230,7 @@ def test_unknown_device_during_teach_is_asked_about_afterwards(conn):
     lab(conn, 146, 0.83)
     teach.finish(conn, "lab")             # now waiting for "صح"
     lab(conn, 206, 0.86)                  # another 60 W device shows up meanwhile
-    assert "بنرجعله" in chat(conn)[-1]
+    assert "سنعود إليه" in chat(conn)[-1]
     teach.say(conn, "lab", "صح")
     teach.say(conn, "lab", "لا")          # nothing saved, teach mode ends ...
-    assert "شو هاد الجهاز" in chat(conn)[-1]   # ... and the AI asks about the unknown device
+    assert "ما هذا الجهاز" in chat(conn)[-1]   # ... and the AI asks about the unknown device

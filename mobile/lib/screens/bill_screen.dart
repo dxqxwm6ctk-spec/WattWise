@@ -8,9 +8,9 @@ import '../widgets/assistant_widgets.dart';
 import '../widgets/bill_photo_card.dart';
 
 const tips = [
-  'السخّان: شغّليه قبل الحمّام بساعة بدل ما يضل شغّال طول اليوم.',
-  'سكّري الشبابيك والمكيّف شغّال، منبّهك تلقائيًا لما نلاحظ.',
-  'حرارة المكيّف ٢٤° بدل ٢٢° مريحة وبتقلّل الاستهلاك.',
+  'السخّان: شغّله قبل الاستحمام بساعة بدل تركه يعمل طوال اليوم.',
+  'أغلق الشبابيك أثناء تشغيل المكيّف، وسننبّهك تلقائيًا إن لاحظنا غير ذلك.',
+  'ضبط المكيّف على ٢٤° بدل ٢٢° مريح ويقلّل الاستهلاك.',
 ];
 
 class BillScreen extends StatelessWidget {
@@ -40,7 +40,7 @@ class BillScreen extends StatelessWidget {
         radius: 22,
         padding: 18,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('نوع اشتراكك (موجود على فاتورتك)', style: sub),
+          const Text('نوع اشتراكك (مذكور في فاتورتك)', style: sub),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(4),
@@ -93,9 +93,9 @@ class BillScreen extends StatelessWidget {
         radius: 22,
         padding: 18,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('وين بتروح المصاري؟ (حسب بصمة كل جهاز)', style: sub),
+          const Text('توزيع التكلفة (حسب بصمة كل جهاز)', style: sub),
           const SizedBox(height: 14),
-          if (breakdown.isEmpty) const Text('لسا ما في بيانات كفاية.', style: sub),
+          if (breakdown.isEmpty) const Text('لا توجد بيانات كافية بعد.', style: sub),
           for (final x in breakdown) ...[
             Row(children: [
               Expanded(child: Text('${x['name']}', style: const TextStyle(fontSize: 14))),
@@ -116,7 +116,7 @@ class BillScreen extends StatelessWidget {
         radius: 22,
         padding: 18,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('وفّرنا معك (مُقاس فعليًا)', style: TextStyle(fontSize: 13, color: WW.greenText)),
+          const Text('التوفير (مُقاس فعليًا)', style: TextStyle(fontSize: 13, color: WW.greenText)),
           const SizedBox(height: 6),
           Text('${WW.fmt(s['jod'], 3)} JD', textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 30, fontWeight: FontWeight.w500)),
           const SizedBox(height: 6),
@@ -130,7 +130,7 @@ class BillScreen extends StatelessWidget {
           radius: 22,
           padding: 18,
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('المتوقّع بالـ${(f['steps'] as List).length} ساعات الجاية', style: sub),
+            Text('المتوقّع للساعات الـ${(f['steps'] as List).length} القادمة', style: sub),
             const SizedBox(height: 6),
             Text('${WW.fmt(f['jod'], 2)} JD · ${WW.fmt(f['kwh'], 1)} kWh',
                 textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 22, fontWeight: FontWeight.w500)),
@@ -138,13 +138,13 @@ class BillScreen extends StatelessWidget {
             Text(
                 (f['accuracy']['hours'] as num) > 0
                     ? 'خطأ التوقّع ≈ ${WW.fmt(f['accuracy']['mean_err_pct'], 0)}% (مقاس بالعدّاد)'
-                    : 'لسا عم نقيس دقّة التوقّع',
+                    : 'جارٍ قياس دقة التوقّع',
                 style: const TextStyle(fontSize: 12.5, color: WW.sub)),
           ]),
         ),
       ],
       const SizedBox(height: 16),
-      const Text('نصايح (ما بننفّذها لحالنا)', style: sub),
+      const Text('نصائح (لا ننفّذها تلقائيًا)', style: sub),
       for (final t in tips) ...[
         const SizedBox(height: 8),
         WWBox(child: Text(t, style: const TextStyle(fontSize: 14, height: 1.65))),

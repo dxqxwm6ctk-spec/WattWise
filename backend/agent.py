@@ -83,11 +83,11 @@ def explain(waste: dict, price: float) -> tuple[str, str, dict]:
     """Plain Arabic explanation with the numbers (reason, saving, alternative)."""
     d = waste["device"]
     minutes = max(1, round(waste["empty_s"] / 60))
-    title = f"نطفي {d['name']}؟"
+    title = f"إطفاء {d['name']}؟"
     if waste["window_open"] and d["kind"] in config.COOLING_KINDS:
-        reason = "ما حدا بالغرفة من شوي والشباك مفتوح، يعني المكيّف عم يبرّد الشارع."
+        reason = "الغرفة فارغة منذ مدة والشباك مفتوح، أي أن المكيّف يبرّد الخارج."
     else:
-        reason = f"ما حدا بالغرفة من {minutes} دقيقة و{d['name']} شغّال."
+        reason = f"الغرفة فارغة منذ {minutes} دقيقة و{d['name']} يعمل."
     details = {
         "device": d["name"],
         "signature_w": round(d["signature_w"]),
@@ -95,9 +95,9 @@ def explain(waste: dict, price: float) -> tuple[str, str, dict]:
         "saving_jod_per_hour": round(d["signature_w"] / 1000 * price, 3),
         "price_jod_per_kwh": price,
         "room_temp_c": (waste["room"] or {}).get("temp_c"),
-        "alternative": ("سكّر الشباك وخلّي المكيّف شغّال، هيك ما بيبرّد الشارع."
+        "alternative": ("أغلق الشباك واترك المكيّف يعمل، فلا يذهب التبريد إلى الخارج."
                         if waste["window_open"] and d["kind"] in config.COOLING_KINDS
-                        else "بنخلّيه شغّال وما بنسأل عنه مرة ثانية لفترة."),
+                        else "نتركه يعمل ولا نسأل عنه مجددًا لفترة."),
     }
     return title, reason, details
 
@@ -126,14 +126,14 @@ def tick(conn, site: str, now: float | None = None) -> None:
             actions._close_pending(conn, site, actions.CANCELLED)
             conn.execute("UPDATE devices SET is_on=normal_on, agent_off=0 WHERE site=? AND agent_off>0", (site,))
             db.audit(conn, site, "STOP", "system", "fail_safe",
-                     "انقطعت القراءات ← وضع آمن: رجّعنا الأجهزة لوضعها الطبيعي وما في إجراء تلقائي.")
+                     "انقطعت القراءات، فدخلنا الوضع الآمن: أعدنا الأجهزة إلى وضعها الطبيعي دون إجراءات تلقائية.")
             actions.set_phase(conn, site, "offline")
             alerts.raise_alert(conn, site, "offline", "offline", alerts.DANGER, "انقطعت القراءات",
-                               "ما وصلنا إشي من العدّاد. رجّعنا الأجهزة لوضعها الطبيعي.", now=now)
+                               "لم تصل أي قراءة من العدّاد. أعدنا الأجهزة إلى وضعها الطبيعي.", now=now)
         return
     if was_fault:
         db.set_state(conn, f"fault:{site}", False)
-        db.audit(conn, site, "T0", "system", "recovered", "رجعت القراءات. الوكيل رجع يراقب.")
+        db.audit(conn, site, "T0", "system", "recovered", "عادت القراءات، وعاد الوكيل إلى المراقبة.")
         alerts.resolve(conn, site, "offline", now)
         if actions.get_phase(conn, site) == "offline" and not actions.flag(conn, "safe_mode", site):
             actions.set_phase(conn, site, "normal")
@@ -185,7 +185,7 @@ def tick(conn, site: str, now: float | None = None) -> None:
         room_name = _room_name(conn, site, d["room"])
         extra = "، وشباكها مفتوح" if waste["window_open"] else ""
         db.audit(conn, site, "T0", "agent", "waste_detected",
-                 f"كشف هدر: {d['name']} شغّال و{room_name} فاضية{extra}. بنتأكد من حدود الراحة.")
+                 f"كشف هدر: {d['name']} يعمل و{room_name} فارغة{extra}. نتحقّق من حدود الراحة.")
         actions.set_phase(conn, site, "analyzing")
         return
     if now - current["since"] < config.ANALYZE_S:
@@ -201,7 +201,7 @@ def tick(conn, site: str, now: float | None = None) -> None:
         elif w is waste:
             _record_skip(conn, site, w["device"], actions.BLOCKED, decision.reason_ar, now)
             db.audit(conn, site, "T0", "policy", "proposal_blocked",
-                     f"ما رح نقترح إطفاء {w['device']['name']}: {decision.reason_ar}")
+                     f"لن نقترح إطفاء {w['device']['name']}: {decision.reason_ar}")
     if waste not in allowed:
         _analyzing.pop(site, None)
         actions.set_phase(conn, site, "normal")
@@ -215,7 +215,7 @@ def tick(conn, site: str, now: float | None = None) -> None:
 
     if choice and choice["action"] == "none":
         _record_skip(conn, site, d, actions.SKIPPED, choice["reason"], now)
-        db.audit(conn, site, "T0", "llm", "no_action", f"قرّرنا ما نقترح إشي هلأ: {choice['reason']}")
+        db.audit(conn, site, "T0", "llm", "no_action", f"قرّرنا عدم اقتراح شيء الآن: {choice['reason']}")
         actions.set_phase(conn, site, "normal")
         return
 
@@ -288,18 +288,18 @@ def _finish(conn, site: str, job: dict, kind: str):
     if not f.done():
         f.cancel()
         llm.mark_down()
-        db.audit(conn, site, "T0", "system", "llm_fallback", f"النموذج تأخّر ({kind}). كمّلنا بالقواعد.")
+        db.audit(conn, site, "T0", "system", "llm_fallback", f"تأخّر النموذج ({kind})، فأكملنا بالقواعد.")
         return None
     try:
         answer, result = f.result()
     except Exception as e:
         llm.mark_down()
         db.audit(conn, site, "T0", "system", "llm_fallback",
-                 f"النموذج ما اشتغل ({kind}: {type(e).__name__}). كمّلنا بالقواعد.")
+                 f"تعذّر تشغيل النموذج ({kind}: {type(e).__name__})، فأكملنا بالقواعد.")
         return None
     llm.add_spend(conn, result)
     if answer is None:
-        db.audit(conn, site, "T0", "system", "llm_fallback", f"جواب النموذج ما كان صالح ({kind}). كمّلنا بالقواعد.")
+        db.audit(conn, site, "T0", "system", "llm_fallback", f"ردّ النموذج غير صالح ({kind})، فأكملنا بالقواعد.")
     return answer
 
 
@@ -344,7 +344,7 @@ def _llm_plan(conn, site: str, now: float) -> None:
         current = db.get_state(conn, f"plan:{site}", None) or {}
         db.set_state(conn, f"plan:{site}", {"goal_id": goal["id"], "by": "llm", **answer,
                                              "intent": current.get("intent"), "focus": current.get("focus")})
-        db.audit(conn, site, "T0", "llm", "plan", "النموذج قسّم الهدف لخطة: " + " · ".join(answer["steps"]),
+        db.audit(conn, site, "T0", "llm", "plan", "قسّم النموذج الهدف إلى خطة: " + " · ".join(answer["steps"]),
                  {"steps": answer["steps"], "summary": answer["summary"]})
 
 
@@ -375,16 +375,16 @@ def _verify(conn, site: str, now: float) -> None:
                 if pf is not None:
                     pf_text = f" · PF {pf:.2f}، {nilm.load_type_ar(pf)}"
                     if same_type is False:
-                        pf_text += f" (كان {d['signature_pf']:.2f}، يمكن الجهاز تغيّر)"
+                        pf_text += f" (كان {d['signature_pf']:.2f}، ربما تغيّر الجهاز)"
                 db.audit(conn, site, "OK", "agent", "verified",
-                         f"العدّاد أكّد انخفاض ≈ {round(drop)} واط يطابق بصمة {d['name']}{pf_text}. "
-                         + ("هاد تأجيل للشحن مش توفير، فما بنحسبه بالتوفير." if d["kind"] == "ev"
+                         f"العدّاد أكّد انخفاضًا ≈ {round(drop)} واط يطابق بصمة {d['name']}{pf_text}. "
+                         + ("هذا تأجيل للشحن وليس توفيرًا، فلا يُحسب ضمن التوفير." if d["kind"] == "ev"
                             else "بدأ حساب التوفير المُقاس."),
                          {"before_w": round(a["power_before"] or 0), "after_w": round(after), "step_pf": pf})
                 actions.set_phase(conn, site, "verified")
             else:
                 db.audit(conn, site, "T1", "agent", "verify_failed",
-                         f"العدّاد ما بيّن انخفاض واضح ({round(drop)} واط). ما رح نحسب توفير لهالإجراء.",
+                         f"لم يُظهر العدّاد انخفاضًا واضحًا ({round(drop)} واط)، فلن نحسب توفيرًا لهذا الإجراء.",
                          {"before_w": round(a["power_before"] or 0), "after_w": round(after)})
                 db.set_device(conn, site, d["id"], agent_off=actions.AGENT_OFF_NONE)
                 actions.set_phase(conn, site, "normal")
@@ -412,10 +412,10 @@ def note_internet_changes(conn) -> None:
         for site in config.load_sites():
             if ch["online"]:
                 db.audit(conn, site, "T0", "system", "internet_back",
-                         f"رجع الإنترنت{sim}. الطقس والنموذج رجعوا متاحين، وما ضاع إشي من القياس.")
+                         f"عاد الإنترنت{sim}. أصبح الطقس والنموذج متاحين مجددًا، ولم يضع شيء من القياسات.")
             else:
                 db.audit(conn, site, "T0", "system", "internet_lost",
-                         f"انقطع الإنترنت{sim} ← WattWise مكمّل محليًا: قياس، كشف هدر، موافقة، إطفاء، تحقق.")
+                         f"انقطع الإنترنت{sim}، ويواصل WattWise العمل محليًا: قياس، كشف هدر، موافقة، إطفاء، تحقق.")
 
 
 def tick_all() -> None:

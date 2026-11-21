@@ -60,7 +60,7 @@ class WattWiseApi {
   Future<void> addDevice({required String kind, required String room, required String name, required bool allow}) =>
       post('/devices', {'kind': kind, 'room': room, 'name': name, 'allow': allow});
 
-  // --- warnings: "طفّيه؟" only creates an approval request, it switches nothing ---
+  // --- warnings: "أطفئه؟" only creates an approval request, it switches nothing ---
   Future<void> alertAct(int id) => post('/alerts/$id/act');
   Future<void> alertDismiss(int id) => post('/alerts/$id/dismiss');
   // --- WiFi smart plugs (Shelly, TP-Link Tapo/Kasa, Tuya, Sonoff/Tasmota, simulated) ---
@@ -135,7 +135,7 @@ class WattWiseApi {
 
   Future<String> weeklyReport() async {
     final res = await http.get(_uri('/weekly.txt')).timeout(const Duration(seconds: 6));
-    if (res.statusCode >= 400) throw ApiException('ما قدرنا نجهّز التقرير.');
+    if (res.statusCode >= 400) throw ApiException('تعذّر تجهيز التقرير.');
     return utf8.decode(res.bodyBytes);
   }
 
@@ -144,7 +144,7 @@ class WattWiseApi {
     final data = body.isEmpty ? <String, dynamic>{} : jsonDecode(body);
     if (res.statusCode >= 400) {
       final detail = data is Map ? data['detail'] : null;
-      throw ApiException(detail is String ? detail : 'خطأ من السيرفر (${res.statusCode})');
+      throw ApiException(detail is String ? detail : 'خطأ من الخادم (${res.statusCode})');
     }
     return data is Map<String, dynamic> ? data : <String, dynamic>{};
   }

@@ -92,8 +92,8 @@ def _words(text: str) -> list[str]:
 
 
 YES = {"صح", "صحيح", "اه", "اي", "ايوا", "ايوه", "نعم", "تمام", "مزبوط", "اكيد", "yes", "ok", "okay",
-       "اوكي", "احفظ", "احفظهم", "احفظه", "احفظها", "موافق", "طيب", "يلا", "ماشي", "زابط"}
-NO = {"لا", "لاء", "no", "بلاش", "الغي", "لاتحفظ"}
+       "اوكي", "حسنا", "احفظ", "احفظهم", "احفظه", "احفظها", "موافق", "طيب", "يلا", "ماشي", "زابط"}
+NO = {"لا", "لاء", "كلا", "no", "بلاش", "الغي", "لاتحفظ"}
 DROP_WORDS = ("تجاهل", "احذف", "شيل", "انسى", "انساه", "مش جهاز", "غلط", "مش مهم", "خليه", "طنش")
 
 
@@ -116,7 +116,7 @@ def is_drop(text: str) -> bool:
 # Device names -> kind (for safety tiers and icons).
 KIND_WORDS = [
     (r"لابتوب|كمبيوتر|حاسوب|حاسب|laptop|pc\b", "pc"),
-    (r"ضو|ضوء|لمبه|انار|ليد|led|اباجور|ابجور|سبوت|نيون", "light"),
+    (r"ضو|ضوء|مصباح|لمبه|انار|ليد|led|اباجور|ابجور|سبوت|نيون", "light"),
     (r"مروح|fan", "fan"),
     (r"تلفزيون|تلفاز|شاشه|tv", "tv"),
     (r"راوتر|مودم|router", "router"),
@@ -217,9 +217,9 @@ def find_room(conn, site: str, text: str) -> tuple[str | None, str]:
 def start(conn, site: str, room: str) -> dict:
     actions.require_site(site)
     if not db.one(conn.execute("SELECT 1 AS x FROM rooms WHERE site=? AND id=?", (site, room))):
-        raise actions.ActionError("الغرفة مش معروفة.")
+        raise actions.ActionError("الغرفة غير معروفة.")
     if db.get_state(conn, f"learn:{site}"):
-        raise actions.ActionError("خلّص إضافة الجهاز الجديد أول.")
+        raise actions.ActionError("أكمل إضافة الجهاز الجديد أولًا.")
     now = time.time()
     _set_session(conn, site, {"room": room, "status": "listening", "started_ts": now, "last_event_ts": now,
                               "base_w": None, "candidates": [], "nudged": False})
@@ -229,18 +229,18 @@ def start(conn, site: str, room: str) -> dict:
     cfg = config.load_sites()[site]
     rname = nilm.room_name(conn, site, room)
     if cfg["source"] == "simulator":
-        where = (f"(بالمحاكي: ركّبنا العدّاد على قاطع {rname}، والمحاكي رح يمثّل إنك عم تشغّل "
-                 "الأجهزة واحد واحد. كل البيانات تركيبية.)")
+        where = (f"(في المحاكي: العدّاد على قاطع {rname}، وسيحاكي تشغيلك للأجهزة "
+                 "واحدًا تلو الآخر. كل البيانات تركيبية.)")
     elif len(cfg["rooms"]) == 1:
-        where = f"العدّاد (PZEM) أصلًا على قاطع {rname}."
+        where = f"العدّاد (PZEM) مركّب أصلًا على قاطع {rname}."
     else:
-        where = f"تأكّد إنه الكهربائي ركّب العدّاد على قاطع {rname}."
+        where = f"تأكّد أن الكهربائي ركّب العدّاد على قاطع {rname}."
     say_ai(conn, site,
-           f"تمام! خلّيني أتعلّم أجهزة {rname}. {where}\n"
-           "١) طفّي الأجهزة اللي بدك أتعرّف عليها بهالغرفة.\n"
-           "٢) شغّلهم واحد واحد، واستنّى ٥ ثواني بين كل جهاز والثاني.\n"
-           "٣) أنا بسمع للعدّاد، ولما يهدى بلخّصلك شو شفت وبسألك.")
-    db.audit(conn, site, "T0", "human", "teach_start", f"بلّش تعليم أجهزة {rname} (وضع التعلّم).")
+           f"حسنًا، سأتعلّم أجهزة {rname}. {where}\n"
+           "١) أطفئ الأجهزة التي تريدني أن أتعرّف عليها في هذه الغرفة.\n"
+           "٢) شغّلها واحدًا تلو الآخر، وانتظر ٥ ثوانٍ بين كل جهاز وآخر.\n"
+           "٣) سأستمع إلى العدّاد، وعندما تستقر القراءة ألخّص لك ما رصدته وأسألك.")
+    db.audit(conn, site, "T0", "human", "teach_start", f"بدء تعليم أجهزة {rname} (وضع التعلّم).")
     return state(conn, site)
 
 
@@ -263,7 +263,7 @@ def add_candidate(conn, site: str, ev: dict) -> None:
     t["candidates"].append({"w": round(ev["dp"], 1), "pf": pf, "pf_quality": ev["pf_quality"], "count": 1,
                             "guess": g, "name": None, "kind": g[0]["kind"], "drop": False})
     _set_session(conn, site, t)
-    say_ai(conn, site, f"شفت جهاز انشغل: +{round(ev['dp'])} واط{_pf_txt(pf)}. غالبًا {g[0]['label']}.")
+    say_ai(conn, site, f"رصدت تشغيل جهاز: +{round(ev['dp'])} واط{_pf_txt(pf)}. غالبًا {g[0]['label']}.")
 
 
 def note_recognised(conn, site: str, fp: dict, ev: dict) -> None:
@@ -272,7 +272,7 @@ def note_recognised(conn, site: str, fp: dict, ev: dict) -> None:
         t["last_event_ts"] = ev["ts"]
         t["recognised"] = t.get("recognised", 0) + 1
         _set_session(conn, site, t)
-        say_ai(conn, site, f"هاد بعرفه: {fp['name']} (≈ {round(abs(ev['dp']))} واط) ✓")
+        say_ai(conn, site, f"هذا جهاز أعرفه: {fp['name']} (≈ {round(abs(ev['dp']))} واط) ✓")
 
 
 def check(conn, site: str, now: float) -> None:
@@ -283,12 +283,12 @@ def check(conn, site: str, now: float) -> None:
     if t["candidates"] and now - t["last_event_ts"] > QUIET_S:
         _summarize(conn, site, t)
     elif not t["candidates"] and t.get("recognised") and now - t["last_event_ts"] > QUIET_S:
-        say_ai(conn, site, "كل الأجهزة اللي شفتها بعرفها من قبل ✓ ما في إشي جديد أحفظه، فسكّرت وضع التعلّم.")
+        say_ai(conn, site, "كل الأجهزة التي رصدتها معروفة لديّ ✓ لا جديد لأحفظه، فأنهيت وضع التعلّم.")
         _end(conn, site)
     elif not t["candidates"] and not t["nudged"] and now - t["started_ts"] > NUDGE_S:
         t["nudged"] = True
         _set_session(conn, site, t)
-        say_ai(conn, site, "لسّا ما شفت ولا جهاز جديد. شغّل جهاز واستنّى ٥ ثواني، أو اكبس «خلصت» إذا بدك نوقف.")
+        say_ai(conn, site, "لم أرصد أي جهاز جديد بعد. شغّل جهازًا وانتظر ٥ ثوانٍ، أو اضغط «انتهيت» للإيقاف.")
 
 
 def _guess_text(c: dict) -> str:
@@ -306,13 +306,13 @@ def _summarize(conn, site: str, t: dict) -> None:
     known = [d for d in db.devices(conn, site) if d["room"] == room and d["is_on"]]
     base = ""
     if t["base_w"] is not None and t["base_w"] > 3:
-        base = f"\nوكان في ≈ {round(t['base_w'])} واط شغّالة من قبل ما تبلّش"
+        base = f"\nوكان هناك ≈ {round(t['base_w'])} واط قيد التشغيل قبل البدء"
         if known:
             base += " (الأجهزة المسجّلة: " + "، ".join(f"{d['name']} {round(d['signature_w'])}" for d in known) + ")"
         base += "."
     say_ai(conn, site,
-           f"ب{nilm.room_name(conn, site, room)} شفت {_count(len(lines))}:\n" + "\n".join(lines) + base +
-           "\nصح هيك؟ اكتب «صح»، أو صحّحلي مثلًا: «الأول لابتوب، الثاني ضو المكتب»، أو «الثالث تجاهله».",
+           f"في {nilm.room_name(conn, site, room)} رصدت {_count(len(lines))}:\n" + "\n".join(lines) + base +
+           "\nهل هذا صحيح؟ اكتب «صحيح»، أو صحّح لي، مثلًا: «الأول لابتوب، الثاني مصباح المكتب»، أو «الثالث تجاهله».",
            {"candidates": t["candidates"]})
     t["status"] = "asking"
     _set_session(conn, site, t)
@@ -326,15 +326,15 @@ def finish(conn, site: str) -> dict:
         if t["candidates"]:
             _summarize(conn, site, t)
         else:
-            say_ai(conn, site, "ما شفت أجهزة جديدة، فسكّرت وضع التعلّم. ما انحفظ إشي.")
+            say_ai(conn, site, "لم أرصد أجهزة جديدة، فأنهيت وضع التعلّم. لم يُحفظ شيء.")
             _end(conn, site)
     return state(conn, site)
 
 
 def cancel(conn, site: str) -> dict:
     if session(conn, site) or _ctx(conn, site):
-        say_ai(conn, site, "وقّفت. ما حفظت إشي، والقياسات انمسحت.")
-        db.audit(conn, site, "T0", "human", "teach_cancel", "توقّف وضع التعلّم بدون حفظ.")
+        say_ai(conn, site, "توقّفت. لم أحفظ شيئًا، وحُذفت القياسات.")
+        db.audit(conn, site, "T0", "human", "teach_cancel", "توقّف وضع التعلّم دون حفظ.")
     _end(conn, site)
     return state(conn, site)
 
@@ -361,17 +361,17 @@ def _final_list(t: dict) -> list[dict]:
 def _ask_save(conn, site: str, t: dict) -> None:
     items = _final_list(t)
     if not items:
-        say_ai(conn, site, "تمام، ما ضل إشي أحفظه. سكّرت وضع التعلّم.")
+        say_ai(conn, site, "حسنًا، لم يبقَ شيء لأحفظه. أنهيت وضع التعلّم.")
         _end(conn, site)
         return
     lines = []
     for c in items:
         line = f"• {c['name']} ≈ {round(c['w'])} واط{_pf_txt(c['pf'])}"
         if c["kind"] in config.FORBIDDEN_KINDS:
-            line += " (جهاز حسّاس: بتعرّف عليه بس، وما بقترح أطفيه أبدًا)"
+            line += " (جهاز حسّاس: أتعرّف عليه فقط، ولن أقترح إطفاءه أبدًا)"
         lines.append(line)
-    say_ai(conn, site, "هيك فهمت:\n" + "\n".join(lines) +
-           f"\nبدّك أحفظ بصماتهم {_li(nilm.room_name(conn, site, t['room']))} عشان أتعرّف عليهم بعدين؟ (احفظ / لا)")
+    say_ai(conn, site, "هذا ما فهمته:\n" + "\n".join(lines) +
+           f"\nهل أحفظ بصماتها {_li(nilm.room_name(conn, site, t['room']))} لأتعرّف عليها لاحقًا؟ (احفظ / لا)")
     t["status"] = "saving"
     _set_session(conn, site, t)
     _set_ctx(conn, site, {"type": "teach_save"})
@@ -386,23 +386,23 @@ def _save_all(conn, site: str, t: dict) -> None:
     db.set_state(conn, f"nilm_on:{site}", on)
     rname = nilm.room_name(conn, site, t["room"])
     db.audit(conn, site, "T0", "human", "fingerprints_saved",
-             f"انحفظت {len(items)} بصمات {_li(rname)} بموافقة المستخدم: " + "، ".join(c["name"] for c in items),
+             f"حُفظت {len(items)} بصمات {_li(rname)} بموافقة المستخدم: " + "، ".join(c["name"] for c in items),
              {"items": [{"name": c["name"], "w": c["w"], "pf": c["pf"]} for c in items]})
-    say_ai(conn, site, f"حفظتهم ✓ من هلأ لما ينشغل أو ينطفي واحد منهم ب{rname} بعرفه، "
-                       "وإذا طلع جهاز ما إله بصمة بنبّهك وبسألك عنه.")
+    say_ai(conn, site, f"حفظتها ✓ من الآن سأتعرّف على أي منها عند تشغيله أو إطفائه في {rname}، "
+                       "وإذا ظهر جهاز بلا بصمة سأنبّهك وأسألك عنه.")
 
 
 # ---------------- unknown devices ----------------
 
 def ask_about_unknown(conn, site: str, u: dict) -> None:
-    where = f"ب{nilm.room_name(conn, site, u['room'])}" if u["room"] else "(على العدّاد الرئيسي، فالغرفة مش معروفة)"
+    where = f"في {nilm.room_name(conn, site, u['room'])}" if u["room"] else "(على العدّاد الرئيسي، والغرفة غير معروفة)"
     busy = (_ctx(conn, site) or {}).get("type", "").startswith("teach")
-    text = (f"⚠️ في جهاز مجهول بيسحب ≈ {u['watts']} واط {where}{_pf_txt(u['pf'])}. ما إله بصمة محفوظة. "
+    text = (f"⚠️ جهاز مجهول يستهلك ≈ {u['watts']} واط {where}{_pf_txt(u['pf'])}، وليست له بصمة محفوظة. "
             f"غالبًا: {u['guess'][0]['label']}.")
     if busy:
-        say_ai(conn, site, text + " (بنرجعله بعد ما نخلّص التعلّم.)")
+        say_ai(conn, site, text + " (سنعود إليه بعد انتهاء التعلّم.)")
         return
-    say_ai(conn, site, text + "\nشو هاد الجهاز؟ اكتبلي اسمه (ووين هو إذا بتعرف)، أو اكتب «تجاهل».",
+    say_ai(conn, site, text + "\nما هذا الجهاز؟ اكتب اسمه (ومكانه إن كنت تعرفه)، أو اكتب «تجاهل».",
            {"unknown": u})
     _set_ctx(conn, site, {"type": "label", "unknown": u})
 
@@ -411,7 +411,7 @@ def _label_reply(conn, site: str, ctx: dict, text: str, reading: dict | None) ->
     u = ctx["unknown"]
     if (reading and reading["intent"] in ("ignore", "no")) or (not reading and (is_drop(text) or is_no(text))):
         nilm.set_unknown_status(conn, site, u["id"], "dismissed")
-        say_ai(conn, site, "تمام، تجاهلته. ما حفظت إشي.")
+        say_ai(conn, site, "حسنًا، تجاهلته ولم أحفظ شيئًا.")
         _set_ctx(conn, site, None)
         return
     if reading:
@@ -422,22 +422,22 @@ def _label_reply(conn, site: str, ctx: dict, text: str, reading: dict | None) ->
         name = _clean_label(rest)
     room = room or u["room"]
     if not name:
-        say_ai(conn, site, "شو اسم الجهاز؟ مثلًا: «مكوى» أو «سخّان صغير بالمطبخ».")
+        say_ai(conn, site, "ما اسم الجهاز؟ مثلًا: «مكواة» أو «سخّان صغير في المطبخ».")
         return
     nxt = {"type": "label_save" if room else "label_room", "unknown": u, "name": name,
            "kind": kind_from_name(name, u["guess"][0]["kind"]), "room": room}
     _set_ctx(conn, site, nxt)
     if not room:
-        say_ai(conn, site, f"تمام، «{name}». بأي غرفة هو؟")
+        say_ai(conn, site, f"حسنًا، «{name}». في أي غرفة هو؟")
     else:
         _ask_label_save(conn, site, nxt)
 
 
 def _ask_label_save(conn, site: str, ctx: dict) -> None:
     u = ctx["unknown"]
-    note = " (جهاز حسّاس: بتعرّف عليه بس، وما بقترح أطفيه أبدًا)" if ctx["kind"] in config.FORBIDDEN_KINDS else ""
-    say_ai(conn, site, f"بدّك أحفظ بصمة «{ctx['name']}» (≈ {u['watts']} واط{_pf_txt(u['pf'])}) "
-                       f"ب{nilm.room_name(conn, site, ctx['room'])}؟{note} (احفظ / لا)")
+    note = " (جهاز حسّاس: أتعرّف عليه فقط، ولن أقترح إطفاءه أبدًا)" if ctx["kind"] in config.FORBIDDEN_KINDS else ""
+    say_ai(conn, site, f"هل أحفظ بصمة «{ctx['name']}» (≈ {u['watts']} واط{_pf_txt(u['pf'])}) "
+                       f"في {nilm.room_name(conn, site, ctx['room'])}؟{note} (احفظ / لا)")
 
 
 def _label_save_reply(conn, site: str, ctx: dict, text: str) -> None:
@@ -451,15 +451,15 @@ def _label_save_reply(conn, site: str, ctx: dict, text: str) -> None:
         nilm.set_unknown_status(conn, site, u["id"], "labeled")
         rname = nilm.room_name(conn, site, ctx["room"])
         db.audit(conn, site, "T0", "human", "fingerprints_saved",
-                 f"انحفظت بصمة «{ctx['name']}» (≈ {u['watts']} واط) {_li(rname)} بموافقة المستخدم.")
-        say_ai(conn, site, f"حفظتها ✓ المرة الجاية بعرف «{ctx['name']}» لحالي.")
+                 f"حُفظت بصمة «{ctx['name']}» (≈ {u['watts']} واط) {_li(rname)} بموافقة المستخدم.")
+        say_ai(conn, site, f"حفظتها ✓ في المرة القادمة سأتعرّف على «{ctx['name']}» بنفسي.")
         _set_ctx(conn, site, None)
     elif is_no(text):
         nilm.set_unknown_status(conn, site, u["id"], "dismissed")
-        say_ai(conn, site, "تمام، ما حفظت إشي.")
+        say_ai(conn, site, "حسنًا، لم أحفظ شيئًا.")
         _set_ctx(conn, site, None)
     else:
-        say_ai(conn, site, "جاوبني بـ «احفظ» أو «لا».")
+        say_ai(conn, site, "أجب بـ «احفظ» أو «لا».")
 
 
 # ---------------- the user's reply ----------------
@@ -491,7 +491,7 @@ def say(conn, site: str, text: str) -> dict:
     actions.require_site(site)
     text = text.strip()[:300]
     if not text:
-        raise actions.ActionError("اكتب إشي.")
+        raise actions.ActionError("اكتب شيئًا.")
     ctx = _ctx(conn, site)
     # Read first (the LLM can take a few seconds), write after.
     reading = _llm_read(conn, site, ctx, text) if ctx and ctx["type"] in ("teach_confirm", "label") else None
@@ -502,7 +502,7 @@ def say(conn, site: str, text: str) -> dict:
         room, _ = find_room(conn, site, text)
         if m and room:
             return start(conn, site, room)
-        say_ai(conn, site, "أنا هون بتعلّم أجهزة الغرف. اختار غرفة واكبس «علّمني»، "
+        say_ai(conn, site, "أنا هنا لأتعلّم أجهزة الغرف. اختر غرفة واضغط «علّمني»، "
                            "أو اكتب مثلًا: «تعرّف على أجهزة غرفة الأولاد».")
     elif ctx["type"] == "teach_confirm":
         _confirm_reply(conn, site, text, reading)
@@ -512,17 +512,17 @@ def say(conn, site: str, text: str) -> dict:
             _save_all(conn, site, t)
             _end(conn, site)
         elif is_no(text):
-            say_ai(conn, site, "تمام، ما حفظت إشي، والقياسات انمسحت.")
-            db.audit(conn, site, "T0", "human", "teach_declined", "المستخدم رفض حفظ البصمات. ما انحفظ إشي.")
+            say_ai(conn, site, "حسنًا، لم أحفظ شيئًا، وحُذفت القياسات.")
+            db.audit(conn, site, "T0", "human", "teach_declined", "رفض المستخدم حفظ البصمات، فلم يُحفظ شيء.")
             _end(conn, site)
         else:
-            say_ai(conn, site, "جاوبني بـ «احفظ» أو «لا».")
+            say_ai(conn, site, "أجب بـ «احفظ» أو «لا».")
     elif ctx["type"] == "label":
         _label_reply(conn, site, ctx, text, reading)
     elif ctx["type"] == "label_room":
         room, _ = find_room(conn, site, text)
         if not room:
-            say_ai(conn, site, "ما عرفت الغرفة. اكتب اسمها مثل: " + "، ".join(r["name"] for r in db.rooms(conn, site)[:3]))
+            say_ai(conn, site, "لم أتعرّف على الغرفة. اكتب اسمها، مثل: " + "، ".join(r["name"] for r in db.rooms(conn, site)[:3]))
         else:
             ctx["room"] = room
             ctx["type"] = "label_save"
@@ -549,7 +549,7 @@ def _confirm_reply(conn, site: str, text: str, reading: dict | None) -> None:
             _ask_save(conn, site, t)
             return
         if reading["intent"] == "no":
-            say_ai(conn, site, "طيب، صحّحلي: مين الأول ومين الثاني؟ مثلًا: «الأول مروحة، الثاني ضو صغير».")
+            say_ai(conn, site, "حسنًا، صحّح لي: ما الأول وما الثاني؟ مثلًا: «الأول مروحة، الثاني مصباح صغير».")
             return
     if is_yes(text):
         _ask_save(conn, site, t)
@@ -557,9 +557,9 @@ def _confirm_reply(conn, site: str, text: str, reading: dict | None) -> None:
     labels = parse_labels(text, cands)
     if not labels:
         if is_no(text):
-            say_ai(conn, site, "طيب، صحّحلي: مين الأول ومين الثاني؟ مثلًا: «الأول مروحة، الثاني ضو صغير».")
+            say_ai(conn, site, "حسنًا، صحّح لي: ما الأول وما الثاني؟ مثلًا: «الأول مروحة، الثاني مصباح صغير».")
         else:
-            say_ai(conn, site, "ما فهمت عليك 🙏 اكتب مثلًا: «الأول لابتوب، الثاني ضو المكتب»، أو «صح».")
+            say_ai(conn, site, "لم أفهم قصدك. اكتب مثلًا: «الأول لابتوب، الثاني مصباح المكتب»، أو «صحيح».")
         return
     for n, v in labels.items():
         if v.get("drop"):
@@ -597,7 +597,7 @@ def room_meter(conn, site: str) -> dict | None:
 def delete_fingerprint(conn, site: str, fp_id: int) -> dict:
     f = db.one(conn.execute("SELECT * FROM fingerprints WHERE site=? AND id=?", (site, fp_id)))
     if not f:
-        raise actions.ActionError("البصمة مش موجودة.")
+        raise actions.ActionError("البصمة غير موجودة.")
     nilm.delete_fingerprint(conn, site, fp_id)
-    db.audit(conn, site, "T0", "human", "fingerprint_deleted", f"انحذفت بصمة «{f['name']}».")
+    db.audit(conn, site, "T0", "human", "fingerprint_deleted", f"حُذفت بصمة «{f['name']}».")
     return state(conn, site)

@@ -35,10 +35,10 @@ KIND_NAMES = {"ac": "المكيّفات", "fan": "المراوح", "light": "ا�
               "tv": "التلفزيون", "pc": "الكمبيوترات", "washer": "الغسالة"}
 
 PERIODS = [
-    (r"الليل|بالليل|ليلا", "بالليل"),
+    (r"الليل|بالليل|ليلا", "ليلًا"),
     (r"اليوم|هاليوم", "اليوم"),
-    (r"الاسبوع|هالاسبوع|اسبوع", "هالأسبوع"),
-    (r"الشهر|هالشهر|شهر", "هالشهر"),
+    (r"الاسبوع|هالاسبوع|اسبوع", "هذا الأسبوع"),
+    (r"الشهر|هالشهر|شهر", "هذا الشهر"),
 ]
 
 PERCENT_RX = r"(\d+(?:\.\d+)?)\s*(?:%|٪|بالميه|في الميه|بالمئه|بالمائه)"
@@ -95,45 +95,45 @@ def understand(conn, site: str, text: str, bill_target_jd: float | None) -> dict
 
 def plan_steps(intent: dict) -> list[str]:
     """The plan in plain Arabic. Different goals give different plans."""
-    steps = ["أقرأ العدّاد والحسّاسات بكل غرفة كل ثانية."]
+    steps = ["أقرأ العدّاد والحسّاسات في كل غرفة كل ثانية."]
 
     # What to look at first.
     focus = [r["name"] for r in intent["rooms"]] + [KIND_NAMES.get(k, k) for k in intent["kinds"]]
     if focus:
-        steps.append(f"أبدأ من: {' و'.join(focus)} (مذكورة بالهدف)، وبعدين باقي المكان.")
-    steps.append("أدوّر على أجهزة شغّالة بغرف فاضية، وعلى حمل غريب ما بيطابق أي بصمة.")
+        steps.append(f"أبدأ بـ: {' و'.join(focus)} (المذكورة في الهدف)، ثم بقية المكان.")
+    steps.append("أبحث عن أجهزة تعمل في غرف فارغة، وعن أي حمل غريب لا يطابق أي بصمة.")
 
     # Comfort limits are always enforced by the Policy Guard; say it louder if the goal mentions comfort.
     lo, hi = config.COMFORT_MIN_TEMP_C, config.COMFORT_MAX_TEMP_C
     if intent["comfort"]:
-        steps.append(f"قبل أي اقتراح أتأكد إنه حرارة الغرفة بتضل بين {lo:g} و{hi:g} درجة، لأنك طلبت ما تنكسر الراحة.")
+        steps.append(f"قبل أي اقتراح أتأكد أن حرارة الغرفة تبقى بين {lo:g} و{hi:g} درجة، لأنك طلبت الحفاظ على الراحة.")
     else:
-        steps.append("أتأكد إنه الإطفاء ما بيكسر حدود الراحة ولا بيلمس جهاز ممنوع.")
+        steps.append("أتأكد أن الإطفاء لا يتجاوز حدود الراحة ولا يمس جهازًا ممنوعًا.")
 
     if intent["peak"]:
-        steps.append("أقترح جدول للسخّان بساعات أقصر حتى ما نطلع على شريحة أغلى.")
+        steps.append("أقترح جدولًا للسخّان بساعات أقصر حتى لا ننتقل إلى شريحة أغلى.")
 
-    steps.append("أسألك قبل أي إطفاء، وإذا ما رديت ما بعمل إشي.")
-    steps.append("بعد التنفيذ أتأكد بالعدّاد إنه الاستهلاك نزل فعلاً.")
+    steps.append("أسألك قبل أي إطفاء، وإن لم تردّ فلن أفعل شيئًا.")
+    steps.append("بعد التنفيذ أتحقق بالعدّاد من انخفاض الاستهلاك فعلًا.")
 
     # How success is measured.
     period = f" {intent['period']}" if intent["period"] else ""
     if intent["percent"]:
         steps.append(f"أقيس التوفير{period} مقابل خط الأساس (M&V) وأقارنه بهدف {intent['percent']:g}٪، "
-                     "وما بحكي رقم إلا إذا انقاس.")
+                     "ولا أذكر رقمًا إلا إذا قِيس.")
     if intent["bill_jd"]:
         steps.append(f"أقارن الفاتورة المتوقعة بهدفك ({intent['bill_jd']:g} دينار) حسب شرائح التعرفة.")
     if not intent["percent"] and not intent["bill_jd"]:
         steps.append(f"أحسب التوفير المُقاس{period} بالدينار.")
     if intent["report"] or intent["period"]:
-        steps.append("أطلع لك تقرير بالأرقام المُقاسة بس.")
+        steps.append("أُعدّ لك تقريرًا بالأرقام المُقاسة فقط.")
     return steps
 
 
 def summary(intent: dict) -> str:
     parts = []
     if intent["percent"]:
-        parts.append(f"تنزيل الاستهلاك {intent['percent']:g}٪")
+        parts.append(f"خفض الاستهلاك {intent['percent']:g}٪")
     if intent["bill_jd"]:
         parts.append(f"الفاتورة تحت {intent['bill_jd']:g} دينار")
     if intent["rooms"] or intent["kinds"]:
@@ -142,9 +142,9 @@ def summary(intent: dict) -> str:
     if intent["period"]:
         parts.append(intent["period"])
     if intent["comfort"]:
-        parts.append("بدون ما تنكسر الراحة")
+        parts.append("مع الحفاظ على الراحة")
     if not parts:
-        return "ما لقيت رقم أو غرفة محددة بكلامك، فبراقب البيت كله وبوفّر بدون هدف رقمي."
+        return "لم أجد رقمًا أو غرفة محددة في كلامك، لذا سأراقب البيت كله وأوفّر دون هدف رقمي."
     return "فهمت: " + "، ".join(parts) + "."
 
 

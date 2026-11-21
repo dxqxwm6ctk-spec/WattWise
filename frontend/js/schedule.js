@@ -19,7 +19,7 @@ const WWSched = (() => {
   // 0 = Sunday ... 6 = Saturday (JavaScript getDay). Shown from Saturday.
   const DAYS = [[6, 'سبت'], [0, 'أحد'], [1, 'إثنين'], [2, 'ثلاثاء'], [3, 'أربعاء'], [4, 'خميس'], [5, 'جمعة']];
   const ALL = [0, 1, 2, 3, 4, 5, 6];
-  const PRESETS = [['كل يوم', ALL], ['أيام الدوام', [0, 1, 2, 3, 4]], ['الويكند', [5, 6]]];
+  const PRESETS = [['كل يوم', ALL], ['أيام الدوام', [0, 1, 2, 3, 4]], ['عطلة نهاية الأسبوع', [5, 6]]];
   const KIND_ICON = { ac: '❄️', light: '💡', tv: '📺', heater: '🔥', washer: '🧺', fan: '🌀', pc: '💻', ev: '🚗', router: '📶', fridge: '🧊', fire_alarm: '🚨', emergency_light: '🚨' };
 
   const s = {
@@ -35,9 +35,9 @@ const WWSched = (() => {
 
   const api = (method, path, body) => WW.api(method, `/api/sites/${s.site}${path}`, body);
   const cur = () => s.data[s.site];
-  const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (متوقّع مش مقاس)` : '';
+  const estText = e => e ? `≈ ${fmt(e.kwh, 1)} ك.و.س/يوم · ≈ ${fmt(e.jod, 2)} دينار/يوم (تقديري، غير مُقاس)` : '';
   const minLabel = n => n === 30 ? '30 دقيقة' : n === 60 ? 'ساعة' : 'ساعتين';
-  const when = r => [r.on_time && 'يشتغل ' + r.on_time, r.off_time && 'يطفي ' + r.off_time].filter(Boolean).join(' ← ');
+  const when = r => [r.on_time && 'تشغيل ' + r.on_time, r.off_time && 'إطفاء ' + r.off_time].filter(Boolean).join(' ← ');
 
   async function load(site) {
     s.loadedAt[site] = Date.now();
@@ -73,9 +73,9 @@ const WWSched = (() => {
     const timers = a.timers.filter(t => t.device_id === d.id);
     const line = mine.length
       ? mine.map(r => `<span class="mono${r.enabled ? '' : ' off'}" dir="ltr">${esc(r.on_time || '··')}→${esc(r.off_time || '··')}</span>`).join(' ')
-      : '<span class="sch-none">بدون جدول</span>';
+      : '<span class="sch-none">دون جدول</span>';
     return `<button class="sch-dev${s.dev === d.id ? ' sel' : ''}" data-act="sc-dev" data-id="${esc(d.id)}">
-      <span class="sch-dot${d.is_on ? ' on' : ''}" title="${d.is_on ? 'شغّال' : 'مطفي'}"></span>
+      <span class="sch-dot${d.is_on ? ' on' : ''}" title="${d.is_on ? 'يعمل' : 'مطفأ'}"></span>
       <span class="sch-dev-main"><span class="sch-dev-name">${KIND_ICON[d.kind] || '🔌'} ${esc(d.name)}</span>
         <span class="sch-dev-line">${line}${timers.length ? ' <span class="sch-timer-tag">⏱ مؤقّت</span>' : ''}</span></span>
       <span class="sch-go">${s.dev === d.id ? '●' : 'جدولة ‹'}</span></button>`;
@@ -102,7 +102,7 @@ const WWSched = (() => {
         <div class="sch-item-main"><span class="mono">${esc(when(r))}</span>
           <span class="sch-item-sub">${esc(r.days_text || 'كل يوم')}${r.source === 'suggested' ? ' · مقترح ومعتمد' : r.source === 'command' ? ' · من أمر صوتي' : ''}</span>
           <span class="sch-item-sub">${estText(r.estimate)}</span></div>
-        <button class="sch-switch${r.enabled ? ' on' : ''}" data-act="sc-enable" data-id="${r.id}" data-on="${r.enabled ? 1 : 0}" aria-label="${r.enabled ? 'وقّف الجدول' : 'فعّل الجدول'}"><i></i></button>
+        <button class="sch-switch${r.enabled ? ' on' : ''}" data-act="sc-enable" data-id="${r.id}" data-on="${r.enabled ? 1 : 0}" aria-label="${r.enabled ? 'إيقاف الجدول' : 'تفعيل الجدول'}"><i></i></button>
         <button class="sch-btn danger sm" data-act="sc-del" data-id="${r.id}">حذف</button></div>`).join('');
     const tRows = timers.map(t => `<div class="sch-item timer"><span class="sch-item-main">⏱ ${esc(t.text)}</span>
         <button class="sch-btn sm" data-act="sc-timer-del" data-id="${t.id}">إلغاء</button></div>`).join('');
@@ -114,52 +114,52 @@ const WWSched = (() => {
     const timerBtns = isFor => [30, 60, 120].map(n => `<button class="sch-btn sm" data-act="sc-timer" data-min="${n}"${isFor ? ' data-for="1"' : ''}>${minLabel(n)}</button>`).join('');
     const rv = s.review;
     const review = !rv ? '' : `<div class="sch-review" role="alertdialog" aria-label="راجع الجدول">
-        <span class="sch-review-t">راجع قبل ما نحفظ</span>
+        <span class="sch-review-t">راجع قبل الحفظ</span>
         <span>${esc(rv.device_name)} · ${esc(rv.room_name)}</span>
         <span class="mono">${esc(when(rv))}</span>
         <span>${esc(rv.days_text)}</span>
         ${rv.estimate ? `<span class="sch-item-sub">${estText(rv.estimate)}</span>` : ''}
-        <span class="sch-ok">✓ حارس السياسات فحصه ووافق. رح يفحصه كمان مرة كل ما ييجي وقته.</span>
+        <span class="sch-ok">✓ فحصه حارس السياسات ووافق عليه، وسيفحصه مجددًا عند كل موعد.</span>
         <div class="sch-row"><button class="sch-btn primary" data-act="sc-confirm">${s.busy ? '…' : 'أكّد واحفظ'}</button>
           <button class="sch-btn" data-act="sc-edit">عدّل</button></div></div>`;
     return `<div class="sch-detail">
       ${drill ? '<button class="sch-back" data-act="sc-back">→ كل الأجهزة</button>' : ''}
       <div class="sch-detail-h">
         <div class="sch-dev-main"><span class="sch-detail-name">${KIND_ICON[d.kind] || '🔌'} ${esc(d.name)}</span>
-          <span class="sch-item-sub">${esc(d.room_name)} · ≈ ${fmt(d.watts)} واط · ${d.is_on ? '<b class="sch-on">شغّال هسا</b>' : 'مطفي هسا'}</span></div>
-        <button class="sch-btn${d.is_on ? '' : ' primary'}" data-act="sc-toggle" data-id="${esc(d.id)}" data-on="${d.is_on ? 1 : 0}">${d.is_on ? 'طفّيه هسا' : 'شغّله هسا'}</button>
+          <span class="sch-item-sub">${esc(d.room_name)} · ≈ ${fmt(d.watts)} واط · ${d.is_on ? '<b class="sch-on">يعمل الآن</b>' : 'مطفأ الآن'}</span></div>
+        <button class="sch-btn${d.is_on ? '' : ' primary'}" data-act="sc-toggle" data-id="${esc(d.id)}" data-on="${d.is_on ? 1 : 0}">${d.is_on ? 'أطفئه الآن' : 'شغّله الآن'}</button>
       </div>
-      <div class="sch-sec">جداول هالجهاز</div>
-      ${rows || '<span class="sch-none">ما في جداول لهالجهاز لسا.</span>'}
+      <div class="sch-sec">جداول هذا الجهاز</div>
+      ${rows || '<span class="sch-none">لا توجد جداول لهذا الجهاز بعد.</span>'}
       ${tRows}
       <div class="sch-sec">جدول جديد</div>
       <div class="sch-times">
-        <label>يشتغل الساعة<input class="sch-field" type="time" id="sc-on" value="${esc(s.on)}"></label>
-        <label>يطفي الساعة<input class="sch-field" type="time" id="sc-off" value="${esc(s.off)}"></label>
+        <label>وقت التشغيل<input class="sch-field" type="time" id="sc-on" value="${esc(s.on)}"></label>
+        <label>وقت الإطفاء<input class="sch-field" type="time" id="sc-off" value="${esc(s.off)}"></label>
       </div>
       <div class="sch-chips">${presets}</div>
       <div class="sch-chips">${dayChips}</div>
-      ${review || `<button class="sch-btn primary wide" data-act="sc-preview">${s.busy ? 'عم نفحص…' : 'راجع الجدول'}</button>`}
+      ${review || `<button class="sch-btn primary wide" data-act="sc-preview">${s.busy ? 'جارٍ الفحص…' : 'راجع الجدول'}</button>`}
       ${s.msg ? `<span class="sch-msg">${esc(s.msg)}</span>` : ''}
       <div class="sch-sec">مؤقّت سريع</div>
-      <div class="sch-row"><span class="sch-lbl">طفّيه بعد</span>${timerBtns(false)}</div>
-      <div class="sch-row"><span class="sch-lbl">شغّله لمدة</span>${timerBtns(true)}</div>
+      <div class="sch-row"><span class="sch-lbl">إطفاء بعد</span>${timerBtns(false)}</div>
+      <div class="sch-row"><span class="sch-lbl">تشغيل لمدة</span>${timerBtns(true)}</div>
     </div>`;
   }
 
   // layout: 'side' (dashboard: rooms + detail side by side) or 'drill' (phone: tap a device to open it)
   function render({ theme = 'dark', layout = 'side' } = {}) {
     const a = cur();
-    if (!a) return `<div class="sch ${theme}">${siteTabs()}<span class="sch-none">عم نحمّل…</span></div>`;
+    if (!a) return `<div class="sch ${theme}">${siteTabs()}<span class="sch-none">جارٍ التحميل…</span></div>`;
     const d = a.devices.find(x => x.id === s.dev);
     if (!d) s.dev = null;
-    const empty = !a.devices.length && !a.locked.length ? '<span class="sch-none">ما في أجهزة بهالموقع.</span>' : '';
+    const empty = !a.devices.length && !a.locked.length ? '<span class="sch-none">لا توجد أجهزة في هذا الموقع.</span>' : '';
     let body;
     if (layout === 'drill') {
       body = d ? detail(a, d, true) : rooms(a);
     } else {
       body = `<div class="sch-body">${rooms(a)}${d ? detail(a, d, false)
-        : '<div class="sch-detail hint"><span>اختار جهاز من أي غرفة عشان تشوف جداوله وتضيف جدول بالتفصيل أو تتحكّم فيه.</span></div>'}</div>`;
+        : '<div class="sch-detail hint"><span>اختر جهازًا من أي غرفة لعرض جداوله أو إضافة جدول أو التحكم به.</span></div>'}</div>`;
     }
     return `<div class="sch ${theme}">${siteTabs()}${empty}${body}</div>`;
   }
@@ -189,8 +189,8 @@ const WWSched = (() => {
     },
     'sc-preset': x => { s.days = x.days.split(',').map(Number); s.review = null; hooks.rerender(); },
     'sc-preview': async () => {
-      if (!s.on && !s.off) { s.msg = 'اختار وقت تشغيل أو وقت إطفاء (أو الاثنين).'; hooks.rerender(); return; }
-      if (!s.days.length) { s.msg = 'اختار يوم واحد على الأقل.'; hooks.rerender(); return; }
+      if (!s.on && !s.off) { s.msg = 'اختر وقت تشغيل أو إطفاء (أو كليهما).'; hooks.rerender(); return; }
+      if (!s.days.length) { s.msg = 'اختر يومًا واحدًا على الأقل.'; hooks.rerender(); return; }
       s.busy = true; s.msg = ''; hooks.rerender();
       try {
         s.review = await api('POST', '/schedules', { device_id: s.dev, on_time: s.on || null, off_time: s.off || null, days: s.days, preview: true });
@@ -204,7 +204,7 @@ const WWSched = (() => {
       s.busy = true;
       try {
         await api('POST', '/schedules', { device_id: rv.device_id, on_time: rv.on_time, off_time: rv.off_time, days: s.days });
-        resetForm(); s.msg = 'انحفظ الجدول ✓';
+        resetForm(); s.msg = 'حُفظ الجدول ✓';
       } catch (e) { s.msg = e.message; }
       s.busy = false;
     }),
@@ -212,7 +212,7 @@ const WWSched = (() => {
     'sc-del': x => act(() => api('DELETE', `/schedules/${x.id}`)),
     'sc-timer': x => act(async () => {
       await api('POST', '/timers', { device_id: s.dev, minutes: Number(x.min), turn_on: false, run_now: x.for === '1' });
-      s.msg = 'انضاف المؤقّت ✓';
+      s.msg = 'أُضيف المؤقّت ✓';
     }),
     'sc-timer-del': x => act(() => api('DELETE', `/timers/${x.id}`)),
     'sc-toggle': x => act(() => api('POST', `/devices/${x.id}/toggle`, { on: x.on !== '1' })),

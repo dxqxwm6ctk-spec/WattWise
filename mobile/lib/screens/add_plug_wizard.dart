@@ -38,7 +38,7 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
   final nameCtrl = TextEditingController();
   final Map<String, TextEditingController> optCtrls = {};
 
-  static const titles = ['اختاري المقبس الذكي', 'شو الجهاز اللي عليه؟', 'فحص الاتصال والأمان'];
+  static const titles = ['اختر المقبس الذكي', 'ما الجهاز الموصول به؟', 'فحص الاتصال والأمان'];
 
   @override
   void initState() {
@@ -184,12 +184,12 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
   Widget _step0() {
     final b = brandInfo;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('وصّلي المقبس الذكي بالكهربا وحطّي الجهاز عليه. لازم يكون المقبس مركّب أول مرة من تطبيق الشركة على نفس الـ Wi-Fi.',
+      const Text('صِل المقبس الذكي بالكهرباء وصِل الجهاز به. يجب أن يكون المقبس قد أُعدّ أول مرة من تطبيق الشركة على شبكة الـ Wi-Fi نفسها.',
           style: TextStyle(fontSize: 13, height: 1.6, color: WW.sub)),
       const SizedBox(height: 10),
-      if (scanning) _busyBox('عم ندوّر على الـ Wi-Fi…'),
+      if (scanning) _busyBox('جارٍ البحث في شبكة الـ Wi-Fi…'),
       if (!scanning && found.isEmpty)
-        const WWBox(child: Text('ما لقينا مقابس على هالشبكة. تأكدي إنو المقبس والتلفون على نفس الـ Wi-Fi، أو ضيفيه يدوي.', style: TextStyle(fontSize: 13.5, color: WW.sub))),
+        const WWBox(child: Text('لم نجد مقابس على هذه الشبكة. تأكّد أن المقبس والهاتف على شبكة الـ Wi-Fi نفسها، أو أضفه يدويًا.', style: TextStyle(fontSize: 13.5, color: WW.sub))),
       if (!scanning)
         for (final f in found) ...[
           _PlugCard(f: f, selected: pick != null && pick!['host'] == f['host'], onTap: () => setState(() {
@@ -202,7 +202,7 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
         ],
       const SizedBox(height: 8),
       Row(children: [
-        Expanded(child: OutlinedButton(onPressed: scanning ? null : _scan, child: const Text('دوّر مرة ثانية'))),
+        Expanded(child: OutlinedButton(onPressed: scanning ? null : _scan, child: const Text('ابحث مجددًا'))),
         const SizedBox(width: 8),
         Expanded(
             child: OutlinedButton(
@@ -210,13 +210,13 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
                       manual = !manual;
                       pick = null;
                     }),
-                child: Text(manual ? 'سكّر اليدوي' : 'ضيفه يدوي'))),
+                child: Text(manual ? 'إخفاء الإدخال اليدوي' : 'إضافة يدويًا'))),
       ]),
       if (manual) ...[
         const SizedBox(height: 10),
         WWBox(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const Text('شو ماركة المقبس؟', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            const Text('ما ماركة المقبس؟', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             _grid([
               for (final x in brands.where((x) => x['key'] != 'simulated'))
@@ -256,21 +256,21 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
   Widget _step1() => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _grid([for (final x in plugKinds) _chip(x.label, type == x.k, () => setState(() => type = x.k))]),
         const SizedBox(height: 12),
-        const Text('بأي غرفة؟', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+        const Text('في أي غرفة؟', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         _grid([for (final r in widget.st['rooms'] as List) _chip('${r['name']}', room == r['id'], () => setState(() => room = r['id'] as String))]),
         const SizedBox(height: 12),
-        TextField(controller: nameCtrl, decoration: _field('سمّيه، مثلًا: سخّان الحمّام')),
+        TextField(controller: nameCtrl, decoration: _field('الاسم، مثلًا: سخّان الحمّام')),
       ]);
 
   Widget _step2() {
-    if (checking) return _busyBox('عم نحكي مع المقبس…');
+    if (checking) return _busyBox('جارٍ الاتصال بالمقبس…');
     final c = check;
     if (c == null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        WWBox(color: const Color(0xFFFBE3DD), child: Text(error.isEmpty ? 'ما قدرنا نوصل للمقبس.' : error, style: const TextStyle(fontSize: 14, height: 1.7, color: Color(0xFF7A2A1C)))),
+        WWBox(color: const Color(0xFFFBE3DD), child: Text(error.isEmpty ? 'تعذّر الوصول إلى المقبس.' : error, style: const TextStyle(fontSize: 14, height: 1.7, color: Color(0xFF7A2A1C)))),
         const SizedBox(height: 8),
-        OutlinedButton(onPressed: _check, child: const Text('جرّب مرة ثانية')),
+        OutlinedButton(onPressed: _check, child: const Text('حاول مجددًا')),
       ]);
     }
     final s = c['safety'] as Map<String, dynamic>;
@@ -281,13 +281,13 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
       WWBox(
         color: WW.greenBg,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('وصلنا للمقبس ✓ ${c['on'] == true ? 'شغّال' : 'مطفي'}', style: const TextStyle(fontSize: 13, color: WW.greenText)),
+          Text('تم الاتصال بالمقبس ✓ ${c['on'] == true ? 'يعمل' : 'مطفأ'}', style: const TextStyle(fontSize: 13, color: WW.greenText)),
           if (c['meters'] == true) ...[
             Text('${WW.fmt(c['power_w'] as num?)} W', textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 24)),
-            Text(c['measured'] == true ? 'هاي بصمة الجهاز من المقبس نفسه.' : 'رح نقيس بصمته أول ما يشتغل. لهلّق نقدّرها ≈ ${c['est_w']} واط.',
+            Text(c['measured'] == true ? 'هذه بصمة الجهاز من المقبس نفسه.' : 'سنقيس بصمته عند تشغيله. التقدير الحالي ≈ ${c['est_w']} واط.',
                 style: const TextStyle(fontSize: 12, color: WW.greenText)),
           ] else
-            Text('هالمقبس ما بيقيس واط. بنتحكّم فيه، وبصمته بنقيسها على العدّاد الرئيسي (≈ ${c['est_w']} واط لهلّق).',
+            Text('هذا المقبس لا يقيس الواط. نتحكّم به ونقيس بصمته على العدّاد الرئيسي (≈ ${c['est_w']} واط حاليًا).',
                 style: const TextStyle(fontSize: 12.5, height: 1.6, color: WW.greenText)),
           Text('حد المقبس: ${WW.fmt(c['max_w'] as num?)} واط', style: const TextStyle(fontSize: 12, color: WW.greenText)),
         ]),
@@ -298,7 +298,7 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
           color: level == 'block' ? const Color(0xFFFBE3DD) : WW.pendingBg,
           border: level == 'block' ? WW.red : WW.pendingBorder,
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(level == 'block' ? 'ممنوع على هالمقبس' : '⚠️ تحذير أمان', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textColor)),
+            Text(level == 'block' ? 'ممنوع على هذا المقبس' : '⚠️ تحذير أمان', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textColor)),
             const SizedBox(height: 6),
             Text('${s['message']}', style: TextStyle(fontSize: 13.5, height: 1.7, color: textColor)),
             if (s['needs_confirm'] == true)
@@ -307,7 +307,7 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
                 onChanged: (v) => setState(() => confirmed = v ?? false),
-                title: Text('فهمت التحذير وبدّي أكمّل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
+                title: Text('فهمت التحذير وأريد المتابعة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
               ),
           ]),
         ),
@@ -316,7 +316,7 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
       if (locked)
         const WWBox(
           color: Color(0xFFFBE3DD),
-          child: Text('جهاز حرج (T2): رح نراقب استهلاكه من المقبس بس، وما حدا بيقدر يطفيه. محمي بالكود.',
+          child: Text('جهاز حرج (T2): سنراقب استهلاكه من المقبس فقط، ولا يمكن لأحد إطفاؤه. محمي برمجيًا.',
               style: TextStyle(fontSize: 13.5, height: 1.7, color: Color(0xFF7A2A1C))),
         )
       else
@@ -324,9 +324,9 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
           child: Row(children: [
             const Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('الوكيل يقترح إطفاءه لما يلاقي هدر', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                Text('يقترح الوكيل إطفاءه عند وجود هدر', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 SizedBox(height: 4),
-                Text('دايمًا بيسألك قبل، وإذا ما رديتي ما بيعمل إشي.', style: TextStyle(fontSize: 12.5, height: 1.6, color: WW.sub)),
+                Text('يسألك دائمًا قبل أي إجراء، ولا يفعل شيئًا إن لم تردّ.', style: TextStyle(fontSize: 12.5, height: 1.6, color: WW.sub)),
               ]),
             ),
             WWToggle(on: allow, onTap: () => setState(() => allow = !allow)),
@@ -384,7 +384,7 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
                 disabledBackgroundColor: const Color(0xFFD8D5CA),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               ),
-              child: Text(step == 2 ? 'ضيف الجهاز' : 'التالي', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              child: Text(step == 2 ? 'إضافة الجهاز' : 'التالي', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             ),
           ),
         ),
@@ -417,7 +417,7 @@ class _PlugCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text('${f['brand_name']} · ${f['host']}', style: TextStyle(fontSize: 12, color: fg.withValues(alpha: 0.75))),
             Text(
-              '${meters == false ? 'تشغيل وإطفاء بس (ما بيقيس واط)' : meters == true ? 'بيقيس الواط ✓' : 'بنعرف إذا بيقيس بعد الفحص'}${needs.isNotEmpty ? ' · بدّه Local Key' : ''}',
+              '${meters == false ? 'تشغيل وإطفاء فقط (لا يقيس الواط)' : meters == true ? 'يقيس الواط ✓' : 'نعرف إن كان يقيس بعد الفحص'}${needs.isNotEmpty ? ' · يحتاج Local Key' : ''}',
               style: TextStyle(fontSize: 12, color: fg.withValues(alpha: 0.75)),
             ),
           ]),
@@ -440,7 +440,7 @@ class PlugLine extends StatelessWidget {
     final online = p['online'] == true;
     final label = p['simulated'] == true && p['model'] != null ? p['model'] : p['brand_name'];
     final live = !online
-        ? 'المقبس مش متصل'
+        ? 'المقبس غير متصل'
         : p['meters'] == true && p['power_w'] != null
             ? '${WW.fmt(p['power_w'] as num)} W من المقبس'
             : 'متصل';
@@ -448,7 +448,7 @@ class PlugLine extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8),
       child: Row(children: [
         Expanded(child: Text('🔌 $label · $live', style: TextStyle(fontSize: 12, color: online ? WW.greenText : WW.red))),
-        TextButton(onPressed: onRemove, child: const Text('شيل', style: TextStyle(fontSize: 12, color: WW.sub))),
+        TextButton(onPressed: onRemove, child: const Text('إزالة', style: TextStyle(fontSize: 12, color: WW.sub))),
       ]),
     );
   }

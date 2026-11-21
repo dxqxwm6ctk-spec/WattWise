@@ -10,8 +10,8 @@ import time
 from backend import actions, billing, config, db, mv
 
 STATUS_AR = {
-    "approved": "وافقت ✓", "rejected": "رفضت", "expired": "ما في رد (ما عملنا إشي)",
-    "blocked": "منعه الـ Policy Guard", "cancelled": "إنلغى", "skipped": "الوكيل قرّر ما يسأل", "pending": "بانتظار",
+    "approved": "وافقت ✓", "rejected": "رفضت", "expired": "دون رد (لم نفعل شيئًا)",
+    "blocked": "منعه حارس السياسات", "cancelled": "أُلغي", "skipped": "قرّر الوكيل عدم السؤال", "pending": "بانتظار",
 }
 
 
@@ -27,7 +27,7 @@ def _chart(series: list[dict]) -> str:
     """Inline SVG: measured power vs the baseline model, per interval."""
     pts = [s for s in series if s["actual_w"] is not None]
     if len(pts) < 2:
-        return '<p class="muted">لسا ما في بيانات كفاية للرسم.</p>'
+        return '<p class="muted">لا توجد بيانات كافية للرسم بعد.</p>'
     w, h, pad = 900, 260, 36
     vals = [p["actual_w"] for p in pts] + [p["baseline_w"] for p in pts if p["baseline_w"] is not None]
     vmax = max(vals) * 1.1 or 1
@@ -54,7 +54,7 @@ def _chart(series: list[dict]) -> str:
   <polyline points="{actual}" fill="none" stroke="#3d6b12" stroke-width="2.5"/>
 </svg>
 <div class="legend"><span><i style="background:#3d6b12"></i>المقاس بالعدّاد (kW)</span>
-<span><i style="background:#999"></i>خط الأساس: المتوقّع بدون الوكيل</span></div>'''
+<span><i style="background:#999"></i>خط الأساس: المتوقّع دون الوكيل</span></div>'''
 
 
 def build(conn, site: str) -> str:
@@ -91,14 +91,14 @@ def build(conn, site: str) -> str:
       <tr><td>CV(RMSE)</td><td>{_num(m["cv_rmse_pct"], 2)}٪</td><td>≤ {mv.CV_RMSE_MAX:g}٪</td></tr>
       <tr><td>NMBE</td><td>{_num(m["nmbe_pct"], 2)}٪</td><td>بين ±{mv.NMBE_MAX:g}٪</td></tr>
       <tr><td>R²</td><td>{_num(m["r2"], 3)}</td><td>للمعلومية</td></tr>
-      <tr><td>النتيجة</td><td colspan="2">{"النموذج مقبول ✓" if m["passes"] else "النموذج مش مقبول، فما في رقم توفير"}</td></tr>'''
+      <tr><td>النتيجة</td><td colspan="2">{"النموذج مقبول ✓" if m["passes"] else "النموذج غير مقبول، فلا رقم للتوفير"}</td></tr>'''
 
     action_rows = "".join(
         f'<tr><td>{_e(names.get(a["device_id"], a["device_id"]))}</td><td>{_e(STATUS_AR.get(a["status"], a["status"]))}</td>'
         f'<td>{_num(a["power_before"], 0) if a["power_before"] else "—"}</td>'
         f'<td>{_num(a["power_after"], 0) if a["power_after"] else "—"}</td>'
         f'<td>{_num(a["power_before"] - a["power_after"], 0) if a["power_before"] and a["power_after"] is not None else "—"}</td></tr>'
-        for a in apps) or '<tr><td colspan="5" class="muted">لسا ما في طلبات.</td></tr>'
+        for a in apps) or '<tr><td colspan="5" class="muted">لا توجد طلبات بعد.</td></tr>'
     log_rows = "".join(f'<tr><td>{_e(x["clock"])}</td><td>{_e(x["tier"])}</td><td>{_e(x["message"])}</td></tr>' for x in log)
     synthetic = cfg["source"] == "simulator"
     now = db.site_clock(conn, site)
@@ -126,18 +126,18 @@ def build(conn, site: str) -> str:
 <body><main>
   <button class="print" onclick="window.print()">اطبع / احفظ PDF</button>
   <h1>تقرير التوفير · WattWise</h1>
-  <div class="muted">{_e(cfg["name"])} · ساعة الموقع {_e(now)} · انطبع {_e(time.strftime("%Y-%m-%d %H:%M"))}</div>
-  {'<p><span class="badge">بيانات تركيبية من المحاكي (synthetic)، مش قياسات حقيقية</span></p>' if synthetic else ''}
-  <p><b>الهدف:</b> {_e(goal["text"]) if goal else '<span class="muted">ما في هدف</span>'}</p>
+  <div class="muted">{_e(cfg["name"])} · ساعة الموقع {_e(now)} · تاريخ الطباعة {_e(time.strftime("%Y-%m-%d %H:%M"))}</div>
+  {'<p><span class="badge">بيانات تركيبية من المحاكي (synthetic)، وليست قياسات حقيقية</span></p>' if synthetic else ''}
+  <p><b>الهدف:</b> {_e(goal["text"]) if goal else '<span class="muted">لا يوجد هدف</span>'}</p>
 
   <h2>الخلاصة</h2>
   <div class="cards">
     <div class="card"><h3>التوفير حسب M&amp;V (مقارنة بخط الأساس المعدّل)</h3>{mv_main}<div class="muted">{mv_sub}</div></div>
-    <div class="card"><h3>التوفير من الإجراءات اللي أكّدها العدّاد</h3><div class="big">{_num(saved_kwh, 2)} <small>ك.و.س</small></div>
+    <div class="card"><h3>التوفير من الإجراءات التي أكّدها العدّاد</h3><div class="big">{_num(saved_kwh, 2)} <small>ك.و.س</small></div>
       <div class="muted">≈ {_num(saved_kwh * price, 3)} دينار بسعر شريحتك ({_num(price, 3)} دينار/ك.و.س) · CO₂: {"—" if co2 is None else _num(saved_kwh * co2, 2) + " كغ"}</div></div>
     <div class="card"><h3>طلبات الموافقة</h3>
-      <div>وافقت: <b>{counts.get("approved", 0)}</b> · رفضت: <b>{counts.get("rejected", 0)}</b> · ما في رد: <b>{counts.get("expired", 0)}</b></div>
-      <div class="muted">منعها الكود: {counts.get("blocked", 0)} · الوكيل قرّر ما يسأل: {counts.get("skipped", 0)}</div></div>
+      <div>وافقت: <b>{counts.get("approved", 0)}</b> · رفضت: <b>{counts.get("rejected", 0)}</b> · دون رد: <b>{counts.get("expired", 0)}</b></div>
+      <div class="muted">منعها الكود: {counts.get("blocked", 0)} · قرّر الوكيل عدم السؤال: {counts.get("skipped", 0)}</div></div>
   </div>
 
   <h2>الاستهلاك المقاس مقابل خط الأساس</h2>
@@ -152,14 +152,14 @@ def build(conn, site: str) -> str:
   <h2>سجل القرارات (آخر ٤٠)</h2>
   <table><tr><th>الوقت</th><th>المستوى</th><th>الرسالة</th></tr>{log_rows}</table>
 
-  <h2>الطريقة وملاحظات الصراحة</h2>
+  <h2>المنهجية وملاحظات الشفافية</h2>
   <ul>
-    <li>خط الأساس = نموذج انحدار (Ridge) بيتوقّع الاستهلاك من الساعة، نسبة الغرف المشغولة، ومعدّل الحرارة، متدرّب على الفترة قبل أول إجراء وافقت عليه (بروح IPMVP Option C). التوفير = خط الأساس المعدّل − المقاس.</li>
-    <li>ما بنعرض رقم توفير إلا إذا النموذج مقبول وفي بيانات كفاية. التوفير السالب بينعرض متل ما هو.</li>
+    <li>خط الأساس = نموذج انحدار (Ridge) يتوقّع الاستهلاك من الساعة ونسبة الغرف المشغولة ومعدّل الحرارة، مُدرَّب على الفترة التي سبقت أول إجراء وافقت عليه (وفق نهج IPMVP Option C). التوفير = خط الأساس المعدّل − المقاس.</li>
+    <li>لا نعرض رقم توفير إلا إذا كان النموذج مقبولًا والبيانات كافية، ويُعرض التوفير السالب كما هو.</li>
     <li>الهامش ± تقريبي (بافتراض أخطاء مستقلة بين الفترات).</li>
-    <li>التوفير من الإجراءات بينحسب بس بعد ما العدّاد يأكّد الانخفاض.</li>
-    <li>القيمة بالدينار = قيمة الطاقة بسعر الشريحة الحالية، بدون الدعم أو الرسوم. شرايح التعرفة لازم تتأكّد من فاتورة حقيقية.</li>
-    <li>معامل CO₂ لسا مش مُعبّى من مصدر رسمي، فبيبيّن «—».</li>
-    <li>الـ 15٪ هدف تصميمي، مش نتيجة.</li>
+    <li>لا يُحسب التوفير من الإجراءات إلا بعد أن يؤكّد العدّاد الانخفاض.</li>
+    <li>القيمة بالدينار = قيمة الطاقة بسعر الشريحة الحالية، دون الدعم أو الرسوم. يجب التحقق من شرائح التعرفة من فاتورة حقيقية.</li>
+    <li>معامل CO₂ لم يُحدَّد بعد من مصدر رسمي، لذا يظهر «—».</li>
+    <li>نسبة الـ 15٪ هدف تصميمي، وليست نتيجة.</li>
   </ul>
 </main></body></html>'''

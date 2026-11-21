@@ -88,7 +88,7 @@ class _SummaryCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Odometer(kwh: ((bill['kwh_now'] ?? 0) as num).toDouble()),
                   const SizedBox(height: 6),
-                  const Text('ك.و.س هالشهر', style: TextStyle(fontSize: 10, color: Color(0xFF8E8C82))),
+                  const Text('ك.و.س هذا الشهر', style: TextStyle(fontSize: 10, color: Color(0xFF8E8C82))),
                 ]),
               ),
             ]),
@@ -99,7 +99,7 @@ class _SummaryCard extends StatelessWidget {
           const Divider(color: Color(0xFF2A2C25), height: 1),
           const SizedBox(height: 8),
           Row(children: [
-            const Expanded(child: Text('الفاتورة لحد الآن', style: TextStyle(fontSize: 12, color: Color(0xFFA9A79D)))),
+            const Expanded(child: Text('الفاتورة حتى الآن', style: TextStyle(fontSize: 12, color: Color(0xFFA9A79D)))),
             Text('${WW.fmt(bill['bill_now'], 2)} JD', textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 18, fontWeight: FontWeight.w600, color: WW.paper)),
           ]),
           if (goalJd != null) ...[
@@ -147,7 +147,7 @@ class _ApprovalCard extends StatelessWidget {
         Row(children: [
           Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFFE8A21A), shape: BoxShape.circle)),
           const SizedBox(width: 8),
-          const Expanded(child: Text('بدنا رأيك', style: TextStyle(fontSize: 13, color: WW.pendingText, fontWeight: FontWeight.w600))),
+          const Expanded(child: Text('نحتاج موافقتك', style: TextStyle(fontSize: 13, color: WW.pendingText, fontWeight: FontWeight.w600))),
           Text('${left.toInt()}s', style: WW.mono.copyWith(fontSize: 13, color: WW.pendingText)),
         ]),
         const SizedBox(height: 10),
@@ -156,14 +156,14 @@ class _ApprovalCard extends StatelessWidget {
         Text('${p['reason']}', style: const TextStyle(fontSize: 14, height: 1.7, color: Color(0xFF4A4536))),
         if ((p['details'] as Map?)?['alternative'] != null) ...[
           const SizedBox(height: 6),
-          Text('إذا لا: ${p['details']['alternative']}', style: const TextStyle(fontSize: 13, height: 1.6, color: Color(0xFF6B4A00))),
+          Text('البديل: ${p['details']['alternative']}', style: const TextStyle(fontSize: 13, height: 1.6, color: Color(0xFF6B4A00))),
         ],
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(color: const Color(0xFFFBE7B5), borderRadius: BorderRadius.circular(12)),
           child: Row(children: [
-            const Expanded(child: Text('بيوفّر تقريبًا', style: TextStyle(fontSize: 13, color: Color(0xFF6B4A00)))),
+            const Expanded(child: Text('التوفير التقريبي', style: TextStyle(fontSize: 13, color: Color(0xFF6B4A00)))),
             Text('${WW.fmt(p['details']['saving_jod_per_hour'], 3)} JD / hr',
                 textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 15, fontWeight: FontWeight.w600)),
           ]),
@@ -186,7 +186,7 @@ class _ApprovalCard extends StatelessWidget {
                   side: const BorderSide(color: Color(0xFFD9C38A), width: 1.5),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                 ),
-                child: const Text('لا، خلّيه', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                child: const Text('لا، اتركه', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
             ),
           ),
@@ -198,13 +198,13 @@ class _ApprovalCard extends StatelessWidget {
               child: FilledButton(
                 onPressed: onApprove,
                 style: FilledButton.styleFrom(backgroundColor: WW.ink, foregroundColor: WW.paper, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
-                child: const Text('إيه، طفّيه', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                child: const Text('نعم، أطفئه', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
             ),
           ),
         ]),
         const SizedBox(height: 8),
-        const Text('إذا ما رديتي، ما رح نعمل إشي', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: Color(0xFF8A7A55))),
+        const Text('إن لم تردّ، لن نفعل شيئًا', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: Color(0xFF8A7A55))),
       ]),
     );
   }
@@ -226,21 +226,21 @@ class _StatusCard extends StatelessWidget {
     late final (Color, Color) c;
     late final String title, body;
     if (st['online'] != true) {
-      (c, title, body) = (red, 'ما في قراءات', 'انقطعت القراءات، فكل إشي رجع طبيعي وما في إجراء تلقائي.');
+      (c, title, body) = (red, 'لا توجد قراءات', 'انقطعت القراءات، فعادت الأجهزة إلى وضعها الطبيعي دون إجراءات تلقائية.');
     } else if (agent['estop'] == true) {
-      (c, title, body) = (red, 'WattWise موقوف', 'كل الأجهزة رجعت طبيعي. ما رح نقترح إشي لحد ما تشغّليه.');
+      (c, title, body) = (red, 'WattWise متوقف', 'عادت كل الأجهزة إلى وضعها الطبيعي. لن نقترح شيئًا حتى تعيد تشغيله.');
     } else if (agent['safe_mode'] == true) {
-      (c, title, body) = (red, 'ما في اتصال', 'الراوتر مطفي، فما بنطلب موافقة وما بننفّذ إشي.');
+      (c, title, body) = (red, 'لا يوجد اتصال', 'الراوتر مطفأ، لذا لن نطلب موافقة ولن ننفّذ شيئًا.');
     } else if (st['goal'] == null) {
-      (c, title, body) = (amber, 'بانتظار هدف', 'أعطِ الوكيل هدف من لوحة التحكم عشان يبلّش.');
+      (c, title, body) = (amber, 'بانتظار هدف', 'أعطِ الوكيل هدفًا من لوحة التحكم ليبدأ.');
     } else {
       (c, title, body) = switch (agent['phase']) {
-        'analyzing' => (amber, 'عم نفكّر', 'لاحظنا جهاز شغّال بغرفة فاضية. ثواني ونرجعلك.'),
-        'executing' => (green, 'عم نطفيه', 'وصلتنا موافقتك.'),
-        'verified' => (green, 'تم ✓', 'طفينا $dev والعدّاد أكّد. التوفير بيبيّن تحت بالفاتورة.'),
-        'rejected' => (red, 'تمام، ما لمسنا إشي', '$dev بقي متل ما بدك.'),
-        'expired' => (red, 'ما وصلنا رد', 'فما عملنا إشي. السكوت عنا مش موافقة.'),
-        _ => (green, 'كل إشي تمام', 'البيت ماشي طبيعي وما في هدر هلأ.'),
+        'analyzing' => (amber, 'جارٍ التحليل', 'لاحظنا جهازًا يعمل في غرفة فارغة. لحظات ونعود إليك.'),
+        'executing' => (green, 'جارٍ الإطفاء', 'وصلت موافقتك.'),
+        'verified' => (green, 'تم ✓', 'أطفأنا $dev وأكّد العدّاد ذلك. يظهر التوفير في قسم الفاتورة.'),
+        'rejected' => (red, 'حسنًا، لم نغيّر شيئًا', 'بقي $dev كما هو.'),
+        'expired' => (red, 'لم يصل رد', 'لذا لم نفعل شيئًا. عدم الرد لا يعني الموافقة.'),
+        _ => (green, 'كل شيء على ما يرام', 'البيت يعمل بشكل طبيعي ولا يوجد هدر الآن.'),
       };
     }
     return WWBox(
@@ -265,13 +265,13 @@ class _AnomalyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final w = (a['residual_w'] as num? ?? 0).toInt();
     final msg = a['kind'] == 'extra'
-        ? 'في جهاز عم يسحب ≈ $w واط وما بنعرفه. شيكي إذا في إشي شغّال ومش لازم.'
-        : 'الاستهلاك أقل من المتوقع بـ≈ ${-w} واط. ممكن جهاز فاصل أو معطّل.';
+        ? 'جهاز غير معروف يستهلك ≈ $w واط. تحقّق إن كان هناك جهاز يعمل دون حاجة.'
+        : 'الاستهلاك أقل من المتوقع بنحو ${-w} واط. ربما يوجد جهاز مفصول أو معطّل.';
     return WWBox(
       color: WW.pendingBg,
       border: WW.pendingBorder,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('استهلاك غريب', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: WW.pendingText)),
+        const Text('استهلاك غير معتاد', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: WW.pendingText)),
         const SizedBox(height: 4),
         Text(msg, style: const TextStyle(fontSize: 14, height: 1.7)),
       ]),
@@ -288,7 +288,7 @@ List<Map<String, dynamic>> _openAlerts(Map<String, dynamic> st) =>
         .toList();
 
 /// One warning from the agent (the same one the phone showed as a notification).
-/// "طفّيه؟" only sends an approval request; nothing is switched before "إيه، طفّيه".
+/// "أطفئه؟" only sends an approval request; nothing is switched before "نعم، أطفئه".
 class _AlertCard extends StatelessWidget {
   const _AlertCard({required this.a, required this.onAct, required this.onDismiss});
   final Map<String, dynamic> a;
@@ -319,7 +319,7 @@ class _AlertCard extends StatelessWidget {
                 child: FilledButton(
                   onPressed: onAct,
                   style: FilledButton.styleFrom(backgroundColor: WW.ink, foregroundColor: WW.paper, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                  child: const Text('طفّيه؟', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  child: const Text('أطفئه؟', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 ),
               ),
             ),
@@ -332,7 +332,7 @@ class _AlertCard extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: onDismiss,
                 style: OutlinedButton.styleFrom(foregroundColor: WW.ink, side: BorderSide(color: border, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                child: const Text('تمام', style: TextStyle(fontSize: 14)),
+                child: const Text('تجاهل', style: TextStyle(fontSize: 14)),
               ),
             ),
           ),

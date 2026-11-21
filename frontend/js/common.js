@@ -85,9 +85,9 @@ const WW = (() => {
 
   function agentLabel(st) {
     const a = st.agent;
-    if (!st.online) return { label: 'ما في قراءات · وضع آمن', color: '#E8553F' };
-    if (a.estop) return { label: 'موقوف (طوارئ)', color: '#E8553F' };
-    if (a.safe_mode) return { label: 'وضع آمن · بلا اتصال', color: '#F2B544' };
+    if (!st.online) return { label: 'لا توجد قراءات · الوضع الآمن', color: '#E8553F' };
+    if (a.estop) return { label: 'متوقف (طوارئ)', color: '#E8553F' };
+    if (a.safe_mode) return { label: 'الوضع الآمن · بلا اتصال', color: '#F2B544' };
     if (!st.goal) return { label: 'بانتظار هدف', color: '#8E8C82' };
     const label = { pending: 'بانتظار موافقة', analyzing: 'يحلّل', executing: 'ينفّذ', verified: 'تحقّق' }[a.phase] || 'يراقب';
     return { label, color: a.phase === 'pending' ? '#F2B544' : '#B8F04A' };
@@ -120,7 +120,7 @@ const WW = (() => {
         URL.revokeObjectURL(url);
         resolve(c.toDataURL('image/jpeg', 0.85));
       };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('ما قدرنا نفتح الصورة.')); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('تعذّر فتح الصورة.')); };
       img.src = url;
     });
   }

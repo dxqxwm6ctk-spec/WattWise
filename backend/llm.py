@@ -179,15 +179,15 @@ def status(conn) -> dict:
     base = {"spent_usd": round(spent, 4), "budget_usd": budget}
     p = get_provider()
     if p is None:
-        return {**base, "mode": "rules", "reason_ar": "بدون نموذج ذكاء اصطناعي (ما في مفتاح). شغّالين بالقواعد."}
+        return {**base, "mode": "rules", "reason_ar": "دون نموذج ذكاء اصطناعي (لا يوجد مفتاح). نعمل بالقواعد."}
     if not connectivity.is_online():
         return {**base, "mode": "rules", "model": p.model, "offline": True,
-                "reason_ar": "ما في إنترنت. الوكيل شغّال محليًا بالقواعد، والموافقة والإطفاء ما وقفوا."}
+                "reason_ar": "لا يوجد إنترنت. يعمل الوكيل محليًا بالقواعد، والموافقة والإطفاء مستمران."}
     if spent >= budget:
-        return {**base, "mode": "rules", "model": p.model, "reason_ar": "خلصت ميزانية الشهر. رجعنا للقواعد."}
+        return {**base, "mode": "rules", "model": p.model, "reason_ar": "نفدت ميزانية الشهر، فعدنا إلى القواعد."}
     if time.time() < _down_until:
-        return {**base, "mode": "rules", "model": p.model, "reason_ar": "النموذج ما ردّ (نت أو خطأ). شغّالين بالقواعد مؤقتًا."}
-    return {**base, "mode": "llm", "model": p.model, "reason_ar": "النموذج بيخطط وبيشرح، والقواعد والموافقة بالكود."}
+        return {**base, "mode": "rules", "model": p.model, "reason_ar": "لم يردّ النموذج (مشكلة اتصال أو خطأ). نعمل بالقواعد مؤقتًا."}
+    return {**base, "mode": "llm", "model": p.model, "reason_ar": "النموذج يخطّط ويشرح، والقواعد والموافقة في الكود."}
 
 
 def available(conn) -> bool:
@@ -229,7 +229,7 @@ def _snapshot_handler(snapshot: dict):
 PLAN_SYSTEM = (
     "You are WattWise, an energy-saving agent for a small home or lab in Jordan. "
     "The owner gives you a goal. Split it into 3 to 6 short, concrete steps you will follow, "
-    "in simple Jordanian Arabic, one sentence each. You can read sensors, weather and the tariff first. "
+    "in simple, friendly Modern Standard Arabic (not dialect), one sentence each. You can read sensors, weather and the tariff first. "
     "Rules you cannot change: you never switch a device without the owner's approval, "
     "you never touch critical loads (fridge, fire alarm, medical, emergency light), and comfort limits "
     "are enforced in code. Do not promise savings numbers; savings are only counted after the meter confirms them. "
@@ -268,7 +268,7 @@ DECIDE_SYSTEM = (
     "You are WattWise, an energy-saving agent. The detect_waste tool lists devices running in empty rooms; "
     "each one already passed the safety checks. Look at the data you need, then either call propose_action "
     "for the ONE candidate that is most worth switching off now, or call no_action if switching is not a good idea "
-    "(for example a short absence, or it would hurt comfort). Write in simple Jordanian Arabic, short, "
+    "(for example a short absence, or it would hurt comfort). Write in simple, friendly Modern Standard Arabic (not dialect), short, "
     "with the real numbers from the tools (watts, JOD per hour). Never invent numbers. "
     "The owner must approve; you only suggest."
 )
@@ -285,7 +285,7 @@ def decide_tools(candidate_ids: list[str]) -> list[dict]:
              "type": "object",
              "properties": {
                  "device_id": {"type": "string", "enum": candidate_ids},
-                 "title_ar": {"type": "string", "description": "Short question, e.g. نطفي مكيّف غرفة النوم؟"},
+                 "title_ar": {"type": "string", "description": "Short question, e.g. إطفاء مكيّف غرفة النوم؟"},
                  "reason_ar": {"type": "string", "description": "Why, with numbers, 1-2 sentences."},
                  "alternative_ar": {"type": "string", "description": "What happens if the owner says no."},
              },
@@ -317,7 +317,7 @@ def decide(provider: Provider, goal_text: str, snapshot: dict) -> tuple[dict | N
 # ---------------- job 3: read the owner's reply in "teach mode" ----------------
 
 READ_SYSTEM = (
-    "You help WattWise, an energy agent, understand the owner's short reply in Jordanian Arabic. "
+    "You help WattWise, an energy agent, understand the owner's short reply in Arabic (Modern Standard or Jordanian dialect). "
     "The meter found some electrical devices (numbered candidates with watts and a guess). "
     "The owner may confirm the guesses (intent yes), refuse (no), give names to some numbers (labels), "
     "or ask to ignore some (ignore, with ignore=true on those items). For one unknown device, the reply "

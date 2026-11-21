@@ -94,7 +94,7 @@ def build(conn, site: str) -> dict:
     # Where does the money go? From NILM-lite attribution of measured energy.
     by_cat: dict[str, float] = {}
     for d in devs:
-        cat = CATEGORY.get(d["kind"], "غيره")
+        cat = CATEGORY.get(d["kind"], "أخرى")
         by_cat[cat] = by_cat.get(cat, 0.0) + d["energy_wh"]
     total_wh = sum(by_cat.values())
     breakdown = []

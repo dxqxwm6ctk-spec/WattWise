@@ -291,7 +291,7 @@ def get_alerts(site: str):
 
 @app.post("/api/sites/{site}/alerts/{alert_id}/act")
 def post_alert_act(site: str, alert_id: int):
-    """"طفّيه؟" on a warning: creates an approval request only. Nothing is switched yet."""
+    """"أطفئه؟" on a warning: creates an approval request only. Nothing is switched yet."""
     return _run(alerts.act, site, alert_id)
 
 
@@ -331,7 +331,7 @@ def post_scenario(site: str, body: Scenario):
 @app.post("/api/sites/{site}/tariff")
 def post_tariff(site: str, body: TariffType):
     if body.type not in config.load_tariff()["types"]:
-        raise HTTPException(status_code=400, detail="نوع اشتراك مش معروف.")
+        raise HTTPException(status_code=400, detail="نوع اشتراك غير معروف.")
     with db.connect() as conn:
         db.set_state(conn, f"tariff_type:{site}", body.type)
     return {"ok": True}
@@ -364,7 +364,7 @@ def get_plug_brands():
 def get_plug_scan(site: str, lan: bool = True):
     """Look for smart plugs on the local Wi-Fi (a few seconds). Changes nothing."""
     if site not in config.load_sites():
-        raise HTTPException(status_code=400, detail="هذا الموقع مش معروف.")
+        raise HTTPException(status_code=400, detail="هذا الموقع غير معروف.")
     with db.connect() as conn:
         used = {p["host"] for p in smartplugs.by_device(conn, site).values()}
     found = plug_scan.scan(include_lan=lan)

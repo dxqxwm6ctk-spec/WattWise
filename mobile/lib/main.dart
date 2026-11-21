@@ -149,24 +149,24 @@ class _RootPageState extends State<RootPage> {
       context: context,
       barrierDismissible: api != null,
       builder: (c) => AlertDialog(
-        title: Text(notFound ? 'ما لقينا اللابتوب' : 'وين السيرفر؟'),
+        title: Text(notFound ? 'لم نجد اللابتوب' : 'أين الخادم؟'),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('تأكد إنه WattWise شغّال على اللابتوب، وإنه الهاتف واللابتوب على نفس الـ Wi-Fi.'),
+          const Text('تأكد أن WattWise يعمل على اللابتوب، وأن الهاتف واللابتوب على شبكة الـ Wi-Fi نفسها.'),
           const SizedBox(height: 14),
           FilledButton.icon(
             onPressed: () => Navigator.pop(c, _choiceScan),
             style: FilledButton.styleFrom(backgroundColor: WW.ink),
             icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('امسح الـ QR من لوحة التحكم'),
+            label: const Text('امسح رمز QR من لوحة التحكم'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () => Navigator.pop(c, _choiceSearch),
             icon: const Icon(Icons.wifi_find),
-            label: const Text('دوّر مرة تانية'),
+            label: const Text('ابحث مجددًا'),
           ),
           const SizedBox(height: 14),
-          const Text('أو اكتب العنوان بإيدك:', style: TextStyle(fontSize: 13, color: WW.sub)),
+          const Text('أو أدخل العنوان يدويًا:', style: TextStyle(fontSize: 13, color: WW.sub)),
           TextField(
             controller: ctrl,
             textDirection: TextDirection.ltr,
@@ -200,7 +200,7 @@ class _RootPageState extends State<RootPage> {
       await Notifier.instance.handleState(s);
       _onNotificationOpened();
     } catch (e) {
-      if (mounted) setState(() => connectionError = 'ما قدرنا نوصل للسيرفر (${a.baseUrl}).');
+      if (mounted) setState(() => connectionError = 'تعذّر الوصول إلى الخادم (${a.baseUrl}).');
       // Still on the splash and the server keeps failing: ask once, quietly retrying meanwhile.
       failedTries++;
       if (st == null && failedTries >= 8 && !askedAfterFailures) {
@@ -212,7 +212,7 @@ class _RootPageState extends State<RootPage> {
     }
   }
 
-  /// A notification was tapped: go to the home tab. If "طفّيه؟" was pressed,
+  /// A notification was tapped: go to the home tab. If "أطفئه؟" was pressed,
   /// ask the backend for an approval request (the human still has to approve it).
   /// It is also called after every refresh, to catch a tap that came before the first
   /// state. It only moves to the home tab when there really was a tap; before this
@@ -234,7 +234,7 @@ class _RootPageState extends State<RootPage> {
     } on ApiException catch (e) {
       _snack(e.message);
     } catch (_) {
-      _snack('ما قدرنا نوصل للسيرفر.');
+      _snack('تعذّر الوصول إلى الخادم.');
     }
     await _refresh();
   }
@@ -290,7 +290,7 @@ class _Header extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(siteName, style: const TextStyle(fontSize: 13, color: WW.sub)),
             const SizedBox(height: 2),
-            const Text('أهلين 👋', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+            const Text('أهلًا 👋', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
           ]),
         ),
         Container(

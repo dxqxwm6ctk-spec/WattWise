@@ -76,7 +76,7 @@ class _BillPhotoCardState extends State<BillPhotoCard> {
   Future<void> sendManual() async {
     final k = double.tryParse(kwh.text.trim());
     if (k == null || k <= 0) {
-      setState(() => msg = 'اكتب الكيلوواط ساعة (ك.و.س) من الفاتورة.');
+      setState(() => msg = 'أدخل الاستهلاك بالكيلوواط ساعة (ك.و.س) من الفاتورة.');
       return;
     }
     await send(() => widget.api.billManual(k, double.tryParse(days.text.trim()), double.tryParse(amount.text.trim())));
@@ -100,7 +100,7 @@ class _BillPhotoCardState extends State<BillPhotoCard> {
         const Text('حلّل فاتورتك من صورة', style: TextStyle(fontSize: 13, color: WW.sub)),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: lineButton(busy ? 'عم نقرأ…' : '📷 صوّر الفاتورة',
+          Expanded(child: lineButton(busy ? 'جارٍ القراءة…' : '📷 صوّر الفاتورة',
               busy || !photoOk ? null : () => pick(ImageSource.camera), border: WW.ink)),
           const SizedBox(width: 8),
           Expanded(child: lineButton('من المعرض', busy || !photoOk ? null : () => pick(ImageSource.gallery), border: WW.ink)),
@@ -111,7 +111,7 @@ class _BillPhotoCardState extends State<BillPhotoCard> {
         else
           TextButton(
             onPressed: () => setState(() => manual = !manual),
-            child: const Text('أو اكتب الأرقام بإيدك', style: TextStyle(color: Color(0xFF5E5C55), decoration: TextDecoration.underline)),
+            child: const Text('أو أدخل الأرقام يدويًا', style: TextStyle(color: Color(0xFF5E5C55), decoration: TextDecoration.underline)),
           ),
         if (msg.isNotEmpty) ...[
           const SizedBox(height: 6),
@@ -127,7 +127,7 @@ class _BillPhotoCardState extends State<BillPhotoCard> {
             Expanded(child: TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: wwField('المبلغ (دينار)'))),
           ]),
           const SizedBox(height: 8),
-          darkButton(busy ? 'عم نحلّل…' : 'حلّل الأرقام', busy ? null : sendManual),
+          darkButton(busy ? 'جارٍ التحليل…' : 'حلّل الأرقام', busy ? null : sendManual),
         ],
         if (r != null && bill != null) ...[
           const SizedBox(height: 10),
@@ -152,7 +152,7 @@ class _BillPhotoCardState extends State<BillPhotoCard> {
           Text('${r['note']}', style: const TextStyle(fontSize: 11.5, color: WW.sub)),
         ],
         const SizedBox(height: 8),
-        const Text('الصورة بتنقرأ مرة وحدة وما بتنحفظ. بنحتفظ بس بالأرقام.', style: TextStyle(fontSize: 11, color: WW.sub)),
+        const Text('تُقرأ الصورة مرة واحدة ولا تُحفظ، ونحتفظ بالأرقام فقط.', style: TextStyle(fontSize: 11, color: WW.sub)),
       ]),
     );
   }

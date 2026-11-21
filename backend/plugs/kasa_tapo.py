@@ -24,7 +24,7 @@ def _lib():
         import kasa  # noqa: F401
         return kasa
     except ImportError:
-        raise PlugError("مكتبة python-kasa مش منزّلة. نفّذ: pip install python-kasa")
+        raise PlugError("مكتبة python-kasa غير مثبّتة. نفّذ: pip install python-kasa")
 
 
 def _credentials(kasa):
@@ -36,7 +36,7 @@ async def _connect(host: str):
     kasa = _lib()
     dev = await kasa.Discover.discover_single(host, credentials=_credentials(kasa), timeout=TIMEOUT_S)
     if dev is None:
-        raise PlugError("ما لقينا مقبس TP-Link على هالعنوان.")
+        raise PlugError("لم نجد مقبس TP-Link على هذا العنوان.")
     await dev.update()
     return dev
 
@@ -56,8 +56,8 @@ def _run(coro):
         raise
     except Exception as exc:
         if "auth" in type(exc).__name__.lower() or "auth" in str(exc).lower():
-            raise PlugError("مقبس Tapo بدّه إيميل وكلمة سر حساب TP-Link بملف .env (مرة وحدة).")
-        raise PlugError("مقبس TP-Link ما رد. تأكد إنه على نفس الـ Wi-Fi.")
+            raise PlugError("مقبس Tapo يحتاج بريد وكلمة سر حساب TP-Link في ملف .env (مرة واحدة).")
+        raise PlugError("لم يردّ مقبس TP-Link. تأكد أنه على شبكة الـ Wi-Fi نفسها.")
 
 
 def status(host: str, options: dict) -> PlugStatus:

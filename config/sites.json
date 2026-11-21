@@ -2,7 +2,7 @@
   "_note": "Sites, rooms and devices. 'home' is the simulated house and 'building' a simulated 10-room office floor (digital twins, synthetic data). 'lab' is the real test room with the ESP32. rated_w is the nameplate value, used only as a first guess until the meter measures the real load signature. 'sim' values are only read by the simulator; 'sim.unlabeled' are synthetic devices the backend does not know, used by teach mode (the AI learns them from the meter).",
   "sites": {
     "home": {
-      "name": "بيت العيلة",
+      "name": "بيت العائلة",
       "source": "simulator",
       "rooms": [
         {"id": "living", "name": "الصالون", "sim": {"occupied": true, "temp_c": 24.5, "unlabeled": [{"name": "laptop", "w": 62, "pf": 0.57}, {"name": "floor lamp LED", "w": 9, "pf": 0.6}]}},
@@ -31,10 +31,10 @@
       "ev": {"battery_kwh": 60, "target_soc": 80, "ready_by": "07:00", "night_price_jod_per_kwh": null, "main_breaker_w": 9200,
              "sim": {"arrive_soc": 30},
              "source": "Simulated home wallbox: 7.4 kW = 230 V x 32 A single phase (IEC 61851 Mode 3). 60 kWh battery is a synthetic assumption for a mid-size EV. main_breaker_w: 40 A x 230 V, an assumed house main breaker; set it to the real one. No real car data."},
-      "demo_waste": {"room": "bedroom", "device": "bedAc", "label": "١ · غرفة النوم فاضية والشباك مفتوح"},
+      "demo_waste": {"room": "bedroom", "device": "bedAc", "label": "١ · غرفة النوم فارغة والشباك مفتوح"},
       "limits": {"max_current_a": 25, "_note": "Simulated main breaker of the digital-twin house (synthetic, for the overload warning demo)."},
       "overload_devices": ["heater", "washer"],
-      "labels": {"mode": "وضع البيت", "goal": "هدف العيلة", "map": "HOME MAP · غرف البيت", "meter": "عدّاد البيت", "max_w": 4000}
+      "labels": {"mode": "وضع البيت", "goal": "هدف العائلة", "map": "HOME MAP · غرف البيت", "meter": "عدّاد البيت", "max_w": 4000}
     },
     "lab": {
       "name": "غرفة المختبر",
@@ -81,7 +81,7 @@
         {"id": "off4Pc", "name": "كمبيوتر مكتب ٤", "room": "office4", "kind": "pc", "rated_w": 150, "tier": "T1", "on": false},
         {"id": "meetAc", "name": "مكيّف الاجتماعات", "room": "meeting", "kind": "ac", "rated_w": 1500, "tier": "T1", "on": true, "setpoint": 24},
         {"id": "meetLight", "name": "إنارة الاجتماعات", "room": "meeting", "kind": "light", "rated_w": 60, "tier": "T1", "on": true},
-        {"id": "projector", "name": "البروجكتر", "room": "training", "kind": "other", "rated_w": 250, "tier": "T1", "on": true},
+        {"id": "projector", "name": "جهاز العرض", "room": "training", "kind": "other", "rated_w": 250, "tier": "T1", "on": true},
         {"id": "trainAc", "name": "مكيّف قاعة التدريب", "room": "training", "kind": "ac", "rated_w": 1800, "tier": "T1", "on": true, "setpoint": 23},
         {"id": "trainLight", "name": "إنارة قاعة التدريب", "room": "training", "kind": "light", "rated_w": 120, "tier": "T1", "on": true},
         {"id": "kettle", "name": "الغلّاية", "room": "kitchenette", "kind": "heater", "rated_w": 1500, "tier": "T1", "on": false},
@@ -93,7 +93,7 @@
         {"id": "emergencyLight", "name": "إنارة الطوارئ", "room": "corridor", "kind": "emergency_light", "rated_w": 10, "tier": "T2", "on": true},
         {"id": "bldFireAlarm", "name": "إنذار الحريق", "room": "corridor", "kind": "fire_alarm", "rated_w": 3, "tier": "T2", "on": true}
       ],
-      "demo_waste": {"room": "meeting", "device": "meetAc", "label": "١ · غرفة الاجتماعات فاضية والشباك مفتوح"},
+      "demo_waste": {"room": "meeting", "device": "meetAc", "label": "١ · غرفة الاجتماعات فارغة والشباك مفتوح"},
       "labels": {"mode": "وضع المبنى", "goal": "هدف المبنى", "map": "BUILDING · ١٠ غرف", "meter": "عدّاد المبنى", "max_w": 12000}
     }
   }

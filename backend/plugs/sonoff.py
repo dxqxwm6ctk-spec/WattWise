@@ -17,7 +17,7 @@ def _post(host: str, options: dict, path: str, data: dict, timeout: float | None
     body = {"deviceid": options.get("device_id", ""), "data": data}
     ans = http_json("POST", f"http://{host}:{PORT}/zeroconf/{path}", body, **({"timeout": timeout} if timeout else {}))
     if ans.get("error") not in (0, None):
-        raise PlugError(f"الـ Sonoff رد بخطأ ({ans.get('error')}).")
+        raise PlugError(f"ردّ جهاز Sonoff بخطأ ({ans.get('error')}).")
     return ans
 
 

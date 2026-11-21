@@ -47,7 +47,7 @@ def projection(today_kwh: float, price_jod_per_kwh: float, co2_kg_per_kwh: float
         "jod_year": round(kwh * price_jod_per_kwh),
         "co2_t_year": None if co2_kg_per_kwh is None else round(kwh * co2_kg_per_kwh / 1000, 1),
         "how_ar": (f"توفير اليوم المُقاس ({today_kwh:.3f} ك.و.س) × {DAYS_PER_YEAR} يوم × {HOMES} بيت. "
-                   "هذا تقدير مش نتيجة مضمونة، وبيفترض إنه كل بيت بيوفّر قد اللي وفّرناه اليوم."),
+                   "هذا تقدير وليس نتيجة مضمونة، ويفترض أن كل بيت يوفّر قدر ما وفّرناه اليوم."),
     }
 
 
