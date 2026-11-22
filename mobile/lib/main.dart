@@ -55,10 +55,11 @@ class _RootPageState extends State<RootPage> {
   // What the "where is the server?" dialog can return besides a typed address.
   static const _choiceSearch = '#search';
   static const _choiceScan = '#scan';
-  // Optional server baked in at build time, for example the online Railway copy:
+  // The online server on Railway. It runs in the cloud all the time, so the app
+  // works from anywhere without the laptop. Another address can be baked in at build time:
   //   flutter build ios --dart-define=WATTWISE_SERVER=https://example.up.railway.app
-  // Empty by default, so normal builds still look for the laptop on the Wi-Fi.
-  static const _builtInServer = String.fromEnvironment('WATTWISE_SERVER');
+  static const _cloudServer = String.fromEnvironment('WATTWISE_SERVER',
+      defaultValue: 'https://wattwise-production-f321c49b.up.railway.app');
 
   WattWiseApi? api;
   Map<String, dynamic>? st;
@@ -96,10 +97,15 @@ class _RootPageState extends State<RootPage> {
     var url = prefs.getString(_urlKey);
     // When the web build is served by our own backend, use the same address.
     if (url == null && kIsWeb && Uri.base.scheme.startsWith('http')) url = Uri.base.origin;
-    if (url == null && _builtInServer.isNotEmpty) url = _builtInServer;
-    // Use the saved address if the server answers there; otherwise look for it on the network.
+    // Use the saved address if the server answers there (for example the laptop during the
+    // offline demo). Otherwise use the online server. Only if that fails too (no internet),
+    // look for the laptop on the Wi-Fi.
     if (url != null && (kIsWeb || await isWattWise(url))) {
       _connect(url);
+      return;
+    }
+    if (url != _cloudServer && await isWattWise(_cloudServer)) {
+      _connect(_cloudServer);
       return;
     }
     await _searchAndConnect();
@@ -149,13 +155,19 @@ class _RootPageState extends State<RootPage> {
       context: context,
       barrierDismissible: api != null,
       builder: (c) => AlertDialog(
-        title: Text(notFound ? 'لم نجد اللابتوب' : 'أين الخادم؟'),
+        title: Text(notFound ? 'تعذّر الوصول إلى الخادم' : 'أين الخادم؟'),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('تأكد أن WattWise يعمل على اللابتوب، وأن الهاتف واللابتوب على شبكة الـ Wi-Fi نفسها.'),
+          const Text('تأكد أن الهاتف متصل بالإنترنت لاستخدام الخادم الأونلاين، أو استخدم اللابتوب على شبكة الـ Wi-Fi نفسها.'),
           const SizedBox(height: 14),
           FilledButton.icon(
-            onPressed: () => Navigator.pop(c, _choiceScan),
+            onPressed: () => Navigator.pop(c, _cloudServer),
             style: FilledButton.styleFrom(backgroundColor: WW.ink),
+            icon: const Icon(Icons.cloud_outlined),
+            label: const Text('استخدم الخادم الأونلاين'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.pop(c, _choiceScan),
             icon: const Icon(Icons.qr_code_scanner),
             label: const Text('امسح رمز QR من لوحة التحكم'),
           ),

@@ -4,6 +4,13 @@
 > `python scripts/run_demo.py`. نسخة Railway بس عشان تفرجي حدا المشروع من أي مكان
 > (زميل، مشرف، رابط بالـ proposal).
 
+## شغّال لحاله بدون اللابتوب
+
+- الرابط المباشر (السيرفر + اللوحة): https://wattwise-production-f321c49b.up.railway.app/index.html
+  وصفحة الموبايل: `/app.html`.
+- Railway مربوط بـ GitHub: كل ما ينرفع تعديل على `main`، Railway بيبني وبينشر **لحاله**. ما في داعي تفتح اللابتوب.
+- تطبيق Flutter بيتصل بهاد الرابط تلقائياً. اللابتوب بس احتياط للعرض بدون إنترنت.
+
 ## شو اللي بصير على Railway؟
 
 - إعدادات Railway موجودة بالملف `.railway/railway.py` (بدل `railway.json` القديم اللي Railway وقّف يقرأه بـ 1/12/2026)، وRailway بشغّل الأمر `python scripts/cloud_start.py`.
