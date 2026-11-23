@@ -367,7 +367,7 @@ class _ReportCardState extends State<ReportCard> {
           // The file download lives on the dashboard; on the phone we copy the text to share it.
           darkButton('انسخ التقرير', () async {
             await Clipboard.setData(ClipboardData(text: text));
-            setState(() => saved = 'نُسخ ✓ يمكنك لصقه في رسالة أو ملف.');
+            setState(() => saved = 'نُسخ ✓');
           }, height: 46),
           if (saved.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(saved, style: const TextStyle(fontSize: 12, color: WW.sub))),
         ],

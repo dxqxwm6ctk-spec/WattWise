@@ -79,7 +79,7 @@ const WW = (() => {
         halt: { tag: phase === 'rejected' ? 'مرفوض' : phase === 'offline' ? 'بلا اتصال' : 'انتهت المهلة', color: '#E8553F', text: '#ECEBE4', bg: '#1E1412', border: '#4A2620' },
         todo: { tag: '', color: '#5E5C55', text: '#8E8C82', bg: 'transparent', border: '#23251F' },
       }[s];
-      return { n: String(i + 1).padStart(2, '0'), label, ...m };
+      return { n: String(i + 1).padStart(2, '0'), label, state: s, ...m };
     });
   }
 

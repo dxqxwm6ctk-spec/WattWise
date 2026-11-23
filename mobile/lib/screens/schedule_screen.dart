@@ -37,7 +37,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Map<String, dynamic>? review;
   String formMsg = '';
 
-  static const sites = [('home', '🏠 البيت'), ('building', '🏢 المبنى'), ('lab', '🔬 المختبر')];
+  static const sites = [('home', 'البيت'), ('building', 'المبنى'), ('lab', 'المختبر')];
   // 0 = Sunday ... 6 = Saturday (the server's numbers). Shown from Saturday.
   static const dayNames = [(6, 'سبت'), (0, 'أحد'), (1, 'إثنين'), (2, 'ثلاثاء'), (3, 'أربعاء'), (4, 'خميس'), (5, 'جمعة')];
   static const allDays = [0, 1, 2, 3, 4, 5, 6];
@@ -102,10 +102,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Future<void> apply() async {
     final p = proposal!;
     await widget.run(() => widget.api.applyHeater('${p['device_id']}', p['items'] as List));
-    final t = p['total'];
     setState(() {
       proposal = null;
-      heaterMsg = 'حُفظ جدول السخّان ✓ يستهلك ≈ ${WW.fmt(t['kwh'], 1)} ك.و.س يوميًا (≈ ${WW.fmt(t['jod'], 2)} دينار، تقديري وغير مُقاس).';
+      heaterMsg = 'حُفظ جدول السخّان ✓';
     });
   }
 
@@ -432,7 +431,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               Text('${r['days_text']}', style: const TextStyle(fontSize: 13.5)),
               if (r['estimate'] != null) Text(est(r['estimate']), style: sub),
               const SizedBox(height: 4),
-              const Text('✓ فحصه حارس السياسات ووافق عليه، وسيفحصه مجددًا عند كل موعد.',
+              const Text('✓ مسموح',
                   style: TextStyle(fontSize: 12, color: WW.greenText)),
               const SizedBox(height: 8),
               Row(children: [

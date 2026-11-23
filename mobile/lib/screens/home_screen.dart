@@ -1,12 +1,9 @@
-// "البيت" tab: live load, monthly meter, bill so far, and the approval card.
+// "البيت" tab: the approval card (or the agent status), key numbers and open alerts.
 
 import 'package:material_ui/material_ui.dart';
 
 import '../api.dart';
 import '../theme.dart';
-import '../widgets/assistant_widgets.dart';
-import '../widgets/device_visuals.dart';
-import '../widgets/meter_widgets.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.st, required this.api, required this.run, required this.onApprove, required this.onReject});
@@ -20,15 +17,11 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final pending = st['pending'] as Map<String, dynamic>?;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      CommandCard(api: api),
-      const SizedBox(height: 12),
-      _SummaryCard(st: st),
-      const SizedBox(height: 12),
-      RunningNowCard(devices: st['devices'] as List<dynamic>, pendingDeviceId: pending?['device_id'] as String?),
-      const SizedBox(height: 12),
       pending != null
           ? _ApprovalCard(p: pending, onApprove: () => run(() => onApprove(pending['id'])), onReject: () => run(() => onReject(pending['id'])))
           : _StatusCard(st: st),
+      const SizedBox(height: 12),
+      _SummaryCard(st: st),
       for (final a in _openAlerts(st)) ...[
         const SizedBox(height: 12),
         _AlertCard(a: a, onAct: () => run(() => api.alertAct(a['id'] as int)), onDismiss: () => run(() => api.alertDismiss(a['id'] as int))),
@@ -53,78 +46,25 @@ class _SummaryCard extends StatelessWidget {
     final goal = st['goal'] as Map<String, dynamic>?;
     final goalJd = goal?['bill_target_jd'] as num?;
     final proj = (bill['bill_projected'] as num).toDouble();
-    final projColor = goalJd != null && proj > goalJd ? WW.amber : WW.lime;
-    final kw = maxW > 1000 ? WW.fmt(w / 1000, 2) : WW.fmt(w);
-    const light = TextStyle(color: Color(0xFFA9A79D));
+    final over = goalJd != null && proj > goalJd;
+    final kw = maxW > 1000 ? '${WW.fmt(w / 1000, 2)} kW' : '${WW.fmt(w)} W';
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const RadialGradient(center: Alignment.topCenter, radius: 1.3, colors: [WW.darkCard1, WW.darkCard2]),
-        boxShadow: const [BoxShadow(color: Color(0x99141408), blurRadius: 26, offset: Offset(0, 14), spreadRadius: -18)],
-      ),
-      child: DefaultTextStyle(
-        style: const TextStyle(color: WW.paper),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Directionality(
-            textDirection: TextDirection.ltr,
-            child: Row(children: [
-              Stack(clipBehavior: Clip.none, children: [
-                LoadGauge(watts: w, maxWatts: maxW),
-                const Positioned(left: 6, top: 86, child: Text('0', style: TextStyle(fontSize: 9, color: Color(0xFF8E8C82)))),
-                Positioned(right: 2, top: 86, child: Text(maxW > 1000 ? '${maxW ~/ 1000}kW' : '${maxW.toInt()}W', style: const TextStyle(fontSize: 9, color: Color(0xFF8E8C82)))),
-              ]),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  const Text('الحمل الآن', style: TextStyle(fontSize: 11, color: Color(0xFFA9A79D))),
-                  const SizedBox(height: 6),
-                  Row(mainAxisAlignment: MainAxisAlignment.end, crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                    Text(kw, style: WW.mono.copyWith(fontSize: 28, fontWeight: FontWeight.w600, color: WW.paper)),
-                    const SizedBox(width: 4),
-                    Text(maxW > 1000 ? 'kW' : 'W', style: WW.mono.copyWith(fontSize: 11, color: const Color(0xFFA9A79D))),
-                  ]),
-                  const SizedBox(height: 6),
-                  Odometer(kwh: ((bill['kwh_now'] ?? 0) as num).toDouble()),
-                  const SizedBox(height: 6),
-                  const Text('ك.و.س هذا الشهر', style: TextStyle(fontSize: 10, color: Color(0xFF8E8C82))),
-                ]),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 10),
-          RoomBars(rooms: st['rooms'] as List<dynamic>, maxWatts: maxW * 0.6),
-          const SizedBox(height: 8),
-          const Divider(color: Color(0xFF2A2C25), height: 1),
-          const SizedBox(height: 8),
-          Row(children: [
-            const Expanded(child: Text('الفاتورة حتى الآن', style: TextStyle(fontSize: 12, color: Color(0xFFA9A79D)))),
-            Text('${WW.fmt(bill['bill_now'], 2)} JD', textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 18, fontWeight: FontWeight.w600, color: WW.paper)),
+    Widget line(String label, String value, {Color? color}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(children: [
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 14, color: WW.sub))),
+            Text(value, textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 17, fontWeight: FontWeight.w600, color: color ?? WW.ink)),
           ]),
-          if (goalJd != null) ...[
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(value: (proj / goalJd).clamp(0, 1).toDouble(), minHeight: 4, backgroundColor: const Color(0xFF33352D), color: projColor),
-            ),
-            const SizedBox(height: 6),
-            Row(children: [
-              const Expanded(child: Text('متوقّع آخر الشهر', style: TextStyle(fontSize: 11, color: Color(0xFF8E8C82)))),
-              Text.rich(
-                TextSpan(children: [
-                  TextSpan(text: WW.fmt(proj, 1), style: TextStyle(color: projColor)),
-                  TextSpan(text: ' / ${WW.fmt(goalJd)} JD'),
-                ]),
-                textDirection: TextDirection.ltr,
-                style: WW.mono.copyWith(fontSize: 11, color: const Color(0xFF8E8C82)),
-              ),
-            ]),
-          ],
-          const SizedBox(height: 6),
-          Text('${bill['message']}', style: light.copyWith(fontSize: 12, height: 1.55, color: const Color(0xFFC8E68A))),
-        ]),
-      ),
+        );
+
+    return WWBox(
+      radius: 20,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        line('الاستهلاك الآن', kw),
+        line('الفاتورة حتى الآن', '${WW.fmt(bill['bill_now'], 2)} JD'),
+        line('المتوقّع آخر الشهر', goalJd != null ? '${WW.fmt(proj, 1)} / ${WW.fmt(goalJd)} JD' : '${WW.fmt(proj, 1)} JD',
+            color: over ? WW.pendingText : null),
+      ]),
     );
   }
 }
@@ -226,21 +166,21 @@ class _StatusCard extends StatelessWidget {
     late final (Color, Color) c;
     late final String title, body;
     if (st['online'] != true) {
-      (c, title, body) = (red, 'لا توجد قراءات', 'انقطعت القراءات، فعادت الأجهزة إلى وضعها الطبيعي دون إجراءات تلقائية.');
+      (c, title, body) = (red, 'لا توجد قراءات', 'عادت الأجهزة إلى وضعها الطبيعي.');
     } else if (agent['estop'] == true) {
-      (c, title, body) = (red, 'WattWise متوقف', 'عادت كل الأجهزة إلى وضعها الطبيعي. لن نقترح شيئًا حتى تعيد تشغيله.');
+      (c, title, body) = (red, 'WattWise متوقف', 'عادت الأجهزة إلى وضعها الطبيعي.');
     } else if (agent['safe_mode'] == true) {
-      (c, title, body) = (red, 'لا يوجد اتصال', 'الراوتر مطفأ، لذا لن نطلب موافقة ولن ننفّذ شيئًا.');
+      (c, title, body) = (red, 'لا يوجد اتصال', 'لن ننفّذ شيئًا حتى يعود الاتصال.');
     } else if (st['goal'] == null) {
       (c, title, body) = (amber, 'بانتظار هدف', 'أعطِ الوكيل هدفًا من لوحة التحكم ليبدأ.');
     } else {
       (c, title, body) = switch (agent['phase']) {
-        'analyzing' => (amber, 'جارٍ التحليل', 'لاحظنا جهازًا يعمل في غرفة فارغة. لحظات ونعود إليك.'),
+        'analyzing' => (amber, 'جارٍ التحليل', 'جهاز يعمل في غرفة فارغة.'),
         'executing' => (green, 'جارٍ الإطفاء', 'وصلت موافقتك.'),
-        'verified' => (green, 'تم ✓', 'أطفأنا $dev وأكّد العدّاد ذلك. يظهر التوفير في قسم الفاتورة.'),
+        'verified' => (green, 'تم ✓', 'أُطفئ $dev وأكّد العدّاد ذلك.'),
         'rejected' => (red, 'حسنًا، لم نغيّر شيئًا', 'بقي $dev كما هو.'),
         'expired' => (red, 'لم يصل رد', 'لذا لم نفعل شيئًا. عدم الرد لا يعني الموافقة.'),
-        _ => (green, 'كل شيء على ما يرام', 'البيت يعمل بشكل طبيعي ولا يوجد هدر الآن.'),
+        _ => (green, 'كل شيء على ما يرام', 'لا يوجد هدر الآن.'),
       };
     }
     return WWBox(

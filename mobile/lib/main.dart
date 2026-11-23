@@ -160,7 +160,7 @@ class _RootPageState extends State<RootPage> {
       builder: (c) => AlertDialog(
         title: Text(notFound ? 'تعذّر الوصول إلى الخادم' : 'أين الخادم؟'),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('تأكد أن الهاتف متصل بالإنترنت لاستخدام الخادم الأونلاين، أو استخدم اللابتوب على شبكة الـ Wi-Fi نفسها.'),
+          const Text('اختر طريقة الاتصال:'),
           const SizedBox(height: 14),
           FilledButton.icon(
             onPressed: () => Navigator.pop(c, _cloudServer),
@@ -305,7 +305,7 @@ class _Header extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(siteName, style: const TextStyle(fontSize: 13, color: WW.sub)),
             const SizedBox(height: 2),
-            const Text('أهلًا 👋', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+            const Text('WattWise', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
           ]),
         ),
         Container(

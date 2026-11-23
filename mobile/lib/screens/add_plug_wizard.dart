@@ -298,7 +298,7 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
           color: level == 'block' ? const Color(0xFFFBE3DD) : WW.pendingBg,
           border: level == 'block' ? WW.red : WW.pendingBorder,
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(level == 'block' ? 'ممنوع على هذا المقبس' : '⚠️ تحذير أمان', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textColor)),
+            Text(level == 'block' ? 'ممنوع على هذا المقبس' : 'تحذير أمان', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textColor)),
             const SizedBox(height: 6),
             Text('${s['message']}', style: TextStyle(fontSize: 13.5, height: 1.7, color: textColor)),
             if (s['needs_confirm'] == true)
@@ -316,7 +316,7 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
       if (locked)
         const WWBox(
           color: Color(0xFFFBE3DD),
-          child: Text('جهاز حرج (T2): سنراقب استهلاكه من المقبس فقط، ولا يمكن لأحد إطفاؤه. محمي برمجيًا.',
+          child: Text('جهاز حرج: لا يمكن إطفاؤه.',
               style: TextStyle(fontSize: 13.5, height: 1.7, color: Color(0xFF7A2A1C))),
         )
       else
@@ -326,7 +326,7 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('يقترح الوكيل إطفاءه عند وجود هدر', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 SizedBox(height: 4),
-                Text('يسألك دائمًا قبل أي إجراء، ولا يفعل شيئًا إن لم تردّ.', style: TextStyle(fontSize: 12.5, height: 1.6, color: WW.sub)),
+                Text('يسألك قبل أي إجراء.', style: TextStyle(fontSize: 12.5, height: 1.6, color: WW.sub)),
               ]),
             ),
             WWToggle(on: allow, onTap: () => setState(() => allow = !allow)),
@@ -447,7 +447,7 @@ class PlugLine extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Row(children: [
-        Expanded(child: Text('🔌 $label · $live', style: TextStyle(fontSize: 12, color: online ? WW.greenText : WW.red))),
+        Expanded(child: Text('$label · $live', style: TextStyle(fontSize: 12, color: online ? WW.greenText : WW.red))),
         TextButton(onPressed: onRemove, child: const Text('إزالة', style: TextStyle(fontSize: 12, color: WW.sub))),
       ]),
     );

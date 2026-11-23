@@ -17,10 +17,10 @@ class SafetyScreen extends StatelessWidget {
     final c = st['comfort'] as Map<String, dynamic>;
     final stopped = st['agent']['estop'] == true;
     final rules = [
-      'لا يُطفئ الوكيل أي جهاز دون موافقتك، ويمكنك التحكم بأي جهاز يدويًا.',
-      'تبقى حرارة أي غرفة مشغولة ضمن ${WW.fmt(c['min_c'])}–${WW.fmt(c['max_c'])}°.',
-      'إذا انقطع الإنترنت أو الراوتر أو حدث عطل، يبقى كل شيء على وضعه الطبيعي دون أي إجراء تلقائي.',
-      'نعرف فقط إن كانت الغرفة مشغولة أم فارغة، بلا كاميرات.',
+      'لا نطفئ أي جهاز دون موافقتك.',
+      'حرارة الغرفة المشغولة تبقى بين ${WW.fmt(c['min_c'])} و${WW.fmt(c['max_c'])}°.',
+      'عند أي عطل أو انقطاع، تبقى الأجهزة على وضعها الطبيعي.',
+      'لا كاميرات: نعرف فقط إن كانت الغرفة مشغولة أم فارغة.',
     ];
     const sub = TextStyle(fontSize: 13, color: WW.sub);
 
@@ -28,7 +28,7 @@ class SafetyScreen extends StatelessWidget {
       const Text('أجهزة لا نلمسها أبدًا', style: sub),
       const SizedBox(height: 10),
       const WWBox(
-        child: Text('الثلاجة وإنذار الحريق والأجهزة الطبية وإنارة الطوارئ: ممنوعة برمجيًا، حتى لو وافقت.', style: TextStyle(fontSize: 14, height: 1.7)),
+        child: Text('الثلاجة، إنذار الحريق، الأجهزة الطبية، إنارة الطوارئ.', style: TextStyle(fontSize: 14, height: 1.7)),
       ),
       const SizedBox(height: 14),
       const Text('قواعد البيت', style: sub),
