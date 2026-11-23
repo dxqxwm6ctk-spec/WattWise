@@ -6,66 +6,87 @@
 <title>WattWise · لوحة التحكم</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/fonts.css">
-<link rel="stylesheet" href="css/dashboard.css?v=4">
+<link rel="stylesheet" href="css/dashboard.css?v=5">
 <link rel="stylesheet" href="css/schedule.css?v=1">
 <script src="vendor/chart.umd.js"></script>
 </head>
 <body>
-<div class="page">
 
-  <header class="top">
-    <div class="brand">
-      <div class="logo">W/</div>
-      <div class="brand-text">
-        <div class="brand-title">WattWise <span id="mode-label"></span></div>
-        <div class="brand-sub" id="mode-sub"></div>
-      </div>
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="index.html" aria-label="WattWise">
+      <img src="icon.svg" alt="" width="32" height="32">
+      <span class="brand-name">WattWise</span>
+    </a>
+    <nav class="sites" id="sites" aria-label="المكان"></nav>
+    <div class="top-end">
+      <span class="status" id="agent-status"></span>
+      <details class="menu" id="menu">
+        <summary class="btn btn-quiet">المزيد</summary>
+        <div class="menu-list" id="menu-list"></div>
+      </details>
+      <button class="btn btn-danger" type="button" data-act="estop">إيقاف طوارئ</button>
     </div>
-    <div class="top-links">
-      <a class="tb house-link" href="house.html" id="house-link">🏠 البيت التفاعلي</a>
-      <button class="tb ghost" type="button" id="phone-open" aria-haspopup="dialog">📱 معاينة الهاتف</button>
-    </div>
-    <div class="toolbar" id="toolbar"></div>
-  </header>
-
-  <div class="layout">
-    <main class="main">
-      <section class="card hero rise" style="animation-delay:0s" id="hero"></section>
-      <section class="card rise" style="animation-delay:.04s" id="alerts"></section>
-      <section class="card rise" style="animation-delay:.08s" id="goal"></section>
-      <section class="card rise" style="animation-delay:.16s" id="rooms"></section>
-      <section class="card rise" style="animation-delay:.24s" id="devices"></section>
-      <section class="card rise" style="animation-delay:.28s" id="teach"></section>
-
-      <div class="row">
-        <section class="card rise grow2" style="animation-delay:.32s">
-          <div class="meter-head">
-            <div class="col4">
-              <div class="label">MAIN METER · <span id="meter-title">العدّاد الرئيسي</span></div>
-              <div class="big-kw" dir="ltr"><span id="meter-kw">0.00</span><span class="unit" id="meter-unit">kW</span></div>
-            </div>
-            <div class="mono muted" dir="ltr" id="meter-clock"></div>
-          </div>
-          <div class="chart-wrap">
-            <canvas id="chart" data-keep></canvas>
-            <div class="legend">
-              <span><i class="sw sw-line"></i>الفعلي</span>
-              <span><i class="sw sw-dash"></i>خط الأساس (دون الوكيل)</span>
-            </div>
-          </div>
-          <div class="note">يُعرف كل حمل من بصمته على العدّاد الرئيسي (NILM-lite). خط الأساس = الاستهلاك الفعلي + الأحمال التي أطفأها الوكيل وأكّدها العدّاد.</div>
-        </section>
-
-        <section class="card rise grow1" style="animation-delay:.40s" id="bill"></section>
-      </div>
-
-      <section class="card rise" style="animation-delay:.42s" id="sched"></section>
-      <section class="card rise" style="animation-delay:.44s" id="analyst"></section>
-      <section class="card rise" style="animation-delay:.48s" id="log"></section>
-    </main>
-
   </div>
-</div>
+</header>
+
+<main class="page">
+  <p class="intro" id="intro"></p>
+
+  <!-- Simulator controls: only shown when the data comes from the simulator -->
+  <section class="demo" id="demo" hidden></section>
+
+  <!-- Key numbers -->
+  <section class="kpis" id="kpis"></section>
+
+  <!-- 1. Goal and plan -->
+  <section class="card" id="goal"></section>
+
+  <!-- 2. Approval requests and alerts -->
+  <section class="card" id="approve"></section>
+
+  <!-- 3. Measured savings -->
+  <section class="card" id="savings-card">
+    <div class="card-head">
+      <h2><span class="num">٣</span> التوفير المُقاس</h2>
+      <span class="hint">الخط المتقطّع = الاستهلاك المتوقع دون الوكيل</span>
+    </div>
+    <div class="savings-grid">
+      <div class="chart-box">
+        <div class="legend">
+          <span><i class="sw sw-line"></i>الفعلي</span>
+          <span><i class="sw sw-dash"></i>دون الوكيل (خط الأساس)</span>
+          <span class="clock" dir="ltr" id="meter-clock"></span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart" data-keep></canvas></div>
+      </div>
+      <div id="bill"></div>
+    </div>
+  </section>
+
+  <!-- Devices by room -->
+  <section class="card" id="devices"></section>
+
+  <!-- Extra tools: closed by default so the page stays short -->
+  <details class="card more" id="more-teach">
+    <summary><h2>تعريف أجهزة الغرفة</h2><span class="hint">يتعلّم الوكيل بصمة كل جهاز من العدّاد</span></summary>
+    <div id="teach"></div>
+  </details>
+  <details class="card more" id="more-sched">
+    <summary><h2>جداول التشغيل</h2><span class="hint">تشغيل وإطفاء في أوقات محددة</span></summary>
+    <div id="sched"></div>
+  </details>
+  <details class="card more" id="more-analyst">
+    <summary><h2>تحليل الفاتورة والتقارير</h2><span class="hint">لماذا الفاتورة بهذا المبلغ؟ والتقرير الأسبوعي</span></summary>
+    <div id="analyst"></div>
+  </details>
+
+  <!-- Audit log: always visible (every decision, its reason and outcome) -->
+  <section class="card" id="log"></section>
+
+  <footer class="foot">WattWise · مشروع طلابي لمسابقة RoboCraft 2.0.0 · البيانات في وضع المحاكي تركيبية</footer>
+</main>
+
 <!-- Phone preview: hidden until needed (backup if the real phone fails in the demo). -->
 <div class="drawer" id="phone-drawer" hidden>
   <div class="drawer-back" data-close></div>
@@ -81,18 +102,18 @@
         <iframe id="phone-frame" title="تطبيق صاحب البيت"></iframe>
       </div>
     </div>
-    <div class="aside-note">معاينة تطبيق صاحب البيت (نسخة الويب الاحتياطية). التطبيق الأساسي مبني بـ Flutter بالشاشات نفسها.</div>
+    <div class="aside-note">معاينة تطبيق صاحب البيت (نسخة الويب الاحتياطية).</div>
     <div class="connect-card">
       <div class="connect-title">ربط تطبيق الهاتف</div>
       <img class="connect-qr" src="api/connect/qr.svg" alt="رمز QR يحمل عنوان الخادم" loading="lazy">
-      <div class="mono connect-url" dir="ltr" id="connect-url"></div>
-      <div class="aside-note">يجد التطبيق اللابتوب تلقائيًا على شبكة الـ Wi-Fi نفسها. إن لم يجده، امسح رمز الـ QR هذا من التطبيق.</div>
+      <div class="connect-url" dir="ltr" id="connect-url"></div>
+      <div class="aside-note">يجد التطبيق اللابتوب تلقائيًا على شبكة الـ Wi-Fi نفسها. إن لم يجده، امسح رمز الـ QR.</div>
     </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
-<script src="js/common.js?v=3"></script>
+<script src="js/common.js?v=4"></script>
 <script src="js/schedule.js?v=1"></script>
-<script src="js/dashboard.js?v=5"></script>
+<script src="js/dashboard.js?v=6"></script>
 </body>
 </html>
