@@ -1,0 +1,31 @@
+# Render Blueprint for the OPTIONAL online copy of WattWise (synthetic data only).
+# The competition demo does not need it: locally, use scripts/run_demo.py.
+#
+# Create it once from the Render dashboard: New > Blueprint > pick this repo.
+# After that, every push to main redeploys automatically (no laptop needed).
+#
+# Free plan notes:
+#   - the service sleeps after about 15 minutes with no visitors and takes
+#     about a minute to wake up on the next visit;
+#   - free services have no persistent disk, so the SQLite database starts
+#     fresh after each restart or redeploy. That is fine here: all data is
+#     synthetic and the simulators refill it within seconds.
+services:
+  - type: web
+    name: wattwise
+    runtime: python
+    plan: free
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/cloud_start.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: RUN_SIMULATOR
+        value: "1"
+      - key: SIM_SITES
+        value: home,building
+      # Optional: add ANTHROPIC_API_KEY in the Render dashboard
+      # (service > Environment). Never put it in this file.
