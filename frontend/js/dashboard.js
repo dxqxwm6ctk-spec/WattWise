@@ -57,12 +57,6 @@ function menuList() {
     <button type="button" data-act="reset">إعادة ضبط العرض</button>`;
 }
 
-function intro() {
-  if (!isSim()) return 'غرفة المختبر: قراءات حقيقية من ESP32 وعدّاد PZEM-004T. ابدأ بإعطاء الوكيل هدفًا، ثم وافق على اقتراحه أو ارفضه.';
-  const where = WW.site === 'building' ? 'مبنى من ١٠ غرف (الكود نفسه)' : 'بيت كامل';
-  return `وكيل ذكي يخفّض استهلاك الكهرباء: يراقب العدّاد، يقترح إجراءً، وينتظر موافقتك قبل أن يطفئ أي جهاز. المعروض الآن ${where} ببيانات تركيبية من المحاكي.`;
-}
-
 // Simulator scenarios (only when the data comes from the simulator).
 function demoBar() {
   return `<span class="demo-label">تجربة العرض (المحاكي):</span>
@@ -121,13 +115,12 @@ function goal() {
     `<li class="${s.state}${s.state === 'active' && i === 4 ? ' wait' : ''}">${esc(s.label)}${s.tag && s.state !== 'done' ? ` · ${esc(s.tag)}` : ''}</li>`).join('');
   const body = st.goal
     ? `<div class="goal-text">«${esc(st.goal.text)}»</div>${form}${planBox()}`
-    : `<div class="hint" style="font-size:14px">اكتب هدفًا (لا سؤالًا)، وسيقسّمه الوكيل إلى خطوات بنفسه. يمكنك استخدام المثال الجاهز.</div>${form}`;
+    : form;
   return `
     <div class="card-head"><h2><span class="num">١</span> أعطِ الوكيل هدفًا</h2><span class="hint">ابدأ من هنا</span></div>
     ${body}
     ${st.goal ? `<ol class="steps" aria-label="مراحل عمل الوكيل">${steps}</ol>` : ''}
-    ${anomalyBox()}
-    ${brainLine()}`;
+    ${anomalyBox()}`;
 }
 
 // The agent's own plan for this goal (from the LLM, or the rule-based template).
@@ -151,21 +144,7 @@ function anomalyBox() {
   const what = a.kind === 'extra'
     ? `العدّاد ≈ ${a.power_w} واط والمتوقع ≈ ${a.expected_w} واط: زيادة ≈ ${a.residual_w} واط مصدرها غير معروف.`
     : `العدّاد أقل من المتوقع بنحو ${-a.residual_w} واط: ربما يوجد جهاز مفصول أو معطّل.`;
-  return `<div class="box warn"><span class="box-title" style="color:var(--warn)">استهلاك غير طبيعي (تنبيه فقط، لن نطفئ شيئًا)</span><span>${what}</span></div>`;
-}
-
-// Which brain is planning, the LLM budget, the weather, and the anomaly model state.
-function brainLine() {
-  const b = st.agent.brain || {};
-  const w = st.weather || {};
-  const a = st.anomaly;
-  const parts = [
-    b.mode === 'llm' ? `يخطّط بـ: ${esc(b.model || 'النموذج الذكي')}` : 'يخطّط بـ: القواعد',
-    b.model ? `تكلفة الشهر <span dir="ltr">$${fmt(b.spent_usd, 2)} / $${fmt(b.budget_usd, 0)}</span>` : '',
-    w.available ? `الطقس ${fmt(w.outdoor_temp_c, 1)}° (${esc(w.place || '')})` : 'الطقس: لا إنترنت، نكمل دونه',
-    a && !a.open ? (a.ready ? 'كشف الشذوذ: طبيعي' : `كشف الشذوذ يتعلّم (${a.samples} قراءة)`) : '',
-  ].filter(Boolean);
-  return `<div class="meta" title="${esc(b.reason_ar || '')}">${parts.map(p => `<span>${p}</span>`).join('')}</div>`;
+  return `<div class="box warn"><span class="box-title" style="color:var(--warn)">استهلاك غير طبيعي</span><span>${what}</span></div>`;
 }
 
 // ---------------- 2. approvals and alerts ----------------
@@ -177,14 +156,13 @@ function approvalCard() {
       <div class="ask-top"><span>الوكيل يطلب موافقتك</span><span class="n" dir="ltr">${p.expires_in_s}s</span></div>
       <div class="ask-title">${esc(p.title)}</div>
       <div>${esc(p.reason)}</div>
-      ${p.details.alternative ? `<div class="hint">البديل: ${esc(p.details.alternative)}</div>` : ''}
       <div class="hint">التوفير التقريبي: <span class="n" dir="ltr">${fmt(p.details.saving_jod_per_hour, 3)} JD/h</span></div>
       <div class="ask-bar"><div style="width:${pct}%"></div></div>
       <div class="ask-btns">
         <button class="btn btn-quiet btn-lg" data-act="reject" data-id="${p.id}">لا، اتركه</button>
         <button class="btn btn-primary btn-lg" data-act="approve" data-id="${p.id}">نعم، نفّذ</button>
       </div>
-      <span class="hint" style="text-align:center">يصل الطلب نفسه إلى الهاتف. إن لم يردّ أحد قبل انتهاء الوقت، لن يُنفَّذ شيء.</span>
+      <span class="hint" style="text-align:center">إن لم ترد، لن يُنفَّذ شيء.</span>
     </div>`;
 }
 
@@ -192,17 +170,17 @@ function statusBox() {
   const a = st.agent, last = st.last_approval;
   const dev = last && last.device_name ? last.device_name : 'الجهاز';
   let m;
-  if (!st.online) m = ['red', 'لا توجد قراءات', 'انقطعت القراءات، فعادت الأجهزة إلى وضعها الطبيعي دون إجراءات تلقائية.'];
-  else if (a.estop) m = ['red', 'الوكيل متوقف (إيقاف طوارئ)', 'عادت كل الأجهزة إلى وضعها الطبيعي. اضغط «إعادة ضبط العرض» من قائمة «المزيد» لتشغيله من جديد.'];
-  else if (a.safe_mode) m = ['red', 'الوضع الآمن', 'لا يوجد اتصال بالهاتف، لذا لن نطلب موافقة ولن ننفّذ شيئًا.'];
-  else if (!st.goal) m = ['', 'لا توجد طلبات بعد', 'عندما يجد الوكيل هدرًا سيظهر هنا طلب موافقة بزرّين: «نعم» و«لا».'];
+  if (!st.online) m = ['red', 'لا توجد قراءات', 'عادت الأجهزة إلى وضعها الطبيعي.'];
+  else if (a.estop) m = ['red', 'الوكيل متوقف (إيقاف طوارئ)', 'عادت الأجهزة إلى وضعها الطبيعي.'];
+  else if (a.safe_mode) m = ['red', 'الوضع الآمن', 'لن ننفّذ شيئًا حتى يعود الاتصال.'];
+  else if (!st.goal) m = ['', 'لا توجد طلبات بعد', 'أعطِ الوكيل هدفًا أولًا.'];
   else m = {
-    analyzing: ['warn', 'جارٍ التحليل', 'لاحظ الوكيل جهازًا يعمل في غرفة فارغة. سيصل طلب الموافقة بعد لحظات.'],
+    analyzing: ['warn', 'جارٍ التحليل', 'جهاز يعمل في غرفة فارغة.'],
     executing: ['good', 'جارٍ التنفيذ', 'وصلت موافقتك.'],
-    verified: ['good', 'تم وتحقّق العدّاد', `أُطفئ ${dev} وأكّد العدّاد انخفاض الاستهلاك. يظهر التوفير في القسم ٣.`],
+    verified: ['good', 'تم وتحقّق العدّاد', `أُطفئ ${dev} وأكّد العدّاد ذلك.`],
     rejected: ['red', 'رفضت الطلب، فلم يتغيّر شيء', `بقي ${dev} كما هو.`],
     expired: ['red', 'انتهى الوقت دون رد', 'لذا لم يُنفَّذ شيء. عدم الرد لا يعني الموافقة.'],
-  }[a.phase] || ['', 'لا توجد طلبات الآن', 'الوكيل يراقب، ولا يوجد هدر يحتاج قرارك.'];
+  }[a.phase] || ['', 'لا توجد طلبات الآن', 'لا يوجد هدر الآن.'];
   return `<div class="box ${m[0]}"><span class="box-title">${m[1]}</span><span class="hint" style="font-size:14px;color:var(--sub)">${m[2]}</span></div>`;
 }
 
@@ -226,7 +204,7 @@ function approveSection() {
   const perm = ('Notification' in window) && Notification.permission === 'default'
     ? '<button class="btn btn-quiet btn-sm" data-act="alert-perm">فعّل إشعارات المتصفح</button>' : '';
   return `
-    <div class="card-head"><h2><span class="num">٢</span> وافق أو ارفض</h2><span class="hint">لا يطفئ الوكيل أي جهاز دون موافقتك</span></div>
+    <div class="card-head"><h2><span class="num">٢</span> وافق أو ارفض</h2></div>
     ${st.pending ? approvalCard() : statusBox()}
     <div class="card-head"><span class="sub-h">التنبيهات${active.length ? ` (${active.length})` : ''}</span>${perm}</div>
     ${rows ? `<div class="rows">${rows}</div>` : '<div class="hint">لا توجد تنبيهات. كل شيء طبيعي.</div>'}`;
@@ -297,7 +275,6 @@ function bill() {
       <div><b style="color:var(--acc)">${fmt(s.jod, 3)}</b><span>دينار مُوفَّر (مُقاس)</span></div>
       <div><b>${fmt(s.kwh, 2)}</b><span>ك.و.س${s.co2_kg === null ? '' : ` · ${fmt(s.co2_kg, 2)} كغ CO₂`}</span></div>
     </div>
-    <div class="note">${esc(b.source || '')} قيمة الطاقة فقط، دون الدعم أو الرسوم الأخرى.${isSim() ? ' الاستهلاك هنا من المحاكي (بيانات تركيبية).' : ''}</div>
   </div>`;
 }
 
@@ -313,7 +290,7 @@ function devicesSection() {
         <button class="btn btn-quiet btn-sm" data-act="confirm-cancel">لا، اتركه</button>
         <button class="btn btn-danger btn-sm" data-act="confirm-off" data-id="${esc(confirmDev.id)}">أطفئه</button>
       </div></div>` : '';
-  const learning = st.learn ? '<div class="box">تجري إضافة جهاز جديد من تطبيق الهاتف. أكمل الخطوات هناك.</div>' : '';
+  const learning = st.learn ? '<div class="box">تجري إضافة جهاز من الهاتف.</div>' : '';
   const contact = WW.site === 'lab' ? 'الباب' : 'الشباك';
   const rooms = st.rooms.map(r => {
     const devs = st.devices.filter(d => d.room === r.id).map(deviceRow).join('');
@@ -336,7 +313,7 @@ function devicesSection() {
     </div>
     ${learning}${confirm}${commandBar()}
     <div class="rooms">${rooms}</div>
-    <div class="note">الإشغال فقط (مشغولة/فارغة)، بلا كاميرات ولا تتبّع للأشخاص. الأجهزة الحرجة (مثل الثلاجة وإنذار الحريق) محمية ولا يمكن إطفاؤها. * بصمة تقديرية لم تُقَس على العدّاد بعد.</div>`;
+`;
 }
 
 function deviceRow(d) {
@@ -354,7 +331,7 @@ function deviceRow(d) {
     : `<button class="switch${on ? ' on' : ''}" role="switch" aria-checked="${on}" data-act="toggle" data-id="${esc(d.id)}" aria-label="${esc(d.name)}"></button>`;
   return `<div class="dev">
       <div class="dev-main"><span class="dev-name">${esc(d.name)}</span><span class="dev-sub">${sub}</span></div>
-      <span class="dev-w" dir="ltr">${on ? d.est_w : 0} W${d.signature_measured ? '' : ' *'}</span>
+      <span class="dev-w" dir="ltr">${on ? d.est_w : 0} W</span>
       ${sw}
     </div>`;
 }
@@ -371,7 +348,6 @@ function commandBar() {
     const canRun = r.items.some(i => i.ok);
     result = `<div class="plan">
         <span>${esc(r.clarify || r.reply)}</span>${items}
-        <span class="note">فحص حارس السياسات كل إجراء. لن يُنفَّذ شيء قبل أن تضغط «نعم».</span>
         <div style="display:flex;gap:8px">
           ${canRun ? '<button class="btn btn-primary btn-sm" data-act="cmd-run">نعم، نفّذ</button>' : ''}
           <button class="btn btn-quiet btn-sm" data-act="cmd-cancel">لا</button>
@@ -430,7 +406,6 @@ function heaterPanel() {
       </div></div>`;
   return `<div class="panel">
       <span class="panel-title">سخّان الماء</span>
-      <span class="hint">يقترح الوكيل تشغيله قبل الاستحمام فقط، ويمنع الحارس أي فترة أطول من ٣ ساعات.</span>
       <input class="field" id="heater-hint" value="${esc(h.hint)}" aria-label="متى تستحمّون؟" placeholder="متى تستحمّون؟ مثلًا: الصباح ٦:٣٠ والمساء ٩">
       <button class="btn btn-quiet" data-act="heater-suggest">${h.busy ? 'جارٍ التخطيط…' : 'اقترح جدولًا للسخّان'}</button>
       ${proposal}
@@ -442,7 +417,7 @@ function schedSection() {
   const heater = WWSched.state.site === WW.site ? heaterPanel() : '';
   return `${WWSched.render({ theme: 'light', layout: 'side' })}
     ${heater ? `<div class="panels" style="margin-top:12px">${heater}</div>` : ''}
-    <div class="note" style="margin-top:8px">تُراجع كل جدول وتؤكّده قبل الحفظ، ويفحصه الحارس في كل مرة يعمل.${isSim() ? ' ساعة المحاكي أسرع ×60.' : ''}</div>`;
+`;
 }
 
 // Teach mode: the AI learns the room's appliances from the meter and asks the user.
@@ -489,7 +464,7 @@ function teachSection() {
         </div>
       </div>
     </div>
-    <div class="note" style="margin-top:8px">بصمة الجهاز = قفزة الواط على العدّاد + معامل القدرة (PF).</div>`;
+`;
 }
 
 async function teachSay(text) {
@@ -532,7 +507,7 @@ function analystSection() {
         ${report}
       </div>
     </div>
-    <div class="note" style="margin-top:8px">الأرقام محسوبة برمجيًا من القياسات.</div>`;
+`;
 }
 
 // Bill photo: Claude reads it (when there is a key), the code checks it. Or type 3 numbers by hand.
@@ -565,7 +540,7 @@ function billPanel() {
     ${noPhoto ? `<div class="note" style="color:var(--warn)">${esc(b.status.reason_ar)}</div>` : ''}
     ${b.msg ? `<div class="note" style="color:var(--warn)">${esc(b.msg)}</div>` : ''}
     ${manual}${result}
-    <div class="note">تُقرأ الصورة مرة واحدة ولا تُحفظ. نحتفظ بالأرقام فقط.</div>`;
+`;
 }
 
 async function billSend(promise) {
@@ -592,7 +567,7 @@ function auditLog() {
     </div>`).join('') || '<div class="hint">لا توجد قرارات بعد.</div>';
   const more = st.log.length > 8 ? `<button class="btn btn-quiet btn-sm" style="align-self:flex-start" data-act="log-all">${ui.logAll ? 'اعرض أقل' : `اعرض الكل (${st.log.length})`}</button>` : '';
   return `
-    <div class="card-head"><h2>سجل القرارات</h2><span class="hint">كل قرار وسببه وهل وافقت عليه ونتيجته</span></div>
+    <div class="card-head"><h2>سجل القرارات</h2></div>
     <div class="rows">${rows}</div>${more}`;
 }
 
@@ -635,7 +610,6 @@ function renderAll() {
   WW.render($('sites'), sitesNav());
   WW.render($('agent-status'), agentStatus());
   WW.render($('menu-list'), menuList());
-  $('intro').textContent = intro();
   $('demo').hidden = !isSim();
   if (isSim() && (!document.activeElement || document.activeElement.id !== 'scenario-pick')) WW.render($('demo'), demoBar());
   WW.render($('kpis'), kpis());

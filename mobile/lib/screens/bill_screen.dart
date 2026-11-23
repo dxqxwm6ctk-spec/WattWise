@@ -1,4 +1,4 @@
-// "الفاتورة" tab: tariff type, tiers, where the money goes, measured savings, tips.
+// "الفاتورة" tab: measured savings, goal, bill tools, tariff, where the money goes, forecast.
 
 import 'package:material_ui/material_ui.dart';
 
@@ -6,12 +6,6 @@ import '../api.dart';
 import '../theme.dart';
 import '../widgets/assistant_widgets.dart';
 import '../widgets/bill_photo_card.dart';
-
-const tips = [
-  'السخّان: شغّله قبل الاستحمام بساعة بدل تركه يعمل طوال اليوم.',
-  'أغلق الشبابيك أثناء تشغيل المكيّف، وسننبّهك تلقائيًا إن لاحظنا غير ذلك.',
-  'ضبط المكيّف على ٢٤° بدل ٢٢° مريح ويقلّل الاستهلاك.',
-];
 
 class BillScreen extends StatelessWidget {
   const BillScreen({super.key, required this.st, required this.api, required this.run});
@@ -28,6 +22,20 @@ class BillScreen extends StatelessWidget {
     const sub = TextStyle(fontSize: 13, color: WW.sub);
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      WWBox(
+        color: WW.greenBg,
+        radius: 22,
+        padding: 18,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('التوفير المُقاس', style: TextStyle(fontSize: 13, color: WW.greenText)),
+          const SizedBox(height: 6),
+          Text('${WW.fmt(s['jod'], 3)} JD', textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 30, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 6),
+          Text('${WW.fmt(s['kwh'], 2)} ك.و.س · ${s['co2_kg'] == null ? '—' : WW.fmt(s['co2_kg'], 2)} كغ CO₂ أقل',
+              style: const TextStyle(fontSize: 12.5, color: WW.greenText)),
+        ]),
+      ),
+      const SizedBox(height: 12),
       GoalCard(st: st, api: api, run: run),
       const SizedBox(height: 12),
       WhyCard(api: api),
@@ -40,7 +48,7 @@ class BillScreen extends StatelessWidget {
         radius: 22,
         padding: 18,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('نوع اشتراكك (مذكور في فاتورتك)', style: sub),
+          const Text('نوع الاشتراك', style: sub),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(4),
@@ -93,7 +101,7 @@ class BillScreen extends StatelessWidget {
         radius: 22,
         padding: 18,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('توزيع التكلفة (حسب بصمة كل جهاز)', style: sub),
+          const Text('توزيع التكلفة', style: sub),
           const SizedBox(height: 14),
           if (breakdown.isEmpty) const Text('لا توجد بيانات كافية بعد.', style: sub),
           for (final x in breakdown) ...[
@@ -108,20 +116,6 @@ class BillScreen extends StatelessWidget {
             ),
             const SizedBox(height: 14),
           ],
-        ]),
-      ),
-      const SizedBox(height: 12),
-      WWBox(
-        color: WW.greenBg,
-        radius: 22,
-        padding: 18,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('التوفير (مُقاس فعليًا)', style: TextStyle(fontSize: 13, color: WW.greenText)),
-          const SizedBox(height: 6),
-          Text('${WW.fmt(s['jod'], 3)} JD', textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 30, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 6),
-          Text('${WW.fmt(s['kwh'], 2)} ك.و.س · ${s['co2_kg'] == null ? '—' : WW.fmt(s['co2_kg'], 2)} كغ CO₂ أقل',
-              style: const TextStyle(fontSize: 12.5, color: WW.greenText)),
         ]),
       ),
       if (f != null) ...[
@@ -142,12 +136,6 @@ class BillScreen extends StatelessWidget {
                 style: const TextStyle(fontSize: 12.5, color: WW.sub)),
           ]),
         ),
-      ],
-      const SizedBox(height: 16),
-      const Text('نصائح (لا ننفّذها تلقائيًا)', style: sub),
-      for (final t in tips) ...[
-        const SizedBox(height: 8),
-        WWBox(child: Text(t, style: const TextStyle(fontSize: 14, height: 1.65))),
       ],
     ]);
   }

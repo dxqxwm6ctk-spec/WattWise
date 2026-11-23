@@ -67,38 +67,15 @@ class _DevicesScreenState extends State<DevicesScreen> {
     final shown = onlyRunning ? devices.where((d) => d['is_on'] == true).toList() : devices;
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SizedBox(
-        height: 52,
-        child: FilledButton(
-          onPressed: () => setState(() => plugOpen = true),
-          style: FilledButton.styleFrom(backgroundColor: WW.ink, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
-          child: const Text('🔌 + إضافة مقبس ذكي (Wi-Fi)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-        ),
-      ),
-      const SizedBox(height: 8),
-      SizedBox(
-        height: 52,
-        child: OutlinedButton(
-          onPressed: () => setState(() => wizardOpen = true),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: WW.ink,
-            side: const BorderSide(color: Color(0xFFB9B6AA), width: 1.5),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          ),
-          child: const Text('+ إضافة جهاز عبر العدّاد الرئيسي', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-        ),
-      ),
       if (st['agent']['safe_mode'] == true) ...[
         const SizedBox(height: 8),
         const WWBox(
           color: WW.pendingBg,
           border: WW.pendingBorder,
-          child: Text('الراوتر مطفأ، وفي الواقع سينقطع التطبيق هنا. WattWise في الوضع الآمن ولن ينفّذ شيئًا.',
+          child: Text('الوضع الآمن: لن ينفّذ WattWise شيئًا حتى يعود الاتصال.',
               style: TextStyle(fontSize: 13.5, height: 1.6, color: Color(0xFF6B4A00))),
         ),
       ],
-      const SizedBox(height: 10),
-      RunningNowCard(devices: devices, pendingDeviceId: pendingId),
       const SizedBox(height: 10),
       Row(children: [
         _filterChip('الكل', !onlyRunning, () => setState(() => onlyRunning = false)),
@@ -114,6 +91,28 @@ class _DevicesScreenState extends State<DevicesScreen> {
           padding: EdgeInsets.symmetric(vertical: 24),
           child: Text('لا يوجد جهاز يعمل الآن.', textAlign: TextAlign.center, style: TextStyle(color: WW.sub)),
         ),
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 52,
+        child: FilledButton(
+          onPressed: () => setState(() => plugOpen = true),
+          style: FilledButton.styleFrom(backgroundColor: WW.ink, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
+          child: const Text('+ إضافة مقبس ذكي', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        ),
+      ),
+      const SizedBox(height: 8),
+      SizedBox(
+        height: 52,
+        child: OutlinedButton(
+          onPressed: () => setState(() => wizardOpen = true),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: WW.ink,
+            side: const BorderSide(color: Color(0xFFB9B6AA), width: 1.5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          ),
+          child: const Text('+ إضافة جهاز عبر العدّاد الرئيسي', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+        ),
+      ),
     ]);
   }
 }
@@ -427,7 +426,7 @@ class _AddDeviceWizardState extends State<AddDeviceWizard> {
           return const WWBox(
             color: Color(0xFFFBE3DD),
             radius: 20,
-            child: Text('هذا جهاز حرج (T2). سنراقب استهلاكه فقط، ولا يمكن لأحد (لا الوكيل ولا التطبيق) إطفاؤه. محمي برمجيًا.',
+            child: Text('جهاز حرج: لا يمكن إطفاؤه.',
                 style: TextStyle(fontSize: 14, height: 1.7, color: Color(0xFF7A2A1C))),
           );
         }
@@ -438,7 +437,7 @@ class _AddDeviceWizardState extends State<AddDeviceWizard> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('يقترح الوكيل إطفاءه عند وجود هدر', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 SizedBox(height: 4),
-                Text('يسألك دائمًا قبل أي إجراء. إن عطّلت هذا الخيار، يبقى التحكم يدويًا فقط.', style: TextStyle(fontSize: 12.5, height: 1.6, color: WW.sub)),
+                Text('يسألك قبل أي إجراء.', style: TextStyle(fontSize: 12.5, height: 1.6, color: WW.sub)),
               ]),
             ),
             WWToggle(on: allow, onTap: () => setState(() => allow = !allow)),

@@ -100,7 +100,7 @@ class _BillPhotoCardState extends State<BillPhotoCard> {
         const Text('حلّل فاتورتك من صورة', style: TextStyle(fontSize: 13, color: WW.sub)),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: lineButton(busy ? 'جارٍ القراءة…' : '📷 صوّر الفاتورة',
+          Expanded(child: lineButton(busy ? 'جارٍ القراءة…' : 'صوّر الفاتورة',
               busy || !photoOk ? null : () => pick(ImageSource.camera), border: WW.ink)),
           const SizedBox(width: 8),
           Expanded(child: lineButton('من المعرض', busy || !photoOk ? null : () => pick(ImageSource.gallery), border: WW.ink)),

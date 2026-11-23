@@ -486,7 +486,7 @@ class RunningNowCard extends StatelessWidget {
           child: running.isEmpty
               ? const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
-                  child: Text('كل الأجهزة مطفأة 🌙', style: TextStyle(fontSize: 13, color: Color(0xFFA9A79D))),
+                  child: Text('كل الأجهزة مطفأة', style: TextStyle(fontSize: 13, color: Color(0xFFA9A79D))),
                 )
               : SizedBox(
                   height: 92,

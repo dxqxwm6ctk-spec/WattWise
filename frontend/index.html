@@ -6,7 +6,7 @@
 <title>WattWise · لوحة التحكم</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/fonts.css">
-<link rel="stylesheet" href="css/dashboard.css?v=5">
+<link rel="stylesheet" href="css/dashboard.css?v=6">
 <link rel="stylesheet" href="css/schedule.css?v=1">
 <script src="vendor/chart.umd.js"></script>
 </head>
@@ -31,8 +31,6 @@
 </header>
 
 <main class="page">
-  <p class="intro" id="intro"></p>
-
   <!-- Simulator controls: only shown when the data comes from the simulator -->
   <section class="demo" id="demo" hidden></section>
 
@@ -49,13 +47,12 @@
   <section class="card" id="savings-card">
     <div class="card-head">
       <h2><span class="num">٣</span> التوفير المُقاس</h2>
-      <span class="hint">الخط المتقطّع = الاستهلاك المتوقع دون الوكيل</span>
     </div>
     <div class="savings-grid">
       <div class="chart-box">
         <div class="legend">
           <span><i class="sw sw-line"></i>الفعلي</span>
-          <span><i class="sw sw-dash"></i>دون الوكيل (خط الأساس)</span>
+          <span><i class="sw sw-dash"></i>دون الوكيل</span>
           <span class="clock" dir="ltr" id="meter-clock"></span>
         </div>
         <div class="chart-wrap"><canvas id="chart" data-keep></canvas></div>
@@ -69,22 +66,20 @@
 
   <!-- Extra tools: closed by default so the page stays short -->
   <details class="card more" id="more-teach">
-    <summary><h2>تعريف أجهزة الغرفة</h2><span class="hint">يتعلّم الوكيل بصمة كل جهاز من العدّاد</span></summary>
+    <summary><h2>تعريف الأجهزة</h2></summary>
     <div id="teach"></div>
   </details>
   <details class="card more" id="more-sched">
-    <summary><h2>جداول التشغيل</h2><span class="hint">تشغيل وإطفاء في أوقات محددة</span></summary>
+    <summary><h2>الجداول</h2></summary>
     <div id="sched"></div>
   </details>
   <details class="card more" id="more-analyst">
-    <summary><h2>تحليل الفاتورة والتقارير</h2><span class="hint">لماذا الفاتورة بهذا المبلغ؟ والتقرير الأسبوعي</span></summary>
+    <summary><h2>الفاتورة والتقارير</h2></summary>
     <div id="analyst"></div>
   </details>
 
   <!-- Audit log: always visible (every decision, its reason and outcome) -->
   <section class="card" id="log"></section>
-
-  <footer class="foot">WattWise · مشروع طلابي لمسابقة RoboCraft 2.0.0 · البيانات في وضع المحاكي تركيبية</footer>
 </main>
 
 <!-- Phone preview: hidden until needed (backup if the real phone fails in the demo). -->
@@ -102,18 +97,17 @@
         <iframe id="phone-frame" title="تطبيق صاحب البيت"></iframe>
       </div>
     </div>
-    <div class="aside-note">معاينة تطبيق صاحب البيت (نسخة الويب الاحتياطية).</div>
     <div class="connect-card">
       <div class="connect-title">ربط تطبيق الهاتف</div>
       <img class="connect-qr" src="api/connect/qr.svg" alt="رمز QR يحمل عنوان الخادم" loading="lazy">
       <div class="connect-url" dir="ltr" id="connect-url"></div>
-      <div class="aside-note">يجد التطبيق اللابتوب تلقائيًا على شبكة الـ Wi-Fi نفسها. إن لم يجده، امسح رمز الـ QR.</div>
+      <div class="aside-note">امسح الرمز من التطبيق.</div>
     </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 <script src="js/common.js?v=4"></script>
 <script src="js/schedule.js?v=1"></script>
-<script src="js/dashboard.js?v=6"></script>
+<script src="js/dashboard.js?v=7"></script>
 </body>
 </html>
