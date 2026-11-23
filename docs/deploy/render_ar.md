@@ -1,7 +1,11 @@
-# نسخة أونلاين على Render (بدل Railway)
+# نسخة أونلاين على Render
 
 > مهم: العرض قدام الحكام **ما بحتاج إنترنت ولا Render**. العرض الأساسي بضل على اللابتوب:
 > `python scripts/run_demo.py`. النسخة الأونلاين بس عشان تفرجي حدا المشروع من أي مكان.
+
+- الرابط المباشر (السيرفر + اللوحة): https://wattwise-vysn.onrender.com/index.html
+- صفحة الموبايل: https://wattwise-vysn.onrender.com/app.html
+- النسخة على Netlify كمان بتحكي مع هذا السيرفر: https://wattwise-jo.netlify.app
 
 ## شو اللي بصير على Render؟
 

@@ -1,4 +1,4 @@
-"""Start WattWise on a cloud host such as Railway (an OPTIONAL online copy).
+"""Start WattWise on a cloud host such as Render (an OPTIONAL online copy).
 
 The competition demo does NOT need this: locally, use scripts/run_demo.py,
 which works with no internet. This script is only for the hosted copy.
@@ -10,8 +10,8 @@ What it does:
      hosted dashboard has live SYNTHETIC data.
 
 Settings (environment variables, all optional):
-  PORT              port to listen on (Railway sets it; default 8000)
-  WATTWISE_DB       database file, for example /data/wattwise.db on a Railway volume
+  PORT              port to listen on (Render sets it; default 8000)
+  WATTWISE_DB       database file path (default: wattwise.db in the repo)
   RUN_SIMULATOR     1 = start the simulators (default), 0 = backend only
   SIM_SITES         which simulated sites to run, default "home,building"
 
