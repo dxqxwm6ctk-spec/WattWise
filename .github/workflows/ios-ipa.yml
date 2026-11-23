@@ -1,6 +1,8 @@
 # Builds the WattWise phone app for iPhone WITHOUT code signing and
 # uploads it as an .ipa file. Download it from the Actions tab and load it
 # with Sideloadly, which signs it with your own Apple ID.
+# Runs ONLY when started by hand (Actions tab > iOS IPA > Run workflow),
+# so pushes never use up the GitHub Actions minutes.
 name: iOS IPA (unsigned, for Sideloadly)
 
 on:
@@ -10,11 +12,6 @@ on:
         description: "Server address baked into the app (leave as is for Render)"
         required: false
         default: "https://wattwise-vysn.onrender.com"
-  push:
-    branches: [main, "claude/**"]
-    paths:
-      - "mobile/**"
-      - ".github/workflows/ios-ipa.yml"
 
 env:
   DEFAULT_SERVER: "https://wattwise-vysn.onrender.com"

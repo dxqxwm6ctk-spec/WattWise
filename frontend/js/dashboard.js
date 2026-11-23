@@ -106,7 +106,7 @@ function hero() {
 
   return `
     <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:6px;align-items:center">
-      <div class="label" style="align-self:stretch;display:flex;justify-content:space-between"><span>LIVE LOAD</span><span>الحمل الآن</span></div>
+      <div class="label" style="align-self:stretch;display:flex;justify-content:space-between"><span>الحمل الآن</span></div>
       <div style="position:relative;width:300px;height:190px">
         <div style="position:absolute;left:60px;top:60px;width:180px;height:180px;border-radius:50%;background:${g.color};filter:blur(60px);opacity:.18;transition:background .8s"></div>
         <svg width="300" height="170" viewBox="0 0 300 170" style="position:absolute;inset:0;overflow:visible">
@@ -122,14 +122,14 @@ function hero() {
       </div>
     </div>
     <div style="flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:14px;justify-content:center">
-      <div class="label" style="display:flex;justify-content:space-between"><span>METER</span><span>عدّاد الشهر</span></div>
+      <div class="label" style="display:flex;justify-content:space-between"><span>عدّاد الشهر</span></div>
       <div style="display:flex;justify-content:center;gap:4px;padding:12px;border-radius:14px;background:#0A0B08;border:1px solid #2A2C25;box-shadow:inset 0 6px 14px rgba(0,0,0,0.6)" dir="ltr">
         ${odo}<span style="align-self:flex-end;font-family:var(--mono);font-size:12px;color:#6F6D64;padding:0 0 4px 6px">kWh</span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">${mini}</div>
     </div>
     <div style="flex:1.3 1 320px;min-width:0;display:flex;flex-direction:column;gap:10px">
-      <div class="label" style="display:flex;justify-content:space-between"><span>BY ROOM</span><span>الاستهلاك حسب الغرفة</span></div>
+      <div class="label" style="display:flex;justify-content:space-between"><span>الاستهلاك حسب الغرفة</span></div>
       <div style="flex:1;min-height:190px;display:flex;align-items:flex-end;gap:10px;padding-top:8px;border-bottom:1px solid #2A2C25">${bars}</div>
       <div style="display:flex;gap:10px">${names}</div>
     </div>`;
@@ -157,11 +157,11 @@ function goal() {
       ${t ? `<div class="muted">سقف الفاتورة: <span style="color:#B8F04A" class="mono">${fmt(t)} JD</span></div>` : ''}
       ${form}${planBox()}`;
   } else {
-    body = `<div class="muted">أعطِ الوكيل هدفًا (لا سؤالًا) بكلماتك، وسيفهم الرقم ويقسّمه إلى خطوات بنفسه:</div>${form}`;
+    body = form;
   }
   return `
     <div class="head">
-      <div class="label">GOAL · ${esc(lbl('goal', 'الهدف'))}</div>
+      <div class="label">${esc(lbl('goal', 'الهدف'))}</div>
       <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:${ag.color}"><span style="width:8px;height:8px;border-radius:50%;background:${ag.color}"></span>${ag.label}</div>
     </div>
     ${body}
@@ -241,7 +241,6 @@ function roomsMap() {
   return `
     <div class="head">
       <div class="label">${esc(lbl('map', 'الغرف'))}</div>
-      <div style="font-size:11px;color:#6F6D64">الإشغال فقط (مشغولة/فارغة)، بلا كاميرات ولا تتبّع للأشخاص</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${cards}</div>`;
 }
@@ -279,7 +278,7 @@ function devicesGrid() {
           </button>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <span style="font-family:var(--mono);font-size:13px;color:${on ? '#ECEBE4' : '#5E5C55'}" dir="ltr">${d.est_w} W${d.signature_measured ? '' : ' *'}${d.signature_pf != null ? ` · PF ${Number(d.signature_pf).toFixed(2)}` : ''}</span>
+          <span style="font-family:var(--mono);font-size:13px;color:${on ? '#ECEBE4' : '#5E5C55'}" dir="ltr">${d.est_w} W${d.signature_pf != null ? ` · PF ${Number(d.signature_pf).toFixed(2)}` : ''}</span>
           ${ac}
         </div>
         ${d.plug ? `<span style="font-size:11px;color:${d.plug.online ? '#9CC85A' : '#E8553F'}">🔌 ${d.plug.simulated && d.plug.model ? esc(d.plug.model) : esc(d.plug.brand_name) + (d.plug.model ? ' · ' + esc(d.plug.model) : '')} · ${d.plug.online ? (d.plug.meters ? 'القراءة من المقبس نفسه' : 'تشغيل وإطفاء فقط') : 'المقبس غير متصل'}</span>` : ''}
@@ -288,7 +287,7 @@ function devicesGrid() {
   }).join('');
   return `
     <div class="head">
-      <div class="label">DEVICES · التحكم اليدوي بالأجهزة</div>
+      <div class="label">الأجهزة</div>
       <div style="display:flex;align-items:center;gap:12px">
         <span style="font-size:12px;color:#8E8C82">يعمل ${onCount} من ${st.devices.length}</span>
         <button class="btn-lime" data-act="open-plug" style="height:34px;font-size:13px">🔌 + مقبس ذكي</button>
@@ -296,8 +295,7 @@ function devicesGrid() {
       </div>
     </div>
     ${learning}${confirm}${commandBar()}
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px">${cards}</div>
-    <div class="note">* بصمة تقديرية من لوحة بيانات الجهاز، لم تُقَس على العدّاد بعد.</div>`;
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px">${cards}</div>`;
 }
 
 // Typed or spoken orders. The server understands them, the Policy Guard checks each
@@ -370,7 +368,6 @@ function heaterPanel() {
       </div></div>`;
   return `<div class="panel green">
       <span class="panel-title">سخّان الماء الذكي</span>
-      <span style="font-size:12.5px;line-height:1.6;color:#A9A79D">السخّان من أكبر الأحمال. بدل تشغيله طوال اليوم، يقترح الوكيل تشغيله في الساعة التي تسبق الاستحمام فقط، ويمنع الحارس أي فترة أطول من ٣ ساعات.</span>
       <input class="field" id="heater-hint" value="${esc(h.hint)}" aria-label="متى تستحمّون؟" placeholder="متى تستحمّون؟ مثلًا: الصباح ٦:٣٠ والمساء ٩">
       <button class="btn-lime" data-act="heater-suggest">${h.busy ? 'جارٍ التخطيط…' : 'اقترح جدولًا للسخّان'}</button>
       ${proposal}
@@ -383,8 +380,7 @@ function schedSection() {
   const heater = WWSched.state.site === WW.site ? heaterPanel() : '';
   return `
     <div class="head">
-      <div class="label">SCHEDULES · جدولة الأجهزة</div>
-      <div style="font-size:11px;color:#6F6D64">تشغيل وإطفاء فقط · تعمل على الخادم · تراجعها وتؤكّدها قبل الحفظ · يفحصها الحارس كل مرة${st.source === 'simulator' ? ' · ساعة المحاكي ×60' : ''}</div>
+      <div class="label">جدولة الأجهزة</div>
     </div>
     ${WWSched.render({ theme: 'dark', layout: 'side' })}
     ${heater ? `<div style="display:flex;flex-wrap:wrap;gap:12px">${heater}</div>` : ''}`;
@@ -419,8 +415,8 @@ function teachSection() {
   const unk = t.unknown.length ? `<span style="font-size:12px;padding:3px 10px;border-radius:10px;background:#1E1A10;color:#F2B544">⚠️ ${t.unknown.length} جهاز مجهول</span>` : '';
   return `
     <div class="head">
-      <div class="label">TEACH · تعريف أجهزة الغرفة</div>
-      <div style="display:flex;gap:8px;align-items:center">${unk}<span style="font-size:11px;color:#6F6D64">بصمة الجهاز = قفزة الواط + معامل القدرة (PF) · لا يُحفظ شيء دون موافقتك</span></div>
+      <div class="label">تعريف الأجهزة</div>
+      <div style="display:flex;gap:8px;align-items:center">${unk}</div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">
       <div class="panel" style="flex:1 1 260px">
@@ -471,8 +467,7 @@ function analystSection() {
       </div>`;
   return `
     <div class="head">
-      <div class="label">ANALYST · محلّل الفاتورة والتقارير</div>
-      <div style="font-size:11px;color:#6F6D64">الأرقام محسوبة برمجيًا من القياسات، ولا يُنفَّذ شيء دون موافقة</div>
+      <div class="label">الفاتورة والتقارير</div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">
       <div class="panel">
@@ -523,8 +518,7 @@ function billPanel() {
     </div>
     ${noPhoto ? `<div style="font-size:12px;line-height:1.55;color:#F2B544">${esc(b.status.reason_ar)}</div>` : ''}
     ${b.msg ? `<div style="font-size:12.5px;line-height:1.55;color:#F2B544">${esc(b.msg)}</div>` : ''}
-    ${manual}${result}
-    <div style="font-size:11px;color:#6F6D64">تُقرأ الصورة مرة واحدة ولا تُحفظ، ونحتفظ بالأرقام فقط (ك.و.س، الأيام، المبلغ).</div>`;
+    ${manual}${result}`;
 }
 
 async function billSend(promise) {
@@ -577,7 +571,7 @@ function bill() {
   const opts = b.types.map(o => `<button data-act="tariff" data-type="${o.key}" style="height:28px;white-space:nowrap;padding:0 10px;border-radius:8px;border:none;background:${b.type === o.key ? '#B8F04A' : 'transparent'};color:${b.type === o.key ? '#0C0D0A' : '#D9D7CF'};font-size:12px;font-weight:600;cursor:pointer">${esc(o.label)}</button>`).join('');
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-      <div class="label">BILL · الفاتورة</div>
+      <div class="label">الفاتورة</div>
       <div style="display:flex;padding:3px;border-radius:10px;background:#1B1D17;gap:2px">${opts}</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:4px">
@@ -603,7 +597,7 @@ function bill() {
       <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px;color:#B8F04A" dir="ltr">${fmt(s.jod, 3)}</span><span style="font-size:11.5px;color:#8E8C82">دينار مُوفَّر (مُقاس · بسعر شريحتك)</span></div>
       <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:20px" dir="ltr">${fmt(s.kwh, 2)}</span><span style="font-size:11.5px;color:#8E8C82">ك.و.س · ${s.co2_kg === null ? '—' : fmt(s.co2_kg, 2)} كغ CO₂</span></div>
     </div>
-    <div class="note">${esc(b.source || '')} المعروض هو قيمة الطاقة فقط، دون الدعم النقدي أو أي رسوم أخرى.${st.source === 'simulator' ? ' الاستهلاك هنا من المحاكي (بيانات تركيبية).' : ''}${s.co2_kg === null ? ' معامل CO₂ لم يُحدَّد بعد.' : ''}</div>`;
+    `;
 }
 
 // Warnings from the agent (the same ones the phone app shows as notifications).
@@ -630,8 +624,8 @@ function alertsSection() {
     ? '<button class="tb ghost" style="height:32px" data-act="alert-perm">فعّل إشعارات المتصفح</button>' : '';
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-      <div class="label">ALERTS · تنبيهات الوكيل</div>
-      <div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:#6F6D64">تنبيه فقط (T0). زر «أطفئه؟» يرسل طلب موافقة ولا يُطفئ شيئًا بنفسه.</span>${perm}</div>
+      <div class="label">التنبيهات</div>
+      <div style="display:flex;gap:8px;align-items:center">${perm}</div>
     </div>${rows}`;
 }
 
@@ -663,8 +657,7 @@ function auditLog() {
     </div>`).join('') || '<div class="muted">لا توجد قرارات بعد.</div>';
   return `
     <div style="display:flex;justify-content:space-between;align-items:baseline">
-      <div class="label">AUDIT LOG · سجل القرارات</div>
-      <div style="font-size:11px;color:#6F6D64">كل قرار وسببه وحالة الموافقة والنتيجة</div>
+      <div class="label">سجل القرارات</div>
     </div>${rows}`;
 }
 
@@ -706,10 +699,10 @@ function updateChart() {
 function renderAll() {
   $('mode-label').textContent = '· ' + lbl('mode', '');
   $('mode-sub').textContent = st.source !== 'simulator'
-    ? 'غرفة المختبر · قراءات حقيقية من ESP32 + PZEM-004T'
+    ? 'قراءات حقيقية من العدّاد'
     : WW.site === 'building'
-      ? 'الوكيل نفسه والكود نفسه على مبنى من ١٠ غرف · بيانات تركيبية من المحاكي'
-      : 'تصوّر للتوسّع من غرفة المختبر لبيت كامل · بيانات تركيبية من المحاكي';
+      ? 'بيانات محاكاة'
+      : 'بيانات محاكاة';
   if (!document.activeElement || document.activeElement.id !== 'scenario-pick') WW.render($('toolbar'), toolbar());
   WW.render($('hero'), hero());
   WW.render($('goal'), goal());

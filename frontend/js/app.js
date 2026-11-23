@@ -464,7 +464,6 @@ function billCard() {
         : `<button data-act="bill-toggle-manual" style="background:none;border:none;color:#5E5C55;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit">أو أدخل الأرقام يدويًا</button>`}
       ${b.msg ? `<span style="font-size:12.5px;line-height:1.55;color:#8A5A00">${esc(b.msg)}</span>` : ''}
       ${manual}${result}
-      <span style="font-size:11px;color:#77756C">تُقرأ الصورة مرة واحدة ولا تُحفظ، ونحتفظ بالأرقام فقط.</span>
     </div>`;
 }
 
