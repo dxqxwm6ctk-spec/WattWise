@@ -50,7 +50,7 @@ Open:
 The demo never needs the internet. For an optional hosted copy, Render reads the
 Blueprint in `render.yaml` and runs `python scripts/cloud_start.py` (backend on `$PORT` plus the
 simulators, synthetic data only). Every push to `main` redeploys it, no laptop needed.
-Live server: __RENDER_URL__/index.html (free plan: it sleeps after about 15 minutes
+Live server: https://wattwise-vysn.onrender.com/index.html (free plan: it sleeps after about 15 minutes
 without visitors and takes about a minute to wake up). Steps in Arabic: `docs/deploy/render_ar.md`.
 
 ## AI planner (optional)

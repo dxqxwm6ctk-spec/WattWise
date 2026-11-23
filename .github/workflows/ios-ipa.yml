@@ -9,7 +9,7 @@ on:
       server:
         description: "Server address baked into the app (leave as is for Render)"
         required: false
-        default: "__RENDER_URL__"
+        default: "https://wattwise-vysn.onrender.com"
   push:
     branches: [main, "claude/**"]
     paths:
@@ -17,7 +17,7 @@ on:
       - ".github/workflows/ios-ipa.yml"
 
 env:
-  DEFAULT_SERVER: "__RENDER_URL__"
+  DEFAULT_SERVER: "https://wattwise-vysn.onrender.com"
 
 jobs:
   build-ios:

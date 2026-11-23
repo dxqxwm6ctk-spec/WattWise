@@ -10,6 +10,6 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "__RENDER_URL__/api/:splat"
+  to = "https://wattwise-vysn.onrender.com/api/:splat"
   status = 200
   force = true

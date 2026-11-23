@@ -61,7 +61,7 @@ class _RootPageState extends State<RootPage> {
   // Another address can be baked in at build time:
   //   flutter build ios --dart-define=WATTWISE_SERVER=https://example.onrender.com
   static const _cloudServer = String.fromEnvironment('WATTWISE_SERVER',
-      defaultValue: '__RENDER_URL__');
+      defaultValue: 'https://wattwise-vysn.onrender.com');
 
   WattWiseApi? api;
   Map<String, dynamic>? st;
