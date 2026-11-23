@@ -6,81 +6,75 @@
 <title>WattWise · لوحة التحكم</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/fonts.css">
-<link rel="stylesheet" href="css/dashboard.css?v=6">
+<link rel="stylesheet" href="css/dashboard.css?v=7">
 <link rel="stylesheet" href="css/schedule.css?v=1">
 <script src="vendor/chart.umd.js"></script>
 </head>
 <body>
+<div class="app">
 
-<header class="top">
-  <div class="top-in">
-    <a class="brand" href="index.html" aria-label="WattWise">
-      <img src="icon.svg" alt="" width="32" height="32">
-      <span class="brand-name">WattWise</span>
-    </a>
-    <nav class="sites" id="sites" aria-label="المكان"></nav>
-    <div class="top-end">
-      <span class="status" id="agent-status"></span>
+  <!-- The agent column: goal, plan, the request that needs the user, decision log -->
+  <aside class="agent">
+    <div class="a-top">
+      <a class="brand" href="index.html">Watt<em>Wise</em></a>
+      <button class="btn btn-danger btn-sm" type="button" data-act="estop">إيقاف طوارئ</button>
+    </div>
+    <div class="blk" id="goal"></div>
+    <div class="blk" id="approve"></div>
+    <div class="blk" id="plan"></div>
+    <div class="blk blk-last" id="log"></div>
+  </aside>
+
+  <!-- The house: key numbers, floor plan with devices, savings chart, extra tools -->
+  <main class="main">
+    <div class="m-top">
+      <nav class="tabs" id="sites" aria-label="المكان"></nav>
+      <span class="m-status" id="agent-status"></span>
       <details class="menu" id="menu">
-        <summary class="btn btn-quiet">المزيد</summary>
+        <summary class="btn btn-quiet btn-sm">المزيد</summary>
         <div class="menu-list" id="menu-list"></div>
       </details>
-      <button class="btn btn-danger" type="button" data-act="estop">إيقاف طوارئ</button>
     </div>
-  </div>
-</header>
 
-<main class="page">
-  <!-- Simulator controls: only shown when the data comes from the simulator -->
-  <section class="demo" id="demo" hidden></section>
+    <!-- Simulator controls: only shown when the data comes from the simulator -->
+    <section class="demo" id="demo" hidden></section>
 
-  <!-- Key numbers -->
-  <section class="kpis" id="kpis"></section>
+    <section class="nums" id="kpis"></section>
+    <div id="anomaly"></div>
 
-  <!-- 1. Goal and plan -->
-  <section class="card" id="goal"></section>
+    <section id="devices"></section>
 
-  <!-- 2. Approval requests and alerts -->
-  <section class="card" id="approve"></section>
-
-  <!-- 3. Measured savings -->
-  <section class="card" id="savings-card">
-    <div class="card-head">
-      <h2><span class="num">٣</span> التوفير المُقاس</h2>
-    </div>
-    <div class="savings-grid">
-      <div class="chart-box">
-        <div class="legend">
-          <span><i class="sw sw-line"></i>الفعلي</span>
-          <span><i class="sw sw-dash"></i>دون الوكيل</span>
-          <span class="clock" dir="ltr" id="meter-clock"></span>
+    <section class="box-line" id="savings-card">
+      <div class="sec-h">
+        <h2>اليوم: الفعلي مقابل المتوقع دون الوكيل <span class="hint" style="font-weight:400" id="chart-unit"></span></h2>
+        <div class="key">
+          <span><i class="k-line"></i>الفعلي</span>
+          <span><i class="k-dash"></i>دون الوكيل</span>
+          <span><i class="k-fill"></i>الموفَّر</span>
+          <span class="clock n" id="meter-clock"></span>
         </div>
-        <div class="chart-wrap"><canvas id="chart" data-keep></canvas></div>
       </div>
-      <div id="bill"></div>
-    </div>
-  </section>
+      <div class="savings-grid">
+        <div class="chart-wrap"><canvas id="chart" data-keep></canvas></div>
+        <div id="bill"></div>
+      </div>
+    </section>
 
-  <!-- Devices by room -->
-  <section class="card" id="devices"></section>
-
-  <!-- Extra tools: closed by default so the page stays short -->
-  <details class="card more" id="more-teach">
-    <summary><h2>تعريف الأجهزة</h2></summary>
-    <div id="teach"></div>
-  </details>
-  <details class="card more" id="more-sched">
-    <summary><h2>الجداول</h2></summary>
-    <div id="sched"></div>
-  </details>
-  <details class="card more" id="more-analyst">
-    <summary><h2>الفاتورة والتقارير</h2></summary>
-    <div id="analyst"></div>
-  </details>
-
-  <!-- Audit log: always visible (every decision, its reason and outcome) -->
-  <section class="card" id="log"></section>
-</main>
+    <!-- Extra tools: closed by default so the page stays short -->
+    <details class="box-line more" id="more-teach">
+      <summary><h2>تعريف الأجهزة</h2></summary>
+      <div id="teach"></div>
+    </details>
+    <details class="box-line more" id="more-sched">
+      <summary><h2>الجداول</h2></summary>
+      <div id="sched"></div>
+    </details>
+    <details class="box-line more" id="more-analyst">
+      <summary><h2>الفاتورة والتقارير</h2></summary>
+      <div id="analyst"></div>
+    </details>
+  </main>
+</div>
 
 <!-- Phone preview: hidden until needed (backup if the real phone fails in the demo). -->
 <div class="drawer" id="phone-drawer" hidden>
@@ -108,6 +102,6 @@
 <div class="toast" id="toast"></div>
 <script src="js/common.js?v=4"></script>
 <script src="js/schedule.js?v=1"></script>
-<script src="js/dashboard.js?v=7"></script>
+<script src="js/dashboard.js?v=8"></script>
 </body>
 </html>

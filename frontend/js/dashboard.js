@@ -1,8 +1,9 @@
 /* WattWise dashboard: polls the backend every second and renders the page.
 
-   Page order follows the demo story:
-     1. give the agent a goal  ->  2. approve or reject its request  ->  3. see the measured saving
-   then the devices, a few extra tools (closed by default) and the audit log.
+   Layout ("house plan"):
+     right column  = the agent: goal, its steps, the request that needs the user, the decision log
+     main area     = key numbers, the house drawn as a floor plan (click a device to switch it),
+                     the "actual vs without agent" chart, then a few extra tools (closed by default).
 */
 
 const { esc, fmt } = WW;
@@ -18,11 +19,12 @@ const ui = {
   why: { res: null, busy: false }, rep: { text: '', busy: false },
   bill: { status: null, busy: false, res: null, msg: '', manual: false, kwh: '', days: '', amount: '' },
   teach: { room: null, text: '', busy: false, lastMsg: 0 },
-  logAll: false,
+  logAll: false, editGoal: false, planOpen: false,
 };
 let st = null;
 let chart = null;
 
+const unitAr = scale.unit === 'kW' ? 'كيلوواط' : 'واط';
 const powerStr = w => scale.unit === 'kW' ? fmt((w || 0) / 1000, 2) : fmt(w, 0);
 const isSim = () => st && st.source === 'simulator';
 
@@ -34,7 +36,7 @@ function toast(msg) {
   toast.h = setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-// ---------------- header ----------------
+// ---------------- top bar ----------------
 
 function sitesNav() {
   return SITES.map(([k, label]) =>
@@ -44,7 +46,8 @@ function sitesNav() {
 function agentStatus() {
   const a = WW.agentLabel(st);
   const col = a.color === '#E8553F' ? 'var(--red)' : a.color === '#F2B544' ? 'var(--warn)' : a.color === '#8E8C82' ? 'var(--muted)' : 'var(--acc)';
-  return `<span style="color:${col};display:inline-flex;align-items:center;gap:7px"><i></i>الوكيل: ${esc(a.label)}</span>`;
+  return `<span style="color:${col};display:inline-flex;align-items:center;gap:7px"><i></i>الوكيل: ${esc(a.label)}</span>
+    ${isSim() ? '<span>· بيانات محاكاة</span>' : ''}`;
 }
 
 function menuList() {
@@ -80,61 +83,12 @@ function kpis() {
   const b = st.bill, s = st.savings, m = st.meter;
   const goalJd = st.goal && st.goal.bill_target_jd;
   const over = goalJd && b.bill_projected > goalJd;
-  return `
-    <div class="kpi">
-      <span class="kpi-label">الاستهلاك الآن</span>
-      <span class="kpi-val" dir="ltr">${powerStr(m.power_w)}<small>${scale.unit}</small></span>
-      <span class="kpi-sub" dir="ltr">${fmt(m.voltage_v, 0)} V · ${fmt(m.current_a, 1)} A</span>
-    </div>
-    <div class="kpi">
-      <span class="kpi-label">فاتورة الشهر حتى الآن</span>
-      <span class="kpi-val">${fmt(b.bill_now, 2)}<small>دينار</small></span>
-      <span class="kpi-sub">${fmt(b.kwh_now)} ك.و.س</span>
-    </div>
-    <div class="kpi ${over ? 'warn' : ''}">
-      <span class="kpi-label">المتوقع آخر الشهر</span>
-      <span class="kpi-val">${fmt(b.bill_projected, 1)}<small>دينار</small></span>
-      <span class="kpi-sub">${goalJd ? (over ? `أعلى من هدفك (${fmt(goalJd)} دينار)` : `ضمن هدفك (${fmt(goalJd)} دينار)`) : 'لا يوجد هدف بعد'}</span>
-    </div>
-    <div class="kpi good">
-      <span class="kpi-label">التوفير المُقاس</span>
-      <span class="kpi-val">${fmt(s.jod, 3)}<small>دينار</small></span>
-      <span class="kpi-sub">${fmt(s.kwh, 2)} ك.و.س${s.co2_kg === null ? '' : ` · ${fmt(s.co2_kg, 2)} كغ CO₂`}</span>
-    </div>`;
-}
-
-// ---------------- 1. goal ----------------
-
-function goal() {
-  const form = `<div class="goal-form">
-      <input class="field grow" id="goal-text" value="${esc(ui.goalText)}" aria-label="اكتب هدفك بكلماتك"
-        placeholder="مثلًا: أريد ألّا تتجاوز الفاتورة ٢٥ دينارًا دون أن يشعر أحد بفرق">
-      <button class="btn btn-primary" style="height:42px" data-act="set-goal">${st.goal ? 'غيّر الهدف' : 'ابدأ'}</button>
-    </div>`;
-  const steps = WW.goalSteps(st).map((s, i) =>
-    `<li class="${s.state}${s.state === 'active' && i === 4 ? ' wait' : ''}">${esc(s.label)}${s.tag && s.state !== 'done' ? ` · ${esc(s.tag)}` : ''}</li>`).join('');
-  const body = st.goal
-    ? `<div class="goal-text">«${esc(st.goal.text)}»</div>${form}${planBox()}`
-    : form;
-  return `
-    <div class="card-head"><h2><span class="num">١</span> أعطِ الوكيل هدفًا</h2><span class="hint">ابدأ من هنا</span></div>
-    ${body}
-    ${st.goal ? `<ol class="steps" aria-label="مراحل عمل الوكيل">${steps}</ol>` : ''}
-    ${anomalyBox()}`;
-}
-
-// The agent's own plan for this goal (from the LLM, or the rule-based template).
-function planBox() {
-  const p = st.plan;
-  if (!p || !p.steps.length) return '';
-  const by = p.by === 'llm' ? 'من النموذج الذكي، ويراجعها حارس السياسات' : 'من القواعد (دون ذكاء اصطناعي)';
-  const tag = i => (p.tags || [])[i] === 'T1'
-    ? '<span class="tag ok">بموافقتك</span>' : '<span class="tag auto">تلقائي</span>';
-  return `<div class="plan">
-      <div class="plan-head"><span>خطة الوكيل</span><span>${by}</span></div>
-      ${p.summary ? `<div class="plan-sum">${esc(p.summary)}</div>` : ''}
-      ${p.steps.map((x, i) => `<div class="plan-step">${tag(i)}<span>${esc(x)}</span></div>`).join('')}
-    </div>`;
+  const cell = (cls, k, v, unit, sub) => `<div class="num-cell ${cls}">
+      <span class="num-k">${k}</span><span class="num-v">${v}<small>${unit}</small></span><span class="num-s">${sub}</span></div>`;
+  return cell('', 'الاستهلاك الآن', powerStr(m.power_w), unitAr, `<span class="n">${fmt(m.voltage_v, 0)}</span> فولت · <span class="n">${fmt(m.current_a, 1)}</span> أمبير`)
+    + cell('', 'فاتورة الشهر حتى الآن', fmt(b.bill_now, 2), 'دينار', `<span class="n">${fmt(b.kwh_now)}</span> ك.و.س`)
+    + cell(over ? 'warn' : '', 'المتوقع آخر الشهر', fmt(b.bill_projected, 2), 'دينار', goalJd ? (over ? 'أعلى من الهدف' : 'ضمن الهدف') : 'لا يوجد هدف بعد')
+    + cell('good', 'التوفير المُقاس', fmt(s.jod, 3), 'دينار', `<span class="n">${fmt(s.kwh, 2)}</span> ك.و.س${s.co2_kg === null ? '' : ` · <span class="n">${fmt(s.co2_kg, 2)}</span> كغ CO₂`}`);
 }
 
 // AI layer 1: the meter reads something the known devices do not explain.
@@ -144,25 +98,85 @@ function anomalyBox() {
   const what = a.kind === 'extra'
     ? `العدّاد ≈ ${a.power_w} واط والمتوقع ≈ ${a.expected_w} واط: زيادة ≈ ${a.residual_w} واط مصدرها غير معروف.`
     : `العدّاد أقل من المتوقع بنحو ${-a.residual_w} واط: ربما يوجد جهاز مفصول أو معطّل.`;
-  return `<div class="box warn"><span class="box-title" style="color:var(--warn)">استهلاك غير طبيعي</span><span>${what}</span></div>`;
+  return `<div class="box warn"><span class="box-title" style="color:var(--warn)">استهلاك غير طبيعي</span><span class="box-sub">${what}</span></div>`;
 }
 
-// ---------------- 2. approvals and alerts ----------------
+// ---------------- agent column: goal ----------------
+
+function goal() {
+  const b = st.bill, g = st.goal;
+  const form = `<div class="goal-form">
+      <textarea class="field" id="goal-text" rows="2" aria-label="اكتب هدفك بكلماتك"
+        placeholder="مثلًا: أريد ألّا تتجاوز الفاتورة ٢٥ دينارًا دون أن يشعر أحد بفرق">${esc(ui.goalText)}</textarea>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" data-act="set-goal">${g ? 'اعتمد الهدف الجديد' : 'ابدأ'}</button>
+        ${g ? '<button class="btn btn-quiet" data-act="goal-edit">إلغاء</button>' : ''}
+      </div>
+    </div>`;
+  if (!g) return `<div class="lbl"><span>الهدف</span></div>
+    <p class="goal-text" style="font-size:15px;font-weight:500;color:var(--sub)">اكتب للوكيل ما تريد تحقيقه، وهو يقسّمه إلى خطوات.</p>${form}`;
+  const goalJd = g.bill_target_jd;
+  const over = goalJd && b.bill_projected > goalJd;
+  return `<div class="lbl"><span>الهدف</span>${ui.editGoal ? '' : '<button class="btn-link" data-act="goal-edit">غيّر الهدف</button>'}</div>
+    <p class="goal-text">${esc(g.text)}</p>
+    <div class="goal-meta">
+      <span>حتى اليوم <b class="n">${fmt(b.bill_now, 2)}</b></span>
+      <span>المتوقع <b class="n${over ? ' over' : ''}">${fmt(b.bill_projected, 2)}</b></span>
+      ${goalJd ? `<span>الحد <b class="n">${fmt(goalJd, 2)}</b></span>` : ''}
+      <span>دينار</span>
+    </div>
+    ${ui.editGoal ? form : ''}`;
+}
+
+// ---------------- agent column: plan ----------------
+
+function planSection() {
+  if (!st.goal) return '';
+  const steps = WW.goalSteps(st).map((s, i) => {
+    const wait = s.state === 'active' && i === 4;
+    const tag = s.state === 'halt' ? `<small>${esc(s.tag)}</small>` : wait ? '<small>لا شيء يتغيّر قبل ردّك</small>' : '';
+    return `<li data-n="${i + 1}" class="${s.state}${wait ? ' wait' : ''}">${esc(s.label)}${tag}</li>`;
+  }).join('');
+  return `<div class="lbl"><span>مراحل عمل الوكيل</span></div>
+    <ol class="steps">${steps}</ol>
+    ${planBox()}`;
+}
+
+// The agent's own plan for this goal (from the LLM, or the rule-based template).
+function planBox() {
+  const p = st.plan;
+  if (!p || !p.steps.length) return '';
+  const by = p.by === 'llm' ? 'من النموذج، ويراجعها حارس السياسات' : 'من القواعد';
+  const tag = i => (p.tags || [])[i] === 'T1'
+    ? '<span class="tag ok">بموافقتك</span>' : '<span class="tag auto">تلقائي</span>';
+  return `<details class="plan" id="plan-details"${ui.planOpen ? ' open' : ''}>
+      <summary class="plan-head"><span>خطة الوكيل لهذا الهدف (${p.steps.length} خطوات)</span><span>${by}</span></summary>
+      ${p.summary ? `<div class="plan-sum">${esc(p.summary)}</div>` : ''}
+      ${p.steps.map((x, i) => `<div class="plan-step">${tag(i)}<span>${esc(x)}</span></div>`).join('')}
+    </details>`;
+}
+
+// ---------------- agent column: the request, status and alerts ----------------
 
 function approvalCard() {
   const p = st.pending;
   const pct = (p.expires_in_s / p.timeout_s * 100).toFixed(1);
+  const mm = Math.floor(p.expires_in_s / 60), ss = String(p.expires_in_s % 60).padStart(2, '0');
+  const dev = p.device_id && st.devices.find(d => d.id === p.device_id);
   return `<div class="ask">
-      <div class="ask-top"><span>الوكيل يطلب موافقتك</span><span class="n" dir="ltr">${p.expires_in_s}s</span></div>
+      <div class="ask-top"><span>بانتظار موافقتك</span><span class="n">${mm}:${ss}</span></div>
       <div class="ask-title">${esc(p.title)}</div>
-      <div>${esc(p.reason)}</div>
-      <div class="hint">التوفير التقريبي: <span class="n" dir="ltr">${fmt(p.details.saving_jod_per_hour, 3)} JD/h</span></div>
+      <div class="ask-why">${esc(p.reason)}</div>
+      <dl class="kv">
+        ${dev && dev.is_on ? `<dt>يسحب الآن</dt><dd><span class="n">${dev.est_w}</span> واط</dd>` : ''}
+        <dt>التوفير التقريبي</dt><dd><span class="n">${fmt(p.details.saving_jod_per_hour, 3)}</span> دينار/ساعة</dd>
+      </dl>
       <div class="ask-bar"><div style="width:${pct}%"></div></div>
       <div class="ask-btns">
-        <button class="btn btn-quiet btn-lg" data-act="reject" data-id="${p.id}">لا، اتركه</button>
-        <button class="btn btn-primary btn-lg" data-act="approve" data-id="${p.id}">نعم، نفّذ</button>
+        <button class="btn btn-primary btn-lg" data-act="approve" data-id="${p.id}">موافق</button>
+        <button class="btn btn-quiet btn-lg" data-act="reject" data-id="${p.id}">ارفض</button>
       </div>
-      <span class="hint" style="text-align:center">إن لم ترد، لن يُنفَّذ شيء.</span>
+      <span class="ask-foot">بدون رد خلال الوقت، لا يُنفَّذ شيء.</span>
     </div>`;
 }
 
@@ -173,41 +187,40 @@ function statusBox() {
   if (!st.online) m = ['red', 'لا توجد قراءات', 'عادت الأجهزة إلى وضعها الطبيعي.'];
   else if (a.estop) m = ['red', 'الوكيل متوقف (إيقاف طوارئ)', 'عادت الأجهزة إلى وضعها الطبيعي.'];
   else if (a.safe_mode) m = ['red', 'الوضع الآمن', 'لن ننفّذ شيئًا حتى يعود الاتصال.'];
-  else if (!st.goal) m = ['', 'لا توجد طلبات بعد', 'أعطِ الوكيل هدفًا أولًا.'];
+  else if (!st.goal) return '';
   else m = {
     analyzing: ['warn', 'جارٍ التحليل', 'جهاز يعمل في غرفة فارغة.'],
     executing: ['good', 'جارٍ التنفيذ', 'وصلت موافقتك.'],
     verified: ['good', 'تم وتحقّق العدّاد', `أُطفئ ${dev} وأكّد العدّاد ذلك.`],
     rejected: ['red', 'رفضت الطلب، فلم يتغيّر شيء', `بقي ${dev} كما هو.`],
     expired: ['red', 'انتهى الوقت دون رد', 'لذا لم يُنفَّذ شيء. عدم الرد لا يعني الموافقة.'],
-  }[a.phase] || ['', 'لا توجد طلبات الآن', 'لا يوجد هدر الآن.'];
-  return `<div class="box ${m[0]}"><span class="box-title">${m[1]}</span><span class="hint" style="font-size:14px;color:var(--sub)">${m[2]}</span></div>`;
+  }[a.phase] || ['', 'لا طلبات الآن', 'الوكيل يراقب، ولا يوجد هدر.'];
+  return `<div class="box ${m[0]}"><span class="box-title">${m[1]}</span><span class="box-sub">${m[2]}</span></div>`;
 }
 
 function approveSection() {
   const al = st.alerts || { items: [] };
   const active = al.items.filter(a => a.active);
-  const rows = al.items.slice(0, 6).map(a => {
+  const rows = al.items.slice(0, 4).map(a => {
     const off = !a.active || a.user_state;
     const status = !a.active ? 'انتهى' : a.user_state === 'acted' ? 'أُرسل طلب موافقة' : a.user_state === 'dismissed' ? 'تم التجاهل' : '';
     const lv = { danger: 'danger', warn: 'warn' }[a.level] || 'info';
+    const acts = [
+      status ? `<span class="hint">${status}</span>` : '',
+      a.can_act ? `<button class="btn btn-primary btn-sm" data-act="alert-act" data-id="${a.id}">اطلب إطفاءه</button>` : '',
+      a.active && !a.user_state ? `<button class="btn btn-quiet btn-sm" data-act="alert-dismiss" data-id="${a.id}">تجاهل</button>` : '',
+    ].join('');
     return `<div class="row${off ? ' off' : ''}">
-      <span class="row-time" dir="ltr">${esc(a.clock)}</span>
+      <span class="row-time">${esc(a.clock)}</span>
       <div><div class="row-title ${lv}">${esc(a.title)}</div><div class="row-body">${esc(a.body)}</div></div>
-      <div class="row-act">
-        ${status ? `<span class="hint">${status}</span>` : ''}
-        ${a.can_act ? `<button class="btn btn-primary btn-sm" data-act="alert-act" data-id="${a.id}">اطلب إطفاءه</button>` : ''}
-        ${a.active && !a.user_state ? `<button class="btn btn-quiet btn-sm" data-act="alert-dismiss" data-id="${a.id}">تجاهل</button>` : ''}
-      </div>
+      ${acts.trim() ? `<div class="row-act">${acts}</div>` : ''}
     </div>`;
   }).join('');
   const perm = ('Notification' in window) && Notification.permission === 'default'
-    ? '<button class="btn btn-quiet btn-sm" data-act="alert-perm">فعّل إشعارات المتصفح</button>' : '';
-  return `
-    <div class="card-head"><h2><span class="num">٢</span> وافق أو ارفض</h2></div>
-    ${st.pending ? approvalCard() : statusBox()}
-    <div class="card-head"><span class="sub-h">التنبيهات${active.length ? ` (${active.length})` : ''}</span>${perm}</div>
-    ${rows ? `<div class="rows">${rows}</div>` : '<div class="hint">لا توجد تنبيهات. كل شيء طبيعي.</div>'}`;
+    ? '<button class="btn-link" data-act="alert-perm">فعّل إشعارات المتصفح</button>' : '';
+  const top = st.pending ? approvalCard() : statusBox();
+  const alerts = rows ? `<div class="lbl"><span>التنبيهات${active.length ? ` (${active.length})` : ''}</span>${perm}</div><div class="rows">${rows}</div>` : '';
+  return top + alerts;
 }
 
 // New warnings: a toast on the page, and a browser notification when allowed
@@ -227,7 +240,7 @@ function notifyNewAlerts() {
   }
 }
 
-// ---------------- 3. savings (bill side panel) ----------------
+// ---------------- savings (side of the chart) ----------------
 
 // AI layer 2: expected load for this hour and the next 5, plus our measured accuracy.
 function forecastBlock() {
@@ -235,11 +248,11 @@ function forecastBlock() {
   if (!f) return '';
   const max = Math.max(...f.steps.map(x => x.power_w), 1);
   const bars = f.steps.map(x => `<div><span>${fmt(x.power_w / 1000, 1)}</span>
-      <i class="${x.method === 'now' ? 'now' : ''}" style="height:${Math.max(4, x.power_w / max * 40).toFixed(0)}px"></i><span>${x.hour}</span></div>`).join('');
+      <i class="${x.method === 'now' ? 'now' : ''}" style="height:${Math.max(3, x.power_w / max * 36).toFixed(0)}px"></i><span>${x.hour}</span></div>`).join('');
   const a = f.accuracy;
   const acc = a.hours ? `الخطأ ≈ ${fmt(a.mean_err_pct, 0)}% في آخر ${a.hours} ساعة` : 'تُقاس الدقة بعد أول ساعة كاملة';
   return `<div style="display:flex;flex-direction:column;gap:6px">
-      <div class="card-head"><span class="sub-h" style="margin:0">التوقّع للساعات القادمة (kW)</span><span class="hint" dir="ltr">${fmt(f.kwh, 1)} kWh ≈ ${fmt(f.jod, 2)} JD</span></div>
+      <div class="lbl"><span class="sub-h">التوقّع للساعات القادمة (كيلوواط)</span><span><span class="n">${fmt(f.kwh, 1)}</span> ك.و.س ≈ <span class="n">${fmt(f.jod, 2)}</span> دينار</span></div>
       <div class="fc">${bars}</div>
       <div class="note">${acc}</div>
     </div>`;
@@ -248,14 +261,22 @@ function forecastBlock() {
 function bill() {
   const b = st.bill, s = st.savings, m = st.mv;
   const goalJd = st.goal && st.goal.bill_target_jd;
-  const projColor = goalJd && b.bill_projected > goalJd ? '#E3A33A' : 'var(--acc)';
-  const shades = b.type === 'unsub' ? ['#E9D9A8', '#EDB8AE'] : ['#C7E2C8', '#E9D9A8', '#EDB8AE'];
-  const segs = b.segments.map((t, i) => `<div style="width:${t.width_pct}%;background:${shades[i] || '#EDB8AE'}"></div>`).join('');
-  const segLabels = b.segments.map(t => `<span style="width:${t.width_pct}%">${t.fils} فلس</span>`).join('');
+  const projColor = goalJd && b.bill_projected > goalJd ? 'var(--warn)' : 'var(--acc)';
+  const segs = b.segments.map((t, i) => `<div class="${i ? 'hot' : ''}" style="width:${t.width_pct}%"></div>`).join('');
+  const segLabels = b.segments.map(t => `<span style="width:${t.width_pct}%">${t.fils}</span>`).join('');
   const opts = b.types.map(o => `<button data-act="tariff" data-type="${o.key}" class="${b.type === o.key ? 'sel' : ''}">${esc(o.label)}</button>`).join('');
   const mv = m ? `<div class="note" style="color:${m.status === 'ok' ? 'var(--acc)' : 'var(--muted)'}">قياس التوفير (M&amp;V): ${esc(m.message_ar)}${m.model ? ` · CV(RMSE) ${fmt(m.model.cv_rmse_pct, 1)}%` : ''}</div>` : '';
   return `<div class="bill">
-    <div class="card-head"><span class="sub-h" style="margin:0">شرائح التعرفة</span><div class="seg">${opts}</div></div>
+    <div>
+      <div class="saved-k">الموفَّر المُقاس</div>
+      <div class="saved-v">${fmt(s.jod, 3)}<small>دينار</small></div>
+    </div>
+    <ul class="facts">
+      <li><span>طاقة</span><span><span class="n">${fmt(s.kwh, 2)}</span> ك.و.س</span></li>
+      ${s.co2_kg === null ? '' : `<li><span>انبعاثات</span><span><span class="n">${fmt(s.co2_kg, 2)}</span> كغ CO₂</span></li>`}
+    </ul>
+    ${mv}
+    <div class="lbl" style="margin-top:4px"><span class="sub-h">شرائح التعرفة (فلس لكل ك.و.س)</span><div class="seg">${opts}</div></div>
     <div>
       <div class="tiers">
         <div class="tiers-bar">${segs}</div>
@@ -263,61 +284,76 @@ function bill() {
         <div class="tiers-mark" style="right:${b.proj_pos}%;background:${projColor}"></div>
       </div>
       <div class="tiers-labels">${segLabels}</div>
-      <div class="meta" style="margin-top:4px">
-        <span><b style="color:var(--text)">|</b> الآن</span>
-        <span><b style="color:${projColor}">|</b> متوقّع آخر الشهر ${fmt(b.projected_kwh)} ك.و.س</span>
+      <div class="key" style="margin-top:4px">
+        <span><i style="width:2px;background:var(--text)"></i>الآن</span>
+        <span><i style="width:2px;background:${projColor}"></i>متوقّع آخر الشهر <span class="n">${fmt(b.projected_kwh)}</span> ك.و.س</span>
       </div>
     </div>
-    <div class="sub-box" style="font-size:14px">${esc(b.message)}</div>
+    <div class="note" style="color:var(--sub)">${esc(b.message)}</div>
     ${forecastBlock()}
-    ${mv}
-    <div class="big-save">
-      <div><b style="color:var(--acc)">${fmt(s.jod, 3)}</b><span>دينار مُوفَّر (مُقاس)</span></div>
-      <div><b>${fmt(s.kwh, 2)}</b><span>ك.و.س${s.co2_kg === null ? '' : ` · ${fmt(s.co2_kg, 2)} كغ CO₂`}</span></div>
-    </div>
   </div>`;
 }
 
-// ---------------- devices, grouped by room ----------------
+// ---------------- the house as a floor plan ----------------
+
+// How many columns the plan uses, so the rooms fill whole rows when possible.
+function planCols(n) {
+  if (n <= 4) return Math.max(n, 1);
+  for (const c of [4, 5, 3]) if (n % c === 0) return c;
+  return 4;
+}
 
 function devicesSection() {
   const onCount = st.devices.filter(d => d.is_on).length;
   const confirmDev = st.devices.find(d => d.id === ui.confirmId);
-  const confirm = confirmDev ? `<div class="box warn">
+  const confirm = confirmDev ? `<div class="box warn" style="margin-bottom:12px">
       <span class="box-title">هل تريد إطفاء ${esc(confirmDev.name)} فعلًا؟</span>
-      <span>سينقطع تطبيق الموافقة على الهاتف، ويدخل الوكيل الوضع الآمن: لن يطلب موافقة ولن ينفّذ أي إجراء حتى يعود الاتصال.</span>
+      <span class="box-sub">سينقطع تطبيق الموافقة على الهاتف، ويدخل الوكيل الوضع الآمن: لن يطلب موافقة ولن ينفّذ أي إجراء حتى يعود الاتصال.</span>
       <div style="display:flex;gap:8px;margin-top:6px">
         <button class="btn btn-quiet btn-sm" data-act="confirm-cancel">لا، اتركه</button>
         <button class="btn btn-danger btn-sm" data-act="confirm-off" data-id="${esc(confirmDev.id)}">أطفئه</button>
       </div></div>` : '';
-  const learning = st.learn ? '<div class="box">تجري إضافة جهاز من الهاتف.</div>' : '';
+  const learning = st.learn ? '<div class="box" style="margin-bottom:12px">تجري إضافة جهاز من الهاتف.</div>' : '';
   const contact = WW.site === 'lab' ? 'الباب' : 'الشباك';
-  const rooms = st.rooms.map(r => {
-    const devs = st.devices.filter(d => d.room === r.id).map(deviceRow).join('');
-    const occ = r.occupied === null ? '' : r.occupied ? '<span>مشغولة</span>' : '<span class="empty">فارغة</span>';
-    const win = r.window_open === null ? '' : `<span>${contact} ${r.window_open ? 'مفتوح' : 'مغلق'} (محاكى)</span>`;
-    return `<div class="room${r.waste ? ' waste' : ''}">
-        <div class="room-h"><span class="room-name">${esc(r.name)}</span><span class="room-w" dir="ltr">${r.power_w} W</span></div>
-        <div class="room-meta">${occ}${r.temp_c == null ? '' : `<span dir="ltr">${fmt(r.temp_c, 1)}°C</span>`}${win}</div>
-        ${devs || '<div class="hint">لا توجد أجهزة</div>'}
+  const cols = planCols(st.rooms.length);
+  const rooms = st.rooms.map((r, i) => {
+    const devs = st.devices.filter(d => d.room === r.id).map(d => deviceChip(d, r)).join('');
+    const empty = r.occupied === false;
+    const meta = [
+      r.occupied === null ? '' : empty ? '<span class="empty-t">فارغة</span>' : '<span>مشغولة</span>',
+      r.temp_c == null ? '' : `<span class="n">${fmt(r.temp_c, 1)}°</span>`,
+      r.window_open === null ? '' : `<span>${contact} ${r.window_open ? 'مفتوح' : 'مغلق'} (محاكى)</span>`,
+    ].join('');
+    // On a phone the plan has 2 columns: an odd last room takes the full row.
+    const cls = (r.waste ? ' waste' : empty ? ' empty' : '') + (i === st.rooms.length - 1 && st.rooms.length % 2 ? ' odd-last' : '');
+    return `<div class="rm${cls}">
+        <div class="rm-h"><span class="rm-n">${esc(r.name)}</span><span class="rm-w">${r.power_w}<small>واط</small></span></div>
+        <div class="rm-s">${meta}</div>
+        <div class="devs">${devs || '<span class="hint">لا توجد أجهزة</span>'}</div>
       </div>`;
-  }).join('');
+  });
+  const left = (cols - st.rooms.length % cols) % cols;
+  for (let i = 0; i < left; i++) rooms.push('<div class="rm filler" aria-hidden="true"></div>');
   return `
-    <div class="card-head">
-      <h2>الأجهزة</h2>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span class="hint">يعمل ${onCount} من ${st.devices.length}</span>
+    <div class="sec-h">
+      <h2>${esc(st.site_name || 'البيت')} <span class="hint" style="font-weight:400">· يعمل ${onCount} من ${st.devices.length} أجهزة</span></h2>
+      <div class="sec-tools">
+        <div class="key plan-key">
+          <span><i class="k-occ"></i>مشغولة</span><span><i class="k-empty"></i>فارغة</span><span><i class="k-waste"></i>فيها هدر</span>
+        </div>
         <button class="btn btn-quiet btn-sm" data-act="open-plug">+ مقبس ذكي</button>
         <button class="btn btn-quiet btn-sm" data-act="open-wiz">+ جهاز عبر العدّاد</button>
       </div>
     </div>
     ${learning}${confirm}${commandBar()}
-    <div class="rooms">${rooms}</div>
-`;
+    <div class="plan-grid" style="--cols:${cols}">${rooms.join('')}</div>`;
 }
 
-function deviceRow(d) {
+// One device as a small switch inside its room. Click to turn it on or off.
+function deviceChip(d, room) {
   const on = d.is_on, locked = d.tier === 'T2';
+  // "مكيّف غرفة النوم" inside the bedroom box reads better as just "مكيّف".
+  const short = d.name.endsWith(' ' + room.name) ? d.name.slice(0, -room.name.length - 1) : d.name;
   const sub = [
     locked ? 'محمي، يعمل دائمًا' : on ? 'يعمل' : 'مطفأ',
     d.agent_off ? 'أطفأه الوكيل بموافقتك' : '',
@@ -326,14 +362,11 @@ function deviceRow(d) {
     d.plug ? `مقبس ${d.plug.online ? 'متصل' : 'غير متصل'}` : '',
     d.added ? 'جديد' : '',
   ].filter(Boolean).join(' · ');
-  const sw = locked
-    ? '<span class="lock">محمي</span>'
-    : `<button class="switch${on ? ' on' : ''}" role="switch" aria-checked="${on}" data-act="toggle" data-id="${esc(d.id)}" aria-label="${esc(d.name)}"></button>`;
-  return `<div class="dev">
-      <div class="dev-main"><span class="dev-name">${esc(d.name)}</span><span class="dev-sub">${sub}</span></div>
-      <span class="dev-w" dir="ltr">${on ? d.est_w : 0} W</span>
-      ${sw}
-    </div>`;
+  const w = on ? ` <b>${d.est_w}</b>` : '';
+  if (locked) return `<span class="d lock on" title="${esc(d.name)}: ${esc(sub)}">${esc(short)} · محمي${w}</span>`;
+  const cls = `d${on ? ' on' : ''}${d.agent_off ? ' agent' : ''}`;
+  return `<button class="${cls}" role="switch" aria-checked="${on}" data-act="toggle" data-id="${esc(d.id)}"
+      title="${esc(d.name)}: ${esc(sub)}" aria-label="${esc(d.name)}">${esc(short)}${d.agent_off ? ' · أطفأه الوكيل' : ''}${w}</button>`;
 }
 
 // Typed or spoken orders. The server understands them, the Policy Guard checks each
@@ -346,7 +379,7 @@ function commandBar() {
     const items = r.items.map(i => `<div class="plan-step"><span class="tag ${i.ok ? 'auto' : 'no'}">${i.ok ? 'مسموح' : 'ممنوع'}</span>
         <span>${esc(i.label)} <span class="hint">${esc(i.why)}</span></span></div>`).join('');
     const canRun = r.items.some(i => i.ok);
-    result = `<div class="plan">
+    result = `<div class="cmd-res">
         <span>${esc(r.clarify || r.reply)}</span>${items}
         <div style="display:flex;gap:8px">
           ${canRun ? '<button class="btn btn-primary btn-sm" data-act="cmd-run">نعم، نفّذ</button>' : ''}
@@ -354,10 +387,10 @@ function commandBar() {
         </div></div>`;
   }
   return `<div class="cmd-box">
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <div class="cmd-row">
         <input class="field grow" id="cmd-text" value="${esc(c.text)}" aria-label="اكتب أمرك للوكيل"
           placeholder="أمر سريع، مثلًا: أطفئ مكيّف غرفة النوم بعد نصف ساعة">
-        ${micOk ? `<button class="mic${ui.listening ? ' on' : ''}" data-act="cmd-mic" aria-label="${ui.listening ? 'أستمع إليك، اضغط للإيقاف' : 'تحدّث'}">🎤</button>` : ''}
+        ${micOk ? `<button class="mic${ui.listening ? ' on' : ''}" data-act="cmd-mic" aria-label="${ui.listening ? 'أستمع إليك، اضغط للإيقاف' : 'تحدّث'}">${ui.listening ? 'أستمع…' : 'تحدّث'}</button>` : ''}
         <button class="btn btn-quiet" style="height:42px" data-act="cmd-parse">${c.busy ? 'جارٍ الفهم…' : 'أرسل'}</button>
       </div>${result}
       ${c.msg ? `<span style="color:var(--acc)">${esc(c.msg)}</span>` : ''}
@@ -553,22 +586,20 @@ async function billSend(promise) {
   ui.bill.busy = false; renderAll();
 }
 
-// ---------------- audit log ----------------
+// ---------------- decision log (agent column) ----------------
 
 function auditLog() {
   const color = t => ({ T1: 'var(--warn)', STOP: 'var(--red)', OK: 'var(--acc)', MANUAL: 'var(--info)', SCHED: 'var(--info)', T2: 'var(--red)' }[t] || 'var(--muted)');
   const tierLabel = t => ({ MANUAL: 'يدوي', SCHED: 'جدول', OK: 'تم', STOP: 'إيقاف', T0: 'تلقائي', T1: 'موافقة', T2: 'ممنوع' }[t] || t);
-  const list = ui.logAll ? st.log : st.log.slice(0, 8);
+  const list = ui.logAll ? st.log : st.log.slice(0, 6);
   const rows = list.map(e => `
-    <div class="row log-row">
-      <span class="row-time" dir="ltr">${esc(e.clock)}</span>
-      <span class="log-tier" style="color:${color(e.tier)}">${esc(tierLabel(e.tier))}</span>
-      <span class="row-body">${esc(e.message)}</span>
+    <div class="row">
+      <span class="row-time">${esc(e.clock)}</span>
+      <span class="row-body"><span class="log-tier" style="color:${color(e.tier)}">${esc(tierLabel(e.tier))}</span>${esc(e.message)}</span>
     </div>`).join('') || '<div class="hint">لا توجد قرارات بعد.</div>';
-  const more = st.log.length > 8 ? `<button class="btn btn-quiet btn-sm" style="align-self:flex-start" data-act="log-all">${ui.logAll ? 'اعرض أقل' : `اعرض الكل (${st.log.length})`}</button>` : '';
-  return `
-    <div class="card-head"><h2>سجل القرارات</h2></div>
-    <div class="rows">${rows}</div>${more}`;
+  const more = st.log.length > 6 ? `<button class="btn-link" data-act="log-all">${ui.logAll ? 'اعرض أقل' : `الكل (${st.log.length})`}</button>` : '';
+  return `<div class="lbl"><span>سجل القرارات</span>${more}</div>
+    <div class="rows">${rows}</div>`;
 }
 
 // ---------------- chart (Chart.js) ----------------
@@ -578,21 +609,25 @@ function updateChart() {
   const actual = st.history.map(h => h.power_w);
   const base = st.history.map(h => h.baseline_w);
   if (!chart) {
+    const mono = { family: "'JetBrains Mono', monospace", size: 11 };
     chart = new Chart($('chart'), {
       type: 'line',
       data: {
         labels,
         datasets: [
-          { label: 'الفعلي', data: actual, borderColor: '#2E7D32', backgroundColor: 'rgba(46,125,50,0.08)', fill: 'origin', borderWidth: 2, pointRadius: 0, tension: 0.25 },
-          { label: 'دون الوكيل', data: base, borderColor: '#9AA096', borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.25 },
+          { label: 'الفعلي', data: actual, borderColor: '#12181C', borderWidth: 2, pointRadius: 0, tension: 0.25, fill: false },
+          // The area between "without agent" and "actual" is the saving (only where the baseline is higher).
+          { label: 'دون الوكيل', data: base, borderColor: '#9AA3AB', borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, tension: 0.25,
+            fill: { target: 0, above: 'rgba(14,106,99,0.14)', below: 'rgba(0,0,0,0)' } },
         ],
       },
       options: {
         animation: false, maintainAspectRatio: false, responsive: true,
         plugins: { legend: { display: false }, tooltip: { rtl: true } },
         scales: {
-          x: { ticks: { color: '#6E736B', maxTicksLimit: 6 }, grid: { display: false } },
-          y: { beginAtZero: true, ticks: { color: '#6E736B', callback: v => scale.unit === 'kW' ? (v / 1000).toFixed(1) + ' kW' : v + ' W' }, grid: { color: '#ECEEEA' } },
+          x: { ticks: { color: '#6B767F', maxTicksLimit: 6, font: mono }, grid: { display: false }, border: { color: '#D5DBE0' } },
+          y: { beginAtZero: true, ticks: { color: '#6B767F', font: mono, maxTicksLimit: 5, callback: v => scale.unit === 'kW' ? (v / 1000).toFixed(1) : v },
+               grid: { color: '#E8ECEF' }, border: { display: false } },
         },
       },
     });
@@ -613,7 +648,9 @@ function renderAll() {
   $('demo').hidden = !isSim();
   if (isSim() && (!document.activeElement || document.activeElement.id !== 'scenario-pick')) WW.render($('demo'), demoBar());
   WW.render($('kpis'), kpis());
+  WW.render($('anomaly'), anomalyBox());
   WW.render($('goal'), goal());
+  WW.render($('plan'), planSection());
   WW.render($('approve'), approveSection());
   notifyNewAlerts();
   WW.render($('bill'), bill());
@@ -629,6 +666,7 @@ function renderAll() {
   WW.render($('log'), auditLog());
   $('meter-clock').textContent = st.clock + (isSim() ? ' · محاكي ×60' : '');
   $('phone-clock').textContent = st.clock;
+  $('chart-unit').textContent = `(${unitAr})`;
   updateChart();
 }
 
@@ -657,9 +695,11 @@ WW.onAction({
   approve: d => act(() => WW.post(`/approvals/${d.id}/approve`)),
   reject: d => act(() => WW.post(`/approvals/${d.id}/reject`)),
   'log-all': () => { ui.logAll = !ui.logAll; renderAll(); },
+  'goal-edit': () => { ui.editGoal = !ui.editGoal; renderAll(); },
   'set-goal': () => act(() => {
     const text = $('goal-text').value.trim();
     ui.goalText = text;
+    ui.editGoal = false;
     return WW.post('/goal', { text });   // the server reads the bill target from the words
   }),
   'teach-room': d => { ui.teach.room = d.id; renderAll(); },
@@ -756,10 +796,12 @@ document.addEventListener('input', ev => {
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target.id === 'cmd-text') parseCommand();
   if (ev.key === 'Enter' && ev.target.id === 'teach-text') teachSay(ui.teach.text);
-  if (ev.key === 'Enter' && ev.target.id === 'goal-text') document.querySelector('[data-act="set-goal"]').click();
+  if (ev.key === 'Enter' && !ev.shiftKey && ev.target.id === 'goal-text') { ev.preventDefault(); document.querySelector('[data-act="set-goal"]').click(); }
 });
 // Opening a collapsed tool renders it at once (not on the next second).
 for (const id of ['more-teach', 'more-sched', 'more-analyst']) $(id).addEventListener('toggle', () => st && renderAll());
+// Remember whether the agent's plan is open (the page re-renders every second).
+document.addEventListener('toggle', ev => { if (ev.target.id === 'plan-details') ui.planOpen = ev.target.open; }, true);
 // Close the "More" menu when clicking elsewhere.
 document.addEventListener('click', ev => { if (!ev.target.closest('#menu')) $('menu').open = false; });
 
