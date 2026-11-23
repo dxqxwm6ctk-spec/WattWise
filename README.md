@@ -45,14 +45,13 @@ Open:
 4. بعد ثواني بتطلع بطاقة «بدنا رأيك» على الهاتف. اضغط «إيه، طفّيه» أو «لا، خلّيه».
 5. شوف سجل القرارات والتوفير المُقاس بالفاتورة.
 
-## Online copy on Railway (optional)
+## Online copy on Render (optional)
 
-The demo never needs the internet. For an optional hosted copy, Railway uses the
-settings in `.railway/railway.py` and runs `python scripts/cloud_start.py` (backend on `$PORT` plus the
-simulators, synthetic data only). Set `WATTWISE_DB=/data/wattwise.db` with a volume
-at `/data` to keep the database. Steps in Arabic: `docs/deploy/railway_ar.md`.
-To change those settings: `pip install railway-sdk`, edit the file, then
-`railway config plan` (preview) and `railway config apply`.
+The demo never needs the internet. For an optional hosted copy, Render reads the
+Blueprint in `render.yaml` and runs `python scripts/cloud_start.py` (backend on `$PORT` plus the
+simulators, synthetic data only). Every push to `main` redeploys it, no laptop needed.
+Live server: __RENDER_URL__/index.html (free plan: it sleeps after about 15 minutes
+without visitors and takes about a minute to wake up). Steps in Arabic: `docs/deploy/render_ar.md`.
 
 ## AI planner (optional)
 

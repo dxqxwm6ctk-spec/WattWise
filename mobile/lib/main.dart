@@ -55,11 +55,13 @@ class _RootPageState extends State<RootPage> {
   // What the "where is the server?" dialog can return besides a typed address.
   static const _choiceSearch = '#search';
   static const _choiceScan = '#scan';
-  // The online server on Railway. It runs in the cloud all the time, so the app
-  // works from anywhere without the laptop. Another address can be baked in at build time:
-  //   flutter build ios --dart-define=WATTWISE_SERVER=https://example.up.railway.app
+  // The online server on Render. It runs in the cloud, so the app works from
+  // anywhere without the laptop. On the free plan it sleeps after about 15 minutes
+  // without visitors; the first open then waits up to a minute while it wakes up.
+  // Another address can be baked in at build time:
+  //   flutter build ios --dart-define=WATTWISE_SERVER=https://example.onrender.com
   static const _cloudServer = String.fromEnvironment('WATTWISE_SERVER',
-      defaultValue: 'https://wattwise-production-f321c49b.up.railway.app');
+      defaultValue: '__RENDER_URL__');
 
   WattWiseApi? api;
   Map<String, dynamic>? st;
@@ -104,7 +106,8 @@ class _RootPageState extends State<RootPage> {
       _connect(url);
       return;
     }
-    if (url != _cloudServer && await isWattWise(_cloudServer)) {
+    // The online server may be asleep (free plan), so wait for it to wake up.
+    if (url != _cloudServer && await waitForWattWise(_cloudServer)) {
       _connect(_cloudServer);
       return;
     }

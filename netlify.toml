@@ -2,7 +2,7 @@
 # The competition demo does not need it: locally, use scripts/run_demo.py.
 #
 # Netlify only serves the static files in frontend/. Every /api/... request is
-# forwarded (proxied) to the backend on Railway, so the pages work unchanged
+# forwarded (proxied) to the backend on Render, so the pages work unchanged
 # and no CORS settings are needed.
 
 [build]
@@ -10,6 +10,6 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://wattwise-production-f321c49b.up.railway.app/api/:splat"
+  to = "__RENDER_URL__/api/:splat"
   status = 200
   force = true

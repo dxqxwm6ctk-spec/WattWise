@@ -23,6 +23,30 @@ Future<bool> isWattWise(String url) async {
   }
 }
 
+/// Like [isWattWise], but patient: the free online server sleeps when nobody
+/// uses it and needs up to about a minute to wake up. While it answers with
+/// "still loading" (or is slow), keep trying until [max] has passed. If there
+/// is no network at all, give up at once so the Wi-Fi search can start.
+Future<bool> waitForWattWise(String url, {Duration max = const Duration(seconds: 75)}) async {
+  final deadline = DateTime.now().add(max);
+  while (DateTime.now().isBefore(deadline)) {
+    try {
+      final res = await http.get(Uri.parse('$url/api/health')).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data is Map && data['ok'] == true) return true;
+      }
+      // The server answered but is not ready yet (for example 503 while waking up).
+    } on TimeoutException {
+      // Slow answer while waking up: try again.
+    } catch (_) {
+      return false; // no internet or the address does not exist
+    }
+    await Future.delayed(const Duration(seconds: 3));
+  }
+  return false;
+}
+
 /// Looks for the server for up to [timeout]. Returns its address, or null.
 Future<String?> findServer({Duration timeout = const Duration(seconds: 6)}) async {
   final found = Completer<String?>();
