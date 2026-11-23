@@ -42,7 +42,7 @@ def home(conn):  # noqa: F811
 
 def test_no_key_asks_for_manual_numbers(home):
     r = bill_reader.from_photo(home, "home", PNG)
-    assert r["needs_manual"] and "ANTHROPIC_API_KEY" in r["message"]
+    assert r["needs_manual"] and r["message"] == bill_reader.NO_KEY_MSG
     assert bill_reader.status(home)["photo"] is False
 
 

@@ -34,7 +34,7 @@
       "demo_waste": {"room": "bedroom", "device": "bedAc", "label": "١ · غرفة النوم فارغة والشباك مفتوح"},
       "limits": {"max_current_a": 25, "_note": "Simulated main breaker of the digital-twin house (synthetic, for the overload warning demo)."},
       "overload_devices": ["heater", "washer"],
-      "labels": {"mode": "وضع البيت", "goal": "هدف العائلة", "map": "HOME MAP · غرف البيت", "meter": "عدّاد البيت", "max_w": 4000}
+      "labels": {"mode": "وضع البيت", "goal": "هدف العائلة", "map": "غرف البيت", "meter": "عدّاد البيت", "max_w": 4000}
     },
     "lab": {
       "name": "غرفة المختبر",
@@ -47,7 +47,7 @@
         {"id": "fan", "name": "المروحة (بدل المكيّف)", "room": "lab", "kind": "fan", "rated_w": 45, "tier": "T1", "on": true, "relay_channel": 2}
       ],
       "limits": {"max_current_a": 10, "_note": "PZEM-004T v3.0 10A version and the kit relay (verify the relay label says 10A 250VAC)."},
-      "labels": {"mode": "وضع المختبر", "goal": "هدف المختبر", "map": "LAB · غرفة المختبر", "meter": "عدّاد المختبر", "max_w": 200}
+      "labels": {"mode": "وضع المختبر", "goal": "هدف المختبر", "map": "غرفة المختبر", "meter": "عدّاد المختبر", "max_w": 200}
     },
     "building": {
       "name": "مبنى مكاتب صغير (١٠ غرف)",
@@ -94,7 +94,7 @@
         {"id": "bldFireAlarm", "name": "إنذار الحريق", "room": "corridor", "kind": "fire_alarm", "rated_w": 3, "tier": "T2", "on": true}
       ],
       "demo_waste": {"room": "meeting", "device": "meetAc", "label": "١ · غرفة الاجتماعات فارغة والشباك مفتوح"},
-      "labels": {"mode": "وضع المبنى", "goal": "هدف المبنى", "map": "BUILDING · ١٠ غرف", "meter": "عدّاد المبنى", "max_w": 12000}
+      "labels": {"mode": "وضع المبنى", "goal": "هدف المبنى", "map": "غرف المبنى", "meter": "عدّاد المبنى", "max_w": 12000}
     }
   }
 }
