@@ -14,42 +14,19 @@ import 'package:speech_to_text/speech_to_text.dart';
 import '../api.dart';
 import '../theme.dart';
 
-InputDecoration wwField(String hint) => InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: WW.line, width: 1.5)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: WW.ink, width: 1.5)),
-    );
+Widget darkButton(String label, VoidCallback? onTap, {double height = 50}) => WWButton(label, onTap, height: height);
 
-Widget darkButton(String label, VoidCallback? onTap, {double height = 50}) => SizedBox(
-      height: height,
-      child: FilledButton(
-        style: FilledButton.styleFrom(backgroundColor: WW.ink, foregroundColor: WW.paper, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-        onPressed: onTap,
-        child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-      ),
-    );
-
-Widget lineButton(String label, VoidCallback? onTap, {double height = 50, Color border = const Color(0xFFD8D5CA)}) => SizedBox(
-      height: height,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(foregroundColor: WW.ink, side: BorderSide(color: border, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-        onPressed: onTap,
-        child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-      ),
-    );
+Widget lineButton(String label, VoidCallback? onTap, {double height = 50, Color border = WW.field}) =>
+    WWButton(label, onTap, kind: border == WW.ink ? BtnKind.outline : BtnKind.ghost, height: height, radius: 14);
 
 Widget greyBox(List<Widget> children) => Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: WW.paper, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: WW.soft, borderRadius: BorderRadius.circular(14)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
     );
 
-void showError(BuildContext context, Object e) =>
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e', textDirection: TextDirection.rtl)));
+void showError(BuildContext context, Object e) => wwSnack(context, '$e');
 
 // ---------- command card (home tab) ----------
 
@@ -173,7 +150,7 @@ class _CommandCardState extends State<CommandCard> {
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   padding: EdgeInsets.zero,
-                  backgroundColor: listening ? const Color(0xFFE8553F) : Colors.transparent,
+                  backgroundColor: listening ? WW.red : Colors.transparent,
                   foregroundColor: listening ? Colors.white : WW.ink,
                   side: const BorderSide(color: WW.ink, width: 1.5),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -194,7 +171,7 @@ class _CommandCardState extends State<CommandCard> {
             greyBox([
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(i['ok'] == true ? '✓ ' : '✕ ',
-                    style: TextStyle(fontWeight: FontWeight.w700, color: i['ok'] == true ? WW.greenText : const Color(0xFFA23A26))),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: i['ok'] == true ? WW.green : WW.red)),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${i['label']}', style: const TextStyle(fontSize: 14)),
@@ -215,7 +192,7 @@ class _CommandCardState extends State<CommandCard> {
         ],
         if (msg.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(msg, style: const TextStyle(fontSize: 13.5, color: WW.greenText, fontWeight: FontWeight.w600)),
+          Text(msg, style: const TextStyle(fontSize: 13.5, color: WW.green, fontWeight: FontWeight.w600)),
         ],
       ]),
     );
@@ -249,33 +226,73 @@ class _GoalCardState extends State<GoalCard> {
     final steps = (plan?['steps'] as List?) ?? const [];
     final tags = (plan?['tags'] as List?) ?? const [];
     return WWBox(
-      radius: 22,
-      padding: 18,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('هدفك بكلماتك', style: TextStyle(fontSize: 13, color: WW.sub)),
+        const Text('هدفك بكلماتك', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
         if (goal != null) ...[
-          const SizedBox(height: 8),
-          Text('«${goal['text']}»', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.5)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(color: WW.soft, borderRadius: BorderRadius.circular(14)),
+            child: Text('«${goal['text']}»', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.6)),
+          ),
         ],
-        const SizedBox(height: 10),
-        TextField(controller: text, decoration: wwField('مثلًا: الفاتورة تحت ٢٥ دينارًا')),
-        const SizedBox(height: 10),
-        darkButton(goal == null ? 'حوّله إلى خطة' : 'غيّر الهدف', () => widget.run(() => widget.api.setGoal(text.text))),
+        const SizedBox(height: 12),
+        Text(goal == null ? 'اكتب هدفك' : 'اكتب هدفًا جديدًا', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: WW.sub)),
+        const SizedBox(height: 6),
+        TextField(controller: text, decoration: wwField('مثال: وفّر 5 دنانير بالشهر')),
+        const SizedBox(height: 12),
+        WWButton(goal == null ? 'حوّله إلى خطة' : 'غيّر الهدف', () => widget.run(() => widget.api.setGoal(text.text))),
         if (goal != null && steps.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          if ('${plan?['summary'] ?? ''}'.isNotEmpty) Text('${plan!['summary']}', style: const TextStyle(fontSize: 14, height: 1.65)),
+          const Divider(height: 26, color: WW.line),
+          const Row(children: [
+            Pill('AI'),
+            SizedBox(width: 8),
+            Text('خطة WattWise', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          ]),
+          if ('${plan?['summary'] ?? ''}'.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text('${plan!['summary']}', style: const TextStyle(fontSize: 14, height: 1.65, color: WW.body)),
+          ],
           for (var i = 0; i < steps.length; i++) ...[
             const SizedBox(height: 8),
-            greyBox([
-              Text(i < tags.length && tags[i] == 'T1' ? 'T1 · بموافقتك' : 'T0 · تلقائي',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: i < tags.length && tags[i] == 'T1' ? WW.pendingText : WW.greenText)),
-              Text('${steps[i]}', style: const TextStyle(fontSize: 13.5, height: 1.55)),
-            ]),
+            _PlanStep(n: i + 1, text: '${steps[i]}', t1: i < tags.length && tags[i] == 'T1'),
           ],
         ],
       ]),
     );
   }
+}
+
+class _PlanStep extends StatelessWidget {
+  const _PlanStep({required this.n, required this.text, required this.t1});
+  final int n;
+  final String text;
+  final bool t1;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(color: WW.soft, borderRadius: BorderRadius.circular(14)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(color: WW.ink, shape: BoxShape.circle),
+            child: Text('$n', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: WW.accent)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(text, style: const TextStyle(fontSize: 14, height: 1.55)),
+              const SizedBox(height: 4),
+              t1
+                  ? const Pill('T1 · بموافقتك', bg: WW.ink, fg: WW.accent, size: 11.5)
+                  : const Pill('T0 · تلقائي', bg: WW.accentBg, fg: WW.ink, size: 11.5),
+            ]),
+          ),
+        ]),
+      );
 }
 
 class WhyCard extends StatefulWidget {
@@ -303,23 +320,50 @@ class _WhyCardState extends State<WhyCard> {
   Widget build(BuildContext context) {
     final w = res;
     return WWBox(
-      radius: 22,
-      padding: 18,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        lineButton(busy ? 'جارٍ التحليل…' : w == null ? 'لماذا الفاتورة بهذا المبلغ؟' : 'أعد التحليل', ask, border: WW.ink),
+        SizedBox(
+          height: 54,
+          child: OutlinedButton(
+            onPressed: busy ? null : ask,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: WW.ink,
+              side: const BorderSide(color: WW.ink, width: 1.5),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: Row(children: [
+              Expanded(child: Text(busy ? 'جارٍ التحليل…' : 'لماذا فاتورتي بهذا المبلغ؟', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+              const Text('?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+        ),
         if (w != null) ...[
-          const SizedBox(height: 10),
-          Text('${w['headline']}', style: const TextStyle(fontSize: 14, height: 1.65)),
+          const SizedBox(height: 12),
+          Text('${w['headline']}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.5)),
           for (final c in w['causes'] as List) ...[
             const SizedBox(height: 8),
-            greyBox([
-              Text('${c['what']}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-              Text('${c['evidence']}', style: const TextStyle(fontSize: 12.5, height: 1.55, color: Color(0xFF5E5C55))),
-            ]),
+            Container(
+              padding: const EdgeInsetsDirectional.only(start: 10),
+              decoration: const BoxDecoration(border: BorderDirectional(start: BorderSide(color: WW.accent, width: 3))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${c['what']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text('${c['evidence']}', style: const TextStyle(fontSize: 13, height: 1.5, color: WW.sub)),
+              ]),
+            ),
           ],
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(color: WW.accentBg, borderRadius: BorderRadius.circular(14)),
+            child: Text.rich(TextSpan(children: [
+              const TextSpan(text: 'الاقتراح: ', style: TextStyle(fontWeight: FontWeight.w700)),
+              TextSpan(text: '${w['action']}'),
+            ]), style: const TextStyle(fontSize: 14, height: 1.6)),
+          ),
           const SizedBox(height: 8),
-          Text('${w['action']}', style: const TextStyle(fontSize: 13.5, height: 1.6, color: WW.greenText)),
-          Text('${w['note']}', style: const TextStyle(fontSize: 11.5, color: WW.sub)),
+          Text('${w['note']}', style: const TextStyle(fontSize: 12, color: WW.sub)),
+          LinkButton('حلّل مرة أخرى', busy ? null : ask),
         ],
       ]),
     );
@@ -351,25 +395,27 @@ class _ReportCardState extends State<ReportCard> {
   @override
   Widget build(BuildContext context) {
     return WWBox(
-      radius: 22,
-      padding: 18,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        lineButton(busy ? 'جارٍ التجهيز…' : text.isEmpty ? 'جهّز التقرير الأسبوعي' : 'جهّز تقريرًا جديدًا', make, border: WW.ink),
+        const Text('التقرير الأسبوعي', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        WWButton(busy ? 'جارٍ التجهيز…' : text.isEmpty ? 'جهّز التقرير الأسبوعي' : 'جهّز تقريرًا جديدًا', busy ? null : make, kind: BtnKind.outline, height: 50, radius: 14),
         if (text.isNotEmpty) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Container(
-            constraints: const BoxConstraints(maxHeight: 220),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: WW.paper, borderRadius: BorderRadius.circular(12)),
-            child: SingleChildScrollView(child: SelectableText(text, style: const TextStyle(fontSize: 12.5, height: 1.75))),
+            constraints: const BoxConstraints(maxHeight: 240),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(color: WW.soft, borderRadius: BorderRadius.circular(14)),
+            child: SingleChildScrollView(child: SelectableText(text, style: const TextStyle(fontSize: 13.5, height: 1.75, color: WW.body))),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           // The file download lives on the dashboard; on the phone we copy the text to share it.
-          darkButton('انسخ التقرير', () async {
-            await Clipboard.setData(ClipboardData(text: text));
-            setState(() => saved = 'نُسخ ✓');
-          }, height: 46),
-          if (saved.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(saved, style: const TextStyle(fontSize: 12, color: WW.sub))),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: WWButton(saved.isEmpty ? 'انسخ التقرير' : saved, () async {
+              await Clipboard.setData(ClipboardData(text: text));
+              setState(() => saved = 'نُسخ ✓');
+            }, kind: saved.isEmpty ? BtnKind.primary : BtnKind.accent, height: 44, radius: 14, fontSize: 14),
+          ),
         ],
       ]),
     );

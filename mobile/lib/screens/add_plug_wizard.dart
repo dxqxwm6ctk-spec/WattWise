@@ -9,9 +9,10 @@ import 'package:material_ui/material_ui.dart';
 
 import '../api.dart';
 import '../theme.dart';
+import '../widgets/wizard.dart';
 import 'devices_screen.dart' show deviceTypes;
 
-final plugKinds = [(k: 'fan', label: 'مروحة', locked: false), ...deviceTypes];
+final plugKinds = [...deviceTypes.where((x) => x.k != 'other'), (k: 'fan', label: 'مروحة', locked: false), (k: 'other', label: 'آخر', locked: false)];
 
 class AddPlugWizard extends StatefulWidget {
   const AddPlugWizard({super.key, required this.st, required this.api, required this.run, required this.onClose});
@@ -37,8 +38,6 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
   final hostCtrl = TextEditingController();
   final nameCtrl = TextEditingController();
   final Map<String, TextEditingController> optCtrls = {};
-
-  static const titles = ['اختر المقبس الذكي', 'ما الجهاز الموصول به؟', 'فحص الاتصال والأمان'];
 
   @override
   void initState() {
@@ -122,7 +121,7 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
   Future<void> _finish() async {
     final t = plugKinds.firstWhere((x) => x.k == type);
     final roomName = (widget.st['rooms'] as List).firstWhere((r) => r['id'] == room)['name'];
-    final name = nameCtrl.text.trim().isEmpty ? '${t.label.split(' / ').first} $roomName' : nameCtrl.text.trim();
+    final name = nameCtrl.text.trim().isEmpty ? '${t.label} $roomName' : nameCtrl.text.trim();
     setState(() => busy = true);
     var ok = false;
     await widget.run(() async {
@@ -142,255 +141,285 @@ class _AddPlugWizardState extends State<AddPlugWizard> {
     if (ok) widget.onClose();
   }
 
-  Widget _chip(String label, bool selected, VoidCallback onTap) => Material(
-        color: selected ? WW.ink : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: selected ? WW.ink : WW.line, width: 1.5)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 46),
-            padding: const EdgeInsets.all(8),
-            alignment: Alignment.center,
-            child: Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: selected ? WW.paper : WW.ink)),
-          ),
-        ),
+  Widget _spinRow(String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(children: [
+          const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.4, color: WW.ink)),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+        ]),
       );
 
-  Widget _grid(List<Widget> children) => GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 2.8,
-        children: children,
+  Widget _label(String t) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       );
 
-  InputDecoration _field(String hint) => InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: WW.line, width: 1.5)),
-      );
-
-  Widget _busyBox(String text) => Container(
-        height: 56,
-        decoration: BoxDecoration(color: WW.greenBg, borderRadius: BorderRadius.circular(18)),
-        alignment: Alignment.center,
-        child: Text(text, style: const TextStyle(fontSize: 15, color: WW.greenText, fontWeight: FontWeight.w600)),
-      );
-
-  Widget _step0() {
+  List<Widget> _step0() {
     final b = brandInfo;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('صِل المقبس الذكي بالكهرباء وصِل الجهاز به. يجب أن يكون المقبس قد أُعدّ أول مرة من تطبيق الشركة على شبكة الـ Wi-Fi نفسها.',
-          style: TextStyle(fontSize: 13, height: 1.6, color: WW.sub)),
-      const SizedBox(height: 10),
-      if (scanning) _busyBox('جارٍ البحث في شبكة الـ Wi-Fi…'),
+    return [
+      ...stepHead('اختر المقبس', 'وصّل المقبس بالكهرباء وتأكد أن هاتفك على شبكة Wi-Fi نفسها. يجب أن يكون المقبس قد أُعدّ أول مرة من تطبيق الشركة.'),
+      if (scanning) _spinRow('جارٍ البحث في شبكة Wi-Fi…'),
       if (!scanning && found.isEmpty)
-        const WWBox(child: Text('لم نجد مقابس على هذه الشبكة. تأكّد أن المقبس والهاتف على شبكة الـ Wi-Fi نفسها، أو أضفه يدويًا.', style: TextStyle(fontSize: 13.5, color: WW.sub))),
+        const WWBox(radius: 16, child: Text('لم نجد مقابس على هذه الشبكة. تأكّد أن المقبس والهاتف على شبكة Wi-Fi نفسها، أو أضفه يدويًا.', style: TextStyle(fontSize: 13.5, height: 1.6, color: WW.sub))),
       if (!scanning)
         for (final f in found) ...[
+          const SizedBox(height: 8),
           _PlugCard(f: f, selected: pick != null && pick!['host'] == f['host'], onTap: () => setState(() {
                 pick = f as Map<String, dynamic>;
                 manual = false;
                 final a = (f['options'] as Map?)?['max_a'];
                 if (a is num) maxA = a.toInt();
               })),
-          const SizedBox(height: 8),
         ],
-      const SizedBox(height: 8),
+      const SizedBox(height: 12),
       Row(children: [
-        Expanded(child: OutlinedButton(onPressed: scanning ? null : _scan, child: const Text('ابحث مجددًا'))),
+        Expanded(child: WWButton('ابحث مجددًا', scanning ? null : _scan, kind: BtnKind.ghost, height: 46, fontSize: 14, radius: 14)),
         const SizedBox(width: 8),
         Expanded(
-            child: OutlinedButton(
-                onPressed: () => setState(() {
-                      manual = !manual;
-                      pick = null;
-                    }),
-                child: Text(manual ? 'إخفاء الإدخال اليدوي' : 'إضافة يدويًا'))),
+            child: WWButton(manual ? 'إخفاء الإدخال اليدوي' : 'أضف يدويًا', () => setState(() {
+                  manual = !manual;
+                  pick = null;
+                }), kind: BtnKind.ghost, height: 46, fontSize: 14, radius: 14)),
       ]),
       if (manual) ...[
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         WWBox(
+          radius: 18,
+          padding: 14,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const Text('ما ماركة المقبس؟', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            _grid([
+            const Text('إضافة يدوية', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: WW.sub)),
+            const SizedBox(height: 10),
+            _label('نوع المقبس'),
+            Wrap(spacing: 8, runSpacing: 8, children: [
               for (final x in brands.where((x) => x['key'] != 'simulated'))
-                _chip('${x['name']}', brand == x['key'], () => setState(() => brand = x['key'] as String)),
+                GestureDetector(
+                  onTap: () => setState(() => brand = x['key'] as String),
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: brand == x['key'] ? WW.ink : Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: brand == x['key'] ? WW.accent : WW.field, width: brand == x['key'] ? 1.5 : 1),
+                    ),
+                    child: Text('${x['name']}',
+                        textDirection: TextDirection.ltr,
+                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: brand == x['key'] ? Colors.white : WW.ink)),
+                  ),
+                ),
             ]),
             if (b != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text('${b['how']}', style: const TextStyle(fontSize: 12.5, height: 1.6, color: WW.sub)),
-              const SizedBox(height: 8),
-              TextField(controller: hostCtrl, textDirection: TextDirection.ltr, onChanged: (_) => setState(() {}), decoration: _field('IP مثل 192.168.1.50')),
+              const SizedBox(height: 10),
+              _label('عنوان IP'),
+              TextField(controller: hostCtrl, textDirection: TextDirection.ltr, onChanged: (_) => setState(() {}), decoration: wwField('192.168.1.23')),
               for (final f in b['fields'] as List) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
+                _label('${f['label']}${f['optional'] == true ? ' (اختياري)' : ''}'),
                 TextField(
                   controller: _opt(f['key'] as String),
                   textDirection: TextDirection.ltr,
                   obscureText: f['secret'] == true,
                   onChanged: (_) => setState(() {}),
-                  decoration: _field('${f['label']}${f['optional'] == true ? ' (اختياري)' : ''}'),
+                  decoration: wwField(''),
                 ),
               ],
             ],
           ]),
         ),
       ],
-      const SizedBox(height: 10),
-      Row(children: [
-        const Expanded(child: Text('حد المقبس (مكتوب عليه)', style: TextStyle(fontSize: 13, color: WW.sub))),
-        DropdownButton<int>(
-          value: maxA,
-          items: const [DropdownMenuItem(value: 10, child: Text('10A')), DropdownMenuItem(value: 13, child: Text('13A')), DropdownMenuItem(value: 16, child: Text('16A'))],
-          onChanged: (v) => setState(() => maxA = v ?? 10),
-        ),
-      ]),
-    ]);
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: WW.line)),
+        child: Row(children: [
+          const Expanded(child: Text('الحد الأقصى للمقبس (مكتوب عليه)', style: TextStyle(fontSize: 13, color: WW.sub))),
+          DropdownButton<int>(
+            value: maxA,
+            underline: const SizedBox.shrink(),
+            style: WW.mono.copyWith(fontFamily: WW.font, fontSize: 15, fontWeight: FontWeight.w700, color: WW.ink),
+            items: const [
+              DropdownMenuItem(value: 10, child: Text('10 A · 2200 W', textDirection: TextDirection.ltr)),
+              DropdownMenuItem(value: 13, child: Text('13 A · 2860 W', textDirection: TextDirection.ltr)),
+              DropdownMenuItem(value: 16, child: Text('16 A · 3520 W', textDirection: TextDirection.ltr)),
+            ],
+            onChanged: (v) => setState(() => maxA = v ?? 10),
+          ),
+        ]),
+      ),
+    ];
   }
 
-  Widget _step1() => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _grid([for (final x in plugKinds) _chip(x.label, type == x.k, () => setState(() => type = x.k))]),
-        const SizedBox(height: 12),
-        const Text('في أي غرفة؟', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        _grid([for (final r in widget.st['rooms'] as List) _chip('${r['name']}', room == r['id'], () => setState(() => room = r['id'] as String))]),
-        const SizedBox(height: 12),
-        TextField(controller: nameCtrl, decoration: _field('الاسم، مثلًا: سخّان الحمّام')),
-      ]);
+  List<Widget> _step1() => [
+        ...stepHead('ما الموصول بالمقبس؟'),
+        KindGrid(kinds: plugKinds, selected: type, onPick: (k) => setState(() => type = k)),
+        const SizedBox(height: 14),
+        const Text('الغرفة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        RoomPills(rooms: widget.st['rooms'] as List, selected: room, onPick: (r) => setState(() => room = r)),
+        const SizedBox(height: 14),
+        const Text('الاسم', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        TextField(controller: nameCtrl, decoration: wwField('مثلًا: سخّان الحمّام')),
+      ];
 
-  Widget _step2() {
-    if (checking) return _busyBox('جارٍ الاتصال بالمقبس…');
+  List<Widget> _step2() {
+    final head = stepHead('الاتصال وفحص الأمان');
+    if (checking) {
+      return [...head, WWBox(radius: 18, padding: 14, child: _spinRow('جارٍ الاتصال بالمقبس…'))];
+    }
     final c = check;
     if (c == null) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        WWBox(color: const Color(0xFFFBE3DD), child: Text(error.isEmpty ? 'تعذّر الوصول إلى المقبس.' : error, style: const TextStyle(fontSize: 14, height: 1.7, color: Color(0xFF7A2A1C)))),
-        const SizedBox(height: 8),
-        OutlinedButton(onPressed: _check, child: const Text('حاول مجددًا')),
-      ]);
+      return [
+        ...head,
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: WW.redBg, borderRadius: BorderRadius.circular(18), border: Border.all(color: WW.redBorder)),
+          child: Text(error.isEmpty ? 'تعذّر الوصول إلى المقبس.' : error, style: const TextStyle(fontSize: 14, height: 1.6, color: WW.red)),
+        ),
+        const SizedBox(height: 10),
+        WWButton('حاول مجددًا', _check, kind: BtnKind.outline, height: 48),
+      ];
     }
     final s = c['safety'] as Map<String, dynamic>;
     final level = s['level'];
     final locked = plugKinds.firstWhere((x) => x.k == type).locked;
-    final textColor = level == 'block' ? const Color(0xFF7A2A1C) : const Color(0xFF6B4A00);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    final block = level == 'block';
+    final fg = block ? WW.red : WW.pendingText;
+    return [
+      ...head,
       WWBox(
-        color: WW.greenBg,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('تم الاتصال بالمقبس ✓ ${c['on'] == true ? 'يعمل' : 'مطفأ'}', style: const TextStyle(fontSize: 13, color: WW.greenText)),
-          if (c['meters'] == true) ...[
-            Text('${WW.fmt(c['power_w'] as num?)} W', textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 24)),
-            Text(c['measured'] == true ? 'هذه بصمة الجهاز من المقبس نفسه.' : 'سنقيس بصمته عند تشغيله. التقدير الحالي ≈ ${c['est_w']} واط.',
-                style: const TextStyle(fontSize: 12, color: WW.greenText)),
-          ] else
-            Text('هذا المقبس لا يقيس الواط. نتحكّم به ونقيس بصمته على العدّاد الرئيسي (≈ ${c['est_w']} واط حاليًا).',
-                style: const TextStyle(fontSize: 12.5, height: 1.6, color: WW.greenText)),
-          Text('حد المقبس: ${WW.fmt(c['max_w'] as num?)} واط', style: const TextStyle(fontSize: 12, color: WW.greenText)),
+        radius: 18,
+        padding: 14,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Row(children: [
+            Icon(Icons.check_rounded, size: 18, color: WW.sub),
+            SizedBox(width: 10),
+            Text('جارٍ الاتصال بالمقبس…', style: TextStyle(fontSize: 13.5, color: WW.sub, decoration: TextDecoration.lineThrough)),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: const BoxDecoration(color: WW.greenBg, shape: BoxShape.circle),
+              child: const Icon(Icons.check_rounded, size: 16, color: WW.green),
+            ),
+            const SizedBox(width: 10),
+            Text('متصل ✓ · ${c['on'] == true ? 'يعمل' : 'مطفأ'}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: WW.green)),
+          ]),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(color: WW.paper, borderRadius: BorderRadius.circular(12)),
+            child: c['meters'] == true
+                ? Row(children: [
+                    Expanded(
+                        child: Text(c['measured'] == true ? 'البصمة المقاسة أثناء التشغيل' : 'سنقيس بصمته عند تشغيله (تقدير حالي)',
+                            style: const TextStyle(fontSize: 13, color: WW.sub))),
+                    Text(c['measured'] == true ? '${WW.fmt(c['power_w'] as num?)} W' : '≈ ${c['est_w']} W',
+                        textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
+                  ])
+                : Text('هذا المقبس لا يقيس الواط. نتحكّم به ونقيس بصمته على العدّاد الرئيسي (≈ ${c['est_w']} W حاليًا).',
+                    style: const TextStyle(fontSize: 13, height: 1.6, color: WW.sub)),
+          ),
+          const SizedBox(height: 8),
+          Row(children: [
+            const Expanded(child: Text('حد المقبس', style: TextStyle(fontSize: 13, color: WW.sub))),
+            Text('${WW.fmt(c['max_w'] as num?)} W', textDirection: TextDirection.ltr, style: WW.mono.copyWith(fontSize: 13, fontWeight: FontWeight.w700)),
+          ]),
         ]),
       ),
       if (level != 'ok') ...[
-        const SizedBox(height: 10),
-        WWBox(
-          color: level == 'block' ? const Color(0xFFFBE3DD) : WW.pendingBg,
-          border: level == 'block' ? WW.red : WW.pendingBorder,
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: block ? WW.redBg : WW.warnBg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: block ? WW.redBorder : WW.warnBorder),
+          ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(level == 'block' ? 'ممنوع على هذا المقبس' : 'تحذير أمان', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textColor)),
-            const SizedBox(height: 6),
-            Text('${s['message']}', style: TextStyle(fontSize: 13.5, height: 1.7, color: textColor)),
-            if (s['needs_confirm'] == true)
-              CheckboxListTile(
-                value: confirmed,
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                onChanged: (v) => setState(() => confirmed = v ?? false),
-                title: Text('فهمت التحذير وأريد المتابعة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.warning_amber_rounded, size: 22, color: block ? WW.red : WW.warnFg),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(block ? 'ممنوع على هذا المقبس' : 'تحذير أمان', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: fg)),
+                  const SizedBox(height: 3),
+                  Text('${s['message']}', style: TextStyle(fontSize: 13.5, height: 1.6, color: fg)),
+                ]),
               ),
+            ]),
+            if (s['needs_confirm'] == true) ...[
+              const SizedBox(height: 6),
+              InkWell(
+                onTap: () => setState(() => confirmed = !confirmed),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: Row(children: [
+                    Checkbox(
+                      value: confirmed,
+                      activeColor: WW.accentDeep,
+                      onChanged: (v) => setState(() => confirmed = v ?? false),
+                    ),
+                    const Expanded(child: Text('أفهم التحذير وأريد المتابعة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                  ]),
+                ),
+              ),
+            ],
           ]),
         ),
       ],
-      const SizedBox(height: 10),
-      if (locked)
-        const WWBox(
-          color: Color(0xFFFBE3DD),
-          child: Text('جهاز حرج: لا يمكن إطفاؤه.',
-              style: TextStyle(fontSize: 13.5, height: 1.7, color: Color(0xFF7A2A1C))),
-        )
-      else
-        WWBox(
-          child: Row(children: [
-            const Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('يقترح الوكيل إطفاءه عند وجود هدر', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                SizedBox(height: 4),
-                Text('يسألك قبل أي إجراء.', style: TextStyle(fontSize: 12.5, height: 1.6, color: WW.sub)),
-              ]),
-            ),
-            WWToggle(on: allow, onTap: () => setState(() => allow = !allow)),
+      const SizedBox(height: 12),
+      WWBox(
+        radius: 18,
+        padding: 14,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('ماذا يُسمح لـ WattWise أن يفعل؟', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          if (locked)
+            const Text('جهاز حرج: لا يمكن إطفاؤه.', style: TextStyle(fontSize: 14, height: 1.6, color: WW.red))
+          else
+            Row(children: [
+              const Expanded(
+                child: Text('يمكن للوكيل اقتراح إطفائه عند وجود هدر، ويسألك دائمًا أولًا.', style: TextStyle(fontSize: 14, height: 1.6, color: WW.body)),
+              ),
+              WWToggle(on: allow, onTap: () => setState(() => allow = !allow)),
+            ]),
+          const Divider(height: 20, color: WW.line),
+          const Row(children: [
+            Icon(Icons.lock_outline_rounded, size: 14, color: WW.sub),
+            SizedBox(width: 8),
+            Expanded(child: Text('الأجهزة الحرجة مثل الثلاجة والأجهزة الطبية: لا يمكن إطفاؤها.', style: TextStyle(fontSize: 12.5, color: WW.sub))),
           ]),
-        ),
-    ]);
+        ]),
+      ),
+    ];
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [
-        const Expanded(child: Text('مقبس ذكي (Wi-Fi)', style: TextStyle(fontSize: 12, color: WW.sub))),
-        Text('${step + 1} / 3', style: WW.mono.copyWith(fontSize: 12, color: WW.sub)),
-      ]),
-      const SizedBox(height: 8),
-      ClipRRect(
-        borderRadius: BorderRadius.circular(2),
-        child: LinearProgressIndicator(value: (step + 1) / 3, minHeight: 4, backgroundColor: WW.line, color: WW.ink),
-      ),
-      const SizedBox(height: 14),
-      Text(titles[step], style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-      const SizedBox(height: 14),
-      [_step0, _step1, _step2][step](),
-      const SizedBox(height: 14),
-      Row(children: [
-        Expanded(
-          flex: 10,
-          child: SizedBox(
-            height: 52,
-            child: OutlinedButton(
-              onPressed: () => step == 0 ? widget.onClose() : setState(() => step--),
-              child: Text(step == 0 ? 'إلغاء' : 'رجوع', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          flex: 15,
-          child: SizedBox(
-            height: 52,
-            child: FilledButton(
-              onPressed: canNext
-                  ? () {
-                      if (step == 2) {
-                        _finish();
-                        return;
-                      }
-                      setState(() => step++);
-                      if (step == 2) _check();
-                    }
-                  : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: WW.ink,
-                disabledBackgroundColor: const Color(0xFFD8D5CA),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              ),
-              child: Text(step == 2 ? 'إضافة الجهاز' : 'التالي', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-            ),
-          ),
-        ),
-      ]),
-    ]);
-  }
+  Widget build(BuildContext context) => WizardScaffold(
+        title: 'مقبس ذكي (Wi-Fi)',
+        step: step,
+        steps: 3,
+        onClose: widget.onClose,
+        onBack: () => setState(() => step--),
+        nextLabel: step == 2 ? 'أضف الجهاز' : 'التالي',
+        onNext: canNext
+            ? () {
+                if (step == 2) {
+                  _finish();
+                  return;
+                }
+                setState(() => step++);
+                if (step == 2) _check();
+              }
+            : null,
+        children: (step == 0 ? _step0 : step == 1 ? _step1 : _step2)(),
+      );
 }
 
 class _PlugCard extends StatelessWidget {
@@ -401,27 +430,22 @@ class _PlugCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = selected ? WW.paper : WW.ink;
     final meters = f['meters'];
     final needs = (f['needs'] as List?) ?? [];
-    return Material(
-      color: selected ? WW.ink : Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: selected ? WW.ink : WW.line, width: 1.5)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${f['model']}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: fg)),
-            const SizedBox(height: 2),
-            Text('${f['brand_name']} · ${f['host']}', style: TextStyle(fontSize: 12, color: fg.withValues(alpha: 0.75))),
-            Text(
-              '${meters == false ? 'تشغيل وإطفاء فقط (لا يقيس الواط)' : meters == true ? 'يقيس الواط ✓' : 'نعرف إن كان يقيس بعد الفحص'}${needs.isNotEmpty ? ' · يحتاج Local Key' : ''}',
-              style: TextStyle(fontSize: 12, color: fg.withValues(alpha: 0.75)),
-            ),
-          ]),
-        ),
+    final cap = meters == false ? 'تشغيل وإطفاء فقط' : meters == true ? 'يقيس الواط ✓' : 'نعرف إن كان يقيس بعد الفحص';
+    return RadioRow(
+      on: selected,
+      onTap: onTap,
+      title: '${f['model']}',
+      titleLtr: true,
+      body: Text.rich(
+        TextSpan(children: [
+          TextSpan(text: '${f['brand_name']} · ${f['host']}'),
+          const TextSpan(text: ' · '),
+          TextSpan(text: cap, style: TextStyle(color: meters == true ? WW.ink : WW.sub, fontWeight: FontWeight.w600)),
+          if (needs.isNotEmpty) const TextSpan(text: ' · يحتاج Local Key'),
+        ]),
+        style: const TextStyle(fontSize: 12.5, color: WW.sub),
       ),
     );
   }
@@ -429,9 +453,10 @@ class _PlugCard extends StatelessWidget {
 
 /// One line under a device that sits on a smart plug: brand, live watts, remove.
 class PlugLine extends StatelessWidget {
-  const PlugLine({super.key, required this.d, required this.onRemove});
+  const PlugLine({super.key, required this.d, required this.onRemove, this.dark = false});
   final dynamic d;
   final VoidCallback onRemove;
+  final bool dark; // the device card is dark (device running)
 
   @override
   Widget build(BuildContext context) {
@@ -444,11 +469,20 @@ class PlugLine extends StatelessWidget {
         : p['meters'] == true && p['power_w'] != null
             ? '${WW.fmt(p['power_w'] as num)} W من المقبس'
             : 'متصل';
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
+    final sub = dark ? WW.darkSub : WW.sub;
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(border: Border(top: BorderSide(color: dark ? WW.darkLine : WW.line))),
       child: Row(children: [
-        Expanded(child: Text('$label · $live', style: TextStyle(fontSize: 12, color: online ? WW.greenText : WW.red))),
-        TextButton(onPressed: onRemove, child: const Text('إزالة', style: TextStyle(fontSize: 12, color: WW.sub))),
+        Icon(Icons.power_outlined, size: 14, color: online ? sub : (dark ? WW.redSoft : WW.red)),
+        const SizedBox(width: 6),
+        Expanded(child: Text('$label · $live', style: TextStyle(fontSize: 12.5, color: online ? sub : (dark ? WW.redSoft : WW.red)))),
+        TextButton(
+          onPressed: onRemove,
+          style: TextButton.styleFrom(minimumSize: const Size(0, 36), foregroundColor: dark ? WW.redSoft : WW.red),
+          child: const Text('إزالة', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        ),
       ]),
     );
   }

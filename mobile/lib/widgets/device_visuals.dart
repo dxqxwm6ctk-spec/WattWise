@@ -21,15 +21,11 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme.dart';
 
-/// Accent colour for each kind of device when it is on.
+/// Colour of a running device's icon and watts: lavender, or a calm grey for
+/// protected devices (they are always on).
 Color deviceAccent(String kind) => switch (kind) {
-      'fan' || 'ac' => const Color(0xFF7FD6FF),
-      'light' || 'emergency_light' => const Color(0xFFFFD45C),
-      'heater' => const Color(0xFFFF7A3D),
-      'tv' => const Color(0xFF9B8CFF),
-      'washer' => const Color(0xFF6FE3D0),
-      'fridge' || 'fire_alarm' || 'medical' => const Color(0xFFFF8A70),
-      _ => WW.lime,
+      'fridge' || 'fire_alarm' || 'medical' || 'emergency_light' => const Color(0xFFC9CDD3),
+      _ => WW.accentLight,
     };
 
 /// Short Arabic label that matches the animation (shown under the name).
@@ -133,21 +129,17 @@ class _DevicePainter extends CustomPainter {
     final s = size.width;
     final c = Offset(s / 2, s / 2);
     final accent = deviceAccent(kind);
-    final offFg = dark ? const Color(0xFF6E6C63) : const Color(0xFF9A988E);
-    final offBg = dark ? const Color(0xFF2A2C25) : const Color(0xFFEDEBE3);
-    final onBg = Color.lerp(const Color(0xFF23251F), accent, 0.16)!;
+    const offFg = Color(0xFF8A8A94);
+    final offBg = dark ? WW.dark2 : const Color(0xFFF1F1F5);
+    const onBg = WW.dark2;
     final fg = Color.lerp(offFg, accent, level)!;
 
-    // Glow behind the disc when on.
-    if (level > 0.01) {
-      final pulse = 0.85 + 0.15 * math.sin(t * 2.4);
-      canvas.drawCircle(c, s * 0.46,
-          Paint()..color = accent.withValues(alpha: 0.38 * level * pulse)..maskFilter = MaskFilter.blur(BlurStyle.normal, s * 0.22));
-    }
-    canvas.drawCircle(c, s / 2, Paint()..color = Color.lerp(offBg, onBg, level)!);
+    // Rounded square tile, as in the design.
+    final tile = RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(s * 0.31));
+    canvas.drawRRect(tile, Paint()..color = Color.lerp(offBg, onBg, level)!);
 
     canvas.save();
-    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: c, radius: s / 2)));
+    canvas.clipRRect(tile);
     switch (kind) {
       case 'fan':
         _fan(canvas, s, c, fg);
@@ -199,7 +191,7 @@ class _DevicePainter extends CustomPainter {
       canvas.restore();
     }
     canvas.restore();
-    canvas.drawCircle(c, s * 0.07, Paint()..color = dark || level > 0.5 ? const Color(0xFF1A1B16) : Colors.white);
+    canvas.drawCircle(c, s * 0.07, Paint()..color = dark || level > 0.5 ? WW.dark2 : const Color(0xFFF1F1F5));
     canvas.drawCircle(c, s * 0.07, _stroke(fg, s * 0.03));
   }
 
@@ -208,7 +200,7 @@ class _DevicePainter extends CustomPainter {
     final body = RRect.fromRectAndRadius(Rect.fromCenter(center: c.translate(0, -s * 0.12), width: s * 0.6, height: s * 0.22), Radius.circular(s * 0.06));
     canvas.drawRRect(body, _stroke(fg, s * 0.045));
     canvas.drawLine(c.translate(-s * 0.2, -s * 0.06), c.translate(s * 0.2, -s * 0.06), _stroke(fg, s * 0.03));
-    canvas.drawCircle(c.translate(s * 0.2, -s * 0.16), s * 0.018, Paint()..color = level > 0.5 ? WW.lime : fg);
+    canvas.drawCircle(c.translate(s * 0.2, -s * 0.16), s * 0.018, Paint()..color = level > 0.5 ? WW.accent : fg);
     if (level < 0.02) return;
     for (var i = 0; i < 3; i++) {
       final x = c.dx + (i - 1) * s * 0.16;
@@ -275,7 +267,7 @@ class _DevicePainter extends CustomPainter {
       final shader = LinearGradient(
         begin: Alignment(math.cos(t), math.sin(t)),
         end: Alignment(-math.cos(t), -math.sin(t)),
-        colors: [accent.withValues(alpha: level), WW.lime.withValues(alpha: 0.6 * level)],
+        colors: [accent.withValues(alpha: level), WW.accentDeep.withValues(alpha: 0.6 * level)],
       ).createShader(rect);
       canvas.drawRRect(rr, Paint()..shader = shader);
       if (kind == 'pc') {
@@ -283,7 +275,7 @@ class _DevicePainter extends CustomPainter {
         for (var i = 0; i < lines; i++) {
           final w = rect.width * (0.3 + 0.12 * ((i * 7) % 4));
           canvas.drawLine(Offset(rect.left + s * 0.06, rect.top + s * 0.07 + i * s * 0.065),
-              Offset(rect.left + s * 0.06 + w, rect.top + s * 0.07 + i * s * 0.065), _stroke(const Color(0xFF1A1B16).withValues(alpha: 0.7 * level), s * 0.03));
+              Offset(rect.left + s * 0.06 + w, rect.top + s * 0.07 + i * s * 0.065), _stroke(WW.ink.withValues(alpha: 0.7 * level), s * 0.03));
         }
       }
     }
@@ -383,7 +375,7 @@ class AnimatedWatts extends StatelessWidget {
 
 /// Small dot with a ring that keeps pulsing: "this is live".
 class LiveDot extends StatefulWidget {
-  const LiveDot({super.key, this.color = WW.lime, this.size = 8});
+  const LiveDot({super.key, this.color = WW.accent, this.size = 8});
   final Color color;
   final double size;
 
@@ -417,124 +409,6 @@ class _LiveDotState extends State<LiveDot> with SingleTickerProviderStateMixin {
           Container(width: s, height: s, decoration: BoxDecoration(shape: BoxShape.circle, color: widget.color)),
         ]),
       ),
-    );
-  }
-}
-
-/// Grows and fades in the first time it is built (a chip that just appeared).
-class PopIn extends StatelessWidget {
-  const PopIn({super.key, required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeOutBack,
-        builder: (context, v, child) => Opacity(opacity: v.clamp(0.0, 1.0), child: Transform.scale(scale: 0.6 + 0.4 * v, child: child)),
-        child: child,
-      );
-}
-
-/// Dark card: "running now" with the total watts and a strip of running devices.
-/// Used on the home tab and at the top of the devices tab.
-class RunningNowCard extends StatelessWidget {
-  const RunningNowCard({super.key, required this.devices, this.pendingDeviceId});
-  final List<dynamic> devices;
-  final String? pendingDeviceId;
-
-  @override
-  Widget build(BuildContext context) {
-    final running = devices.where((d) => d['is_on'] == true).toList();
-    // Biggest loads first: the ones that matter for the bill.
-    running.sort((a, b) => (b['est_w'] as num).compareTo(a['est_w'] as num));
-    final total = running.fold<num>(0, (sum, d) => sum + (d['est_w'] as num));
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [WW.darkCard1, WW.darkCard2]),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          const LiveDot(),
-          const SizedBox(width: 4),
-          const Text('يعمل الآن', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: WW.paper)),
-          const SizedBox(width: 8),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            transitionBuilder: (child, a) => ScaleTransition(scale: a, child: child),
-            child: Container(
-              key: ValueKey(running.length),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(color: const Color(0xFF33352D), borderRadius: BorderRadius.circular(10)),
-              child: Text('${running.length} من ${devices.length}', style: const TextStyle(fontSize: 11.5, color: Color(0xFFC9C7BC))),
-            ),
-          ),
-          const Spacer(),
-          AnimatedWatts(
-            watts: total,
-            style: WW.mono.copyWith(fontSize: 20, fontWeight: FontWeight.w600, color: WW.lime),
-            unitStyle: WW.mono.copyWith(fontSize: 11, color: const Color(0xFFA9A79D)),
-          ),
-        ]),
-        const SizedBox(height: 10),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOutCubic,
-          child: running.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: Text('كل الأجهزة مطفأة', style: TextStyle(fontSize: 13, color: Color(0xFFA9A79D))),
-                )
-              : SizedBox(
-                  height: 92,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: running.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, i) {
-                      final d = running[i];
-                      return PopIn(
-                        key: ValueKey(d['id']),
-                        child: _RunningChip(d: d, pending: d['id'] == pendingDeviceId),
-                      );
-                    },
-                  ),
-                ),
-        ),
-      ]),
-    );
-  }
-}
-
-class _RunningChip extends StatelessWidget {
-  const _RunningChip({required this.d, required this.pending});
-  final dynamic d;
-  final bool pending;
-
-  @override
-  Widget build(BuildContext context) {
-    final kind = '${d['kind']}';
-    return Container(
-      width: 84,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF23251F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: pending ? WW.amber : const Color(0xFF33352D), width: pending ? 1.5 : 1),
-      ),
-      child: Column(children: [
-        DeviceIcon(kind: kind, on: true, size: 38, locked: d['tier'] == 'T2', dark: true),
-        const SizedBox(height: 4),
-        Text('${d['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: WW.paper)),
-        AnimatedWatts(
-          watts: d['est_w'] as num,
-          style: WW.mono.copyWith(fontSize: 11, color: deviceAccent(kind)),
-          unitStyle: WW.mono.copyWith(fontSize: 9, color: const Color(0xFF8E8C82)),
-        ),
-      ]),
     );
   }
 }

@@ -12,7 +12,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../api.dart';
 import '../theme.dart';
-import 'assistant_widgets.dart';
 
 class BillPhotoCard extends StatefulWidget {
   const BillPhotoCard({super.key, required this.api});
@@ -82,10 +81,46 @@ class _BillPhotoCardState extends State<BillPhotoCard> {
     await send(() => widget.api.billManual(k, double.tryParse(days.text.trim()), double.tryParse(amount.text.trim())));
   }
 
-  Widget chip(String text) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: WW.paper, borderRadius: BorderRadius.circular(999)),
-        child: Text(text, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+  Widget tile(String label, IconData icon, VoidCallback? onTap, {bool dark = false}) => Expanded(
+        child: SizedBox(
+          height: 84,
+          child: Material(
+            color: dark ? WW.ink : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: dark ? BorderSide.none : const BorderSide(color: WW.field, width: 1.5)),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: Opacity(
+                opacity: onTap == null ? 0.5 : 1,
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(icon, size: 24, color: dark ? WW.accent : WW.ink),
+                  const SizedBox(height: 6),
+                  Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: dark ? Colors.white : WW.ink)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Widget field(String label, TextEditingController c, {bool ltrLabel = false}) => Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, textDirection: ltrLabel ? TextDirection.ltr : null, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: WW.sub)),
+          const SizedBox(height: 4),
+          TextField(
+            controller: c,
+            textDirection: TextDirection.ltr,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: wwField(''),
+          ),
+        ]),
+      );
+
+  Widget number(String v, String unit) => Expanded(
+        child: Column(children: [
+          Text(v, style: WW.mono.copyWith(fontSize: 18, fontWeight: FontWeight.w700)),
+          Text(unit, style: const TextStyle(fontSize: 11, color: WW.sub, fontWeight: FontWeight.w500)),
+        ]),
       );
 
   @override
@@ -93,66 +128,83 @@ class _BillPhotoCardState extends State<BillPhotoCard> {
     final r = res;
     final bill = r?['bill'] as Map<String, dynamic>?;
     final showForm = manual || !photoOk;
+    final canPhoto = !busy && photoOk;
     return WWBox(
-      radius: 22,
-      padding: 18,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('حلّل فاتورتك من صورة', style: TextStyle(fontSize: 13, color: WW.sub)),
-        const SizedBox(height: 10),
+        const Text('حلّل فاتورتك من صورة', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: lineButton(busy ? 'جارٍ القراءة…' : 'صوّر الفاتورة',
-              busy || !photoOk ? null : () => pick(ImageSource.camera), border: WW.ink)),
+          tile(busy ? 'جارٍ القراءة…' : 'صوّر الفاتورة', Icons.photo_camera_outlined, canPhoto ? () => pick(ImageSource.camera) : null, dark: true),
           const SizedBox(width: 8),
-          Expanded(child: lineButton('من المعرض', busy || !photoOk ? null : () => pick(ImageSource.gallery), border: WW.ink)),
+          tile('من المعرض', Icons.image_outlined, canPhoto ? () => pick(ImageSource.gallery) : null),
         ]),
         const SizedBox(height: 6),
         if (!photoOk)
-          Text('${status!['reason_ar']}', style: const TextStyle(fontSize: 12.5, height: 1.55, color: WW.pendingText))
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('${status!['reason_ar']}', style: const TextStyle(fontSize: 12.5, height: 1.55, color: WW.pendingFg)),
+          )
         else
-          TextButton(
-            onPressed: () => setState(() => manual = !manual),
-            child: const Text('أو أدخل الأرقام يدويًا', style: TextStyle(color: Color(0xFF5E5C55), decoration: TextDecoration.underline)),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              onPressed: () => setState(() => manual = !manual),
+              style: TextButton.styleFrom(foregroundColor: WW.ink, padding: const EdgeInsets.symmetric(horizontal: 2), minimumSize: const Size(0, 40)),
+              child: const Text('أو أدخل الأرقام يدويًا', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)),
+            ),
           ),
         if (msg.isNotEmpty) ...[
           const SizedBox(height: 6),
-          Text(msg, style: const TextStyle(fontSize: 12.5, height: 1.55, color: WW.pendingText)),
+          Text(msg, style: const TextStyle(fontSize: 12.5, height: 1.55, color: WW.pendingFg)),
         ],
         if (showForm) ...[
           const SizedBox(height: 8),
-          TextField(controller: kwh, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: wwField('الاستهلاك (ك.و.س)')),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: TextField(controller: days, keyboardType: TextInputType.number, decoration: wwField('عدد الأيام'))),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            field('kWh', kwh, ltrLabel: true),
             const SizedBox(width: 8),
-            Expanded(child: TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: wwField('المبلغ (دينار)'))),
+            field('أيام', days),
+            const SizedBox(width: 8),
+            field('المبلغ JD', amount),
           ]),
-          const SizedBox(height: 8),
-          darkButton(busy ? 'جارٍ التحليل…' : 'حلّل الأرقام', busy ? null : sendManual),
+          const SizedBox(height: 12),
+          WWButton(busy ? 'جارٍ التحليل…' : 'حلّل الأرقام', busy ? null : sendManual, kind: BtnKind.outline, height: 48, radius: 14),
         ],
         if (r != null && bill != null) ...[
-          const SizedBox(height: 10),
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            if (bill['kwh'] != null) chip('${(bill['kwh'] as num).round()} ك.و.س'),
-            if (bill['days'] != null) chip('${bill['days']} يوم'),
-            if (bill['amount_jod'] != null) chip('${(bill['amount_jod'] as num).toStringAsFixed(2)} دينار'),
-          ]),
-          for (final x in r['explanation'] as List) ...[
-            const SizedBox(height: 6),
-            Text('$x', style: const TextStyle(fontSize: 14, height: 1.65)),
-          ],
-          for (final x in r['checks'] as List) ...[
-            const SizedBox(height: 8),
-            greyBox([Text('$x', style: const TextStyle(fontSize: 12.5, height: 1.55, color: Color(0xFF5E5C55)))]),
-          ],
-          for (final x in r['ideas'] as List) ...[
-            const SizedBox(height: 6),
-            Text('• $x', style: const TextStyle(fontSize: 13.5, height: 1.6, color: WW.greenText)),
-          ],
-          const SizedBox(height: 6),
-          Text('${r['note']}', style: const TextStyle(fontSize: 11.5, color: WW.sub)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(color: WW.soft, borderRadius: BorderRadius.circular(16)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Row(children: [
+                  if (bill['kwh'] != null) number('${(bill['kwh'] as num).round()}', 'kWh'),
+                  if (bill['days'] != null) number('${bill['days']}', 'days'),
+                  if (bill['amount_jod'] != null) number((bill['amount_jod'] as num).toStringAsFixed(2), 'JD'),
+                ]),
+              ),
+              const SizedBox(height: 8),
+              for (final x in [...r['explanation'] as List, ...r['checks'] as List]) ...[
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('•  ', style: TextStyle(fontSize: 13.5, height: 1.7, color: WW.body)),
+                  Expanded(child: Text('$x', style: const TextStyle(fontSize: 13.5, height: 1.7, color: WW.body))),
+                ]),
+              ],
+              for (final x in r['ideas'] as List) ...[
+                const SizedBox(height: 6),
+                Text('• $x', style: const TextStyle(fontSize: 13.5, height: 1.6, color: WW.green)),
+              ],
+              const SizedBox(height: 6),
+              Text('${r['note']}', style: const TextStyle(fontSize: 11.5, color: WW.sub)),
+            ]),
+          ),
         ],
-        const SizedBox(height: 8),
-        const Text('تُقرأ الصورة مرة واحدة ولا تُحفظ، ونحتفظ بالأرقام فقط.', style: TextStyle(fontSize: 11, color: WW.sub)),
+        const SizedBox(height: 12),
+        const Row(children: [
+          Icon(Icons.lock_outline_rounded, size: 14, color: WW.sub),
+          SizedBox(width: 6),
+          Expanded(child: Text('تُقرأ الصورة مرة واحدة ولا تُحفظ أبدًا، ونحتفظ بالأرقام فقط.', style: TextStyle(fontSize: 12, color: WW.sub))),
+        ]),
       ]),
     );
   }

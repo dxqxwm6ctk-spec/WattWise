@@ -3,7 +3,7 @@
 Run from the mobile/ folder:  python tool/make_icons.py
 Needs: Pillow and CairoSVG (pip install pillow cairosvg).
 
-The design: a lime house outline with a lightning bolt inside, on the dark "ink" colour
+The design: a lavender house outline with a lightning bolt inside, on the dark "ink" colour
 used across the app. House = smart home, bolt = electricity.
 """
 import io
@@ -13,9 +13,9 @@ from pathlib import Path
 from PIL import Image
 import cairosvg
 
-INK = "#1A1B16"
-INK_LIGHT = "#2A2E22"
-LIME = "#B8F04A"
+INK = "#0B0B0F"
+INK_LIGHT = "#1B1B22"
+LIME = "#A9A4F7"
 ROOT = Path(__file__).resolve().parent.parent
 
 # The mark (house + bolt) drawn on a 1024 x 1024 canvas, centred on (512, 512).
