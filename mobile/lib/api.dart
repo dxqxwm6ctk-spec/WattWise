@@ -5,7 +5,12 @@
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:http/http.dart' as http;
+
+/// The latest state from the server (refreshed every second by the app shell).
+/// Full-screen pages such as the add-device wizards listen to it to stay live.
+final liveState = ValueNotifier<Map<String, dynamic>?>(null);
 
 class ApiException implements Exception {
   ApiException(this.message);

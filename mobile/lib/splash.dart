@@ -24,7 +24,7 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
   // Fades the name in once, right after the native splash.
   late final AnimationController intro = AnimationController(vsync: this, duration: const Duration(milliseconds: 650))..forward();
   // The bolt's glow, breathing slowly while we wait.
-  late final AnimationController glow = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
+  late final AnimationController glow = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
     ..repeat(reverse: true);
 
   @override
@@ -47,6 +47,28 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
             width: 288,
             height: 288,
             child: Stack(clipBehavior: Clip.none, children: [
+              // A rounded square ring that breathes out and fades, behind the mark.
+              Positioned(
+                left: 54,
+                top: 54,
+                width: 180,
+                height: 180,
+                child: AnimatedBuilder(
+                  animation: glow,
+                  builder: (_, _) {
+                    final v = Curves.easeInOut.transform(glow.value);
+                    return Transform.scale(
+                      scale: 1 + 0.18 * v,
+                      child: Opacity(
+                        opacity: 0.55 * (1 - v),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(54), border: Border.all(color: WW.accent, width: 2.5)),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
               Positioned.fill(
                 child: AnimatedBuilder(
                   animation: glow,
@@ -81,16 +103,16 @@ class _Wordmark extends StatelessWidget {
         textDirection: TextDirection.ltr,
         child: Text.rich(
           TextSpan(children: [
-            TextSpan(text: 'Watt', style: TextStyle(color: WW.paper)),
-            TextSpan(text: 'Wise', style: TextStyle(color: WW.lime)),
+            TextSpan(text: 'Watt', style: TextStyle(color: Colors.white)),
+            TextSpan(text: 'Wise', style: TextStyle(color: WW.accent)),
           ]),
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: 0.4, decoration: TextDecoration.none),
+          style: TextStyle(fontFamily: WW.font, fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: -0.4, decoration: TextDecoration.none),
         ),
       );
 }
 
-/// Draws the WattWise mark: a lime house outline with a lightning bolt inside.
+/// Draws the WattWise mark: a lavender house outline with a lightning bolt inside.
 ///
 /// Coordinates come from the 1024 x 1024 drawing in tool/make_icons.py (splash version:
 /// scaled 0.9 around the centre). [glow] from 0 to 1 sets how bright the bolt's halo is.
@@ -126,7 +148,7 @@ class WattWiseMarkPainter extends CustomPainter {
     canvas.translate(-512, -512 - 23);
 
     final stroke = Paint()
-      ..color = WW.lime
+      ..color = WW.accent
       ..style = PaintingStyle.stroke
       ..strokeJoin = StrokeJoin.round;
 
@@ -135,12 +157,12 @@ class WattWiseMarkPainter extends CustomPainter {
       canvas.drawPath(
         _bolt,
         Paint()
-          ..color = WW.lime.withValues(alpha: 0.15 + 0.45 * glow)
+          ..color = WW.accent.withValues(alpha: 0.15 + 0.45 * glow)
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, 18 + 22 * glow),
       );
     }
     canvas.drawPath(_house, stroke..strokeWidth = 52);
-    canvas.drawPath(_bolt, Paint()..color = WW.lime);
+    canvas.drawPath(_bolt, Paint()..color = WW.accent);
     canvas.drawPath(_bolt, stroke..strokeWidth = 18);
     canvas.restore();
   }
